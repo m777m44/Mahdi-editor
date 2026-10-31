@@ -60,6 +60,7 @@ import io.github.rosemoe.sora.event.InlayHintClickEvent
 import io.github.rosemoe.sora.event.KeyBindingEvent
 import io.github.rosemoe.sora.event.LayoutStateChangeEvent
 import io.github.rosemoe.sora.event.PublishDiagnosticsEvent
+import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.lang.format.FormatterProvider
 import io.github.rosemoe.sora.lang.styling.inlayHint.ColorInlayHint
 import io.github.rosemoe.sora.text.CharPosition
@@ -250,6 +251,11 @@ fun Editor.registerMahdiEvents(
             editorTab.editorState.updateUndoRedo()
             onTextChange.invoke()
         }
+    }
+
+    // «آخر ملف مفتوح»: أي تحريك للمؤشر يجدول حفظًا مؤجّلًا بعد 500ms (2.5.0)
+    subscribeAlways(SelectionChangeEvent::class.java) {
+        editorTab.scheduleDocumentStateSave()
     }
 
     subscribeAlways(LayoutStateChangeEvent::class.java) { event ->

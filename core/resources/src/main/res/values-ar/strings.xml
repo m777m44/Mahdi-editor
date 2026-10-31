@@ -1060,4 +1060,6 @@
     <string name="terminal_unavailable">الطرفية غير متوفرة في هذا الإصدار</string>
     <string name="terminal_service_error">خطأ: لا يوجد اتصال بخدمة الطرفية</string>
     <string name="languages_supported_stats">التلوين النحوي: %1$d لغة — التشغيل المباشر: %2$d لغة</string>
+    <string name="theme_suggestions">اقتراحات ثيمات</string>
+    <string name="run_direct">تشغيل مباشر</string>
 </resources>

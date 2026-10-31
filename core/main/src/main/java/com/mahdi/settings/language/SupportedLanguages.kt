@@ -44,12 +44,9 @@ fun SupportedLanguages(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
+        // 2.5.0: كل اللغات صارت قابلة للتشغيل المباشر — لا توجد مجموعة «تلوين فقط».
         PreferenceGroup(heading = stringResource(strings.language_runnable)) {
-            LanguageRegistry.runnable.forEach { lang -> LanguageRow(lang, runnable = true) }
-        }
-
-        PreferenceGroup(heading = stringResource(strings.language_highlight)) {
-            LanguageRegistry.all.filterNot { it.runnable }.forEach { lang -> LanguageRow(lang, runnable = false) }
+            LanguageRegistry.all.forEach { lang -> LanguageRow(lang, runnable = lang.runnable) }
         }
 
         Text(
@@ -68,15 +65,18 @@ private fun LanguageRow(lang: CodeLanguage, runnable: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(
+        // شارة «تشغيل مباشر» — تُظهر بوضوح أنّ اللغة قابلة للتنفيذ بلمسة واحدة
+        Row(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .background(
                         if (runnable) MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.surfaceContainerHigh
                     )
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 text = if (runnable) "▶" else "Aa",
@@ -85,6 +85,13 @@ private fun LanguageRow(lang: CodeLanguage, runnable: Boolean) {
                     if (runnable) MaterialTheme.colorScheme.onPrimaryContainer
                     else MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (runnable) {
+                Text(
+                    text = stringResource(strings.run_direct),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
         }
 
         val isArabic = LocalConfiguration.current.locales[0].language == "ar"

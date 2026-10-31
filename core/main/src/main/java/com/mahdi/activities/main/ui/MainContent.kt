@@ -229,6 +229,9 @@ fun MainContent(
         }
 
         TaskOutputView(modifier = Modifier.align(Alignment.BottomCenter))
+
+        // شريط «استئناف الملف الأخير» — يظهر مرّة واحدة عند الإقلاع (2.5.0)
+        ResumeBanner(mainViewModel = mainViewModel, modifier = Modifier.align(Alignment.TopCenter))
     }
 }
 

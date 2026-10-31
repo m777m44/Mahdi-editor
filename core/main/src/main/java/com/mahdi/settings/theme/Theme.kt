@@ -1,7 +1,6 @@
 package com.mahdi.settings.theme
 
 import android.content.Context
-import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
@@ -30,13 +29,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.mahdi.App.Companion.iconPackManager
 import com.mahdi.App.Companion.themeManager
 import com.mahdi.DefaultScope
 import com.mahdi.activities.settings.SettingsRoutes
-import com.mahdi.app.AppFlavour
 import com.mahdi.components.BottomSheetContent
 import com.mahdi.components.SettingsItem
 import com.mahdi.components.compose.preferences.base.PreferenceGroup
@@ -44,8 +41,6 @@ import com.mahdi.components.compose.preferences.base.PreferenceLayout
 import com.mahdi.components.compose.preferences.base.PreferenceTemplate
 import com.mahdi.events.AppEvent
 import com.mahdi.events.Events
-import com.mahdi.feature.FeatureRegistry
-import com.mahdi.icons.pack.currentIconPack
 import com.mahdi.resources.drawables
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
@@ -60,10 +55,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
     val showDayNightBottomSheet = remember { mutableStateOf(false) }
-    val monetState = remember { mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Settings.monet) }
     val amoledState = remember { mutableStateOf(Settings.amoled) }
     val loadedThemes = themeManager.loadedThemesState.value
-    val localIconPacks by iconPackManager.localIconPacks.collectAsStateWithLifecycle()
 
     PreferenceLayout(label = stringResource(strings.themes)) {
         PreferenceGroup(heading = stringResource(strings.theme_settings)) {
@@ -101,18 +94,6 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
                 },
             )
 
-            SettingsItem(
-                label = stringResource(id = strings.monet),
-                description = stringResource(id = strings.monet_desc),
-                default = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Settings.monet,
-                isEnabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
-                state = monetState,
-                sideEffect = {
-                    Settings.monet = it
-                    themeManager.ensureThemeMode()
-                    refreshEditors()
-                },
-            )
         }
 
         PreferenceGroup(heading = stringResource(strings.themes)) {
@@ -140,7 +121,7 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
                     }
 
                 SettingsItem(
-                    isEnabled = !Settings.monet,
+                    isEnabled = true,
                     label = theme.name,
                     description = themeStyleOf(theme.id)?.label,
                     showSwitch = false,
@@ -148,7 +129,7 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
                     startWidget = {
                         RadioButton(
                             modifier = Modifier.padding(start = 16.dp),
-                            enabled = !Settings.monet,
+                            enabled = true,
                             selected = themeManager.currentTheme.id == theme.id,
                             onClick = null,
                         )
@@ -164,89 +145,6 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
                 )
             }
 
-            // The store exists only when this build bundles extensions and the user has not disabled them.
-            if (AppFlavour.current.bundlesExtensions && FeatureRegistry.isEnabled("enable_extension")) {
-                SettingsItem(
-                    label = stringResource(strings.browse_themes),
-                    description = null,
-                    showSwitch = false,
-                    default = false,
-                    startWidget = {
-                        Icon(
-                            modifier = Modifier.padding(start = 16.dp),
-                            painter = painterResource(drawables.arrow_outward),
-                            contentDescription = null,
-                        )
-                    },
-                    sideEffect = { navController.navigate("${SettingsRoutes.Extensions.route}?category=themes") },
-                )
-            }
-        }
-
-        PreferenceGroup(heading = stringResource(strings.icon_packs)) {
-            SettingsItem(
-                label = "Simple Icons (${stringResource(strings.default_option)})",
-                description = null,
-                showSwitch = false,
-                default = false,
-                startWidget = {
-                    RadioButton(
-                        modifier = Modifier.padding(start = 16.dp),
-                        selected = currentIconPack.value == null,
-                        onClick = null,
-                    )
-                },
-                sideEffect = {
-                    val oldIconPack = currentIconPack.value
-                    currentIconPack.value = null
-                    Settings.icon_pack = ""
-
-                    DefaultScope.launch { Events.publish(AppEvent.IconPackChanged(null, oldIconPack)) }
-                },
-            )
-
-            localIconPacks.forEach { (id, iconPack) ->
-                val iconPackManifest = iconPack.manifest
-
-                SettingsItem(
-                    label = iconPackManifest.name,
-                    description = null,
-                    showSwitch = false,
-                    default = false,
-                    startWidget = {
-                        RadioButton(
-                            modifier = Modifier.padding(start = 16.dp),
-                            selected = currentIconPack.value?.manifest?.id == id,
-                            onClick = null,
-                        )
-                    },
-                    sideEffect = {
-                        val oldIconPack = currentIconPack.value
-                        currentIconPack.value = iconPack
-                        Settings.icon_pack = id
-
-                        DefaultScope.launch { Events.publish(AppEvent.IconPackChanged(iconPack, oldIconPack)) }
-                    },
-                )
-            }
-
-            // The store exists only when this build bundles extensions and the user has not disabled them.
-            if (AppFlavour.current.bundlesExtensions && FeatureRegistry.isEnabled("enable_extension")) {
-                SettingsItem(
-                    label = stringResource(strings.browse_icon_packs),
-                    description = null,
-                    showSwitch = false,
-                    default = false,
-                    startWidget = {
-                        Icon(
-                            modifier = Modifier.padding(start = 16.dp),
-                            painter = painterResource(drawables.arrow_outward),
-                            contentDescription = null,
-                        )
-                    },
-                    sideEffect = { navController.navigate("${SettingsRoutes.Extensions.route}?category=icon_packs") },
-                )
-            }
         }
 
         if (showDayNightBottomSheet.value) {
@@ -302,7 +200,6 @@ fun DayNightDialog(showBottomSheet: MutableState<Boolean>, context: Context) {
                     itemsIndexed(modes) { index, mode ->
                         val isEnabled =
                             when {
-                                Settings.monet && supportsDynamicTheming() -> true
                                 mode == AppCompatDelegate.MODE_NIGHT_NO -> isLightSupported
                                 mode == AppCompatDelegate.MODE_NIGHT_YES -> isDarkSupported
                                 else -> true

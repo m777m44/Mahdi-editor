@@ -28,6 +28,10 @@ data class DocumentState(
 interface DocumentStateDao {
     @Query("SELECT * FROM document_state WHERE path = :path") suspend fun getState(path: String): DocumentState?
 
+    /** أحدث الملفات المفتوحة — تُستخدم لميزة «آخر ملف مفتوح» في 2.5.0. */
+    @Query("SELECT * FROM document_state ORDER BY lastOpened DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int): List<DocumentState>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertState(state: DocumentState)
 
     @Query(

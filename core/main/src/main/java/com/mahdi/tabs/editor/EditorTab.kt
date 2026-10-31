@@ -53,9 +53,9 @@ import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.search.EditorSearchPanel
 import com.mahdi.search.FindingsDialog
+import com.mahdi.motivation.Motivation
 import com.mahdi.settings.Settings
 import com.mahdi.settings.editor.refreshEditorSettings
-import com.mahdi.settings.support.handleSupport
 import com.mahdi.tabs.base.Tab
 import com.mahdi.utils.errorDialog
 import com.mahdi.utils.hasBinaryChars
@@ -107,6 +107,9 @@ open class EditorTab(
         get() = file == null && !isReadOnly
 
     private var autoSaveJob: Job? = null
+
+    /** مهمّة حفظ موضع المؤشر/التمرير المؤجّل (2.5.0 — debounce 500ms). */
+    private var documentStateJob: Job? = null
     private var activeTasks = mutableStateSetOf<String>()
 
     private var charset = Charset.forName(Settings.encoding)
@@ -446,7 +449,8 @@ open class EditorTab(
         Events.publish(EditorTabEvent.Saved(this, file, false))
 
         Settings.saves += 1
-        MainActivity.instance?.handleSupport()
+        // تحفيز: سلسلة الأيام + الهدف اليومي + الإنجازات (2.5.0)
+        runCatching { Motivation.onSave(editorState.editor.get()?.text?.lineCount ?: 0) }
     }
 
     @MahdiExtensionPoint
@@ -607,6 +611,9 @@ open class EditorTab(
                             editorState.isDirty = true
                         }
 
+                        // «آخر ملف مفتوح»: تحديث مؤجّل بعد 500ms (2.5.0)
+                        scheduleDocumentStateSave()
+
                         if (file?.getName() == ".editorconfig" && Settings.enable_editorconfig) {
                             showNotice(EDITORCONFIG_NOTICE_KEY) { id -> EditorConfigNotice(id) }
                         }
@@ -693,30 +700,51 @@ open class EditorTab(
         }
     }
 
-    private fun saveDocumentState() {
-        val file = file ?: return
-        val editor = editorState.editor.get() ?: return
-        val path = file.getAbsolutePath()
+    /** يأخذ لقطة متزامنة من محرّر الملف الحالي (يجب أن يُنادى من خيط الواجهة). */
+    private fun snapshotDocumentState(): DocumentState? {
+        val file = file ?: return null
+        val editor = editorState.editor.get() ?: return null
         val cursor = editor.cursor
-        val scrollX = editor.scrollX
-        val scrollY = editor.scrollY
+        return DocumentState(
+            path = file.getAbsolutePath(),
+            cursorLineLeft = cursor.leftLine,
+            cursorColumnLeft = cursor.leftColumn,
+            cursorLineRight = cursor.rightLine,
+            cursorColumnRight = cursor.rightColumn,
+            scrollX = editor.scrollX,
+            scrollY = editor.scrollY,
+            lastOpened = System.currentTimeMillis(),
+        )
+    }
 
-        val state =
-            DocumentState(
-                path = path,
-                cursorLineLeft = cursor.leftLine,
-                cursorColumnLeft = cursor.leftColumn,
-                cursorLineRight = cursor.rightLine,
-                cursorColumnRight = cursor.rightColumn,
-                scrollX = scrollX,
-                scrollY = scrollY,
-                lastOpened = System.currentTimeMillis(),
-            )
-
-        GlobalScope.launch(Dispatchers.IO) {
-            val db = DocumentStateDatabase.getDatabase(MainActivity.instance!!)
-            db.documentStateDao().insertState(state)
+    private suspend fun persistDocumentState(state: DocumentState) {
+        val activity = MainActivity.instance ?: return
+        runCatching {
+            DocumentStateDatabase.getDatabase(activity).documentStateDao().insertState(state)
         }
+    }
+
+    /**
+     * «آخر ملف مفتوح» — يحفظ موضع المؤشر والتمرير بعد **500 مللي ثانية** من آخر تغيير
+     * (كتابة أو تحريك المؤشر)، فلا يُثقل قاعدة البيانات أثناء الكتابة السريعة.
+     */
+    fun scheduleDocumentStateSave() {
+        if (file == null) return
+        val snapshot = snapshotDocumentState() ?: return
+        documentStateJob?.cancel()
+        documentStateJob =
+            GlobalScope.launch(Dispatchers.IO) {
+                delay(500)
+                persistDocumentState(snapshot)
+            }
+    }
+
+    /** حفظ فوري (عند الإيقاف المؤقت أو إغلاق التبويب). */
+    private fun saveDocumentState() {
+        if (file == null) return
+        documentStateJob?.cancel()
+        val snapshot = snapshotDocumentState() ?: return
+        GlobalScope.launch(Dispatchers.IO) { persistDocumentState(snapshot) }
     }
 
     @Composable

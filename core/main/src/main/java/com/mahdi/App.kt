@@ -20,6 +20,7 @@ import com.mahdi.icons.pack.IconPackManager
 import com.mahdi.lsp.FileIconProvider
 import com.mahdi.lsp.LspPersistence
 import com.mahdi.lsp.MarkdownImageProvider
+import com.mahdi.motivation.Motivation
 import com.mahdi.resources.Res
 import com.mahdi.settings.Preference
 import com.mahdi.settings.Settings
@@ -99,9 +100,15 @@ open class App : Application() {
         // نصوص خارج Compose (النوافذ المنبثقة، الرسائل السريعة) تتبع اللغة المختارة أيضًا
         Res.updateLocale(currentLocale)
 
+        // تحفيز: قراءة سلسلة الأيام والهدف اليومي عند الإقلاع
+        runCatching { Motivation.refresh() }
+
         GlobalScope.launch(Dispatchers.IO) {
             launch(Dispatchers.IO) {
                 iconPackManager.indexLocalPacks()
+                // 2.5.0: أُزيلت «الألوان الديناميكية» (Monet) — نُبطلها دائمًا حتى تبقى الثيمات الأربعة فقط
+                if (Settings.monet) Settings.monet = false
+
                 iconPackManager.indexStoreIconPacks()
             }
             launch(Dispatchers.IO) {

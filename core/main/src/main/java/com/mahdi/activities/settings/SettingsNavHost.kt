@@ -10,7 +10,6 @@ import com.mahdi.animations.NavigationAnimationTransitions
 import com.mahdi.lsp.LspRegistry
 import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.SettingsScreen
-import com.mahdi.settings.about.AboutScreen
 import com.mahdi.settings.app.SettingsAppScreen
 import com.mahdi.settings.debugOptions.AppLogs
 import com.mahdi.settings.debugOptions.DeveloperOptions
@@ -30,7 +29,6 @@ import com.mahdi.settings.lsp.LspInitializationOptions
 import com.mahdi.settings.lsp.LspServerDetail
 import com.mahdi.settings.lsp.LspServerLogs
 import com.mahdi.settings.lsp.LspSettings
-import com.mahdi.settings.support.Support
 import com.mahdi.settings.theme.ThemeScreen
 import com.mahdi.theme.ThemeCustomizer
 
@@ -49,7 +47,6 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
         composable(SettingsRoutes.EditorSettings.route) { SettingsEditorScreen(navController) }
         composable(SettingsRoutes.Keybindings.route) { KeybindingsScreen() }
 
-        composable(SettingsRoutes.About.route) { AboutScreen() }
         composable(SettingsRoutes.EditorFontScreen.route) { EditorFontScreen() }
         composable(SettingsRoutes.AppFontScreen.route) { AppFontScreen() }
 
@@ -66,7 +63,6 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
         }
         composable(SettingsRoutes.DeveloperOptions.route) { DeveloperOptions(navController = navController) }
         composable(SettingsRoutes.AppLogs.route) { AppLogs() }
-        composable(SettingsRoutes.Support.route) { Support() }
         composable(SettingsRoutes.LanguageScreen.route) { LanguageScreen() }
         composable(SettingsRoutes.Formatters.route) { FormatterSettings(navController) }
         composable(SettingsRoutes.LspSettings.route) { LspSettings(navController) }

@@ -406,4 +406,160 @@ case "$file" in
     fi
     info "ملفات Visual Basic تحتاج مشروعًا كاملًا؛ استخدم مشروعًا بامتداد .vbproj"
     ;;
+
+  # ——— لغات وُسِّعت في Mahdi-Editor 2.5.0 (كل اللغات قابلة للتشغيل) ———
+
+  *.json)
+    # التحقق من صحّة JSON وطباعته مرتّبًا
+    python3 -c 'import json,sys; json.dump(json.load(open(sys.argv[1], encoding="utf-8")), sys.stdout, ensure_ascii=False, indent=2)' "$file" && echo
+    ;;
+
+  *.yaml|*.yml)
+    mahdi_auto_deps "$file"
+    python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1], encoding="utf-8")); print("✓ YAML صحيح")' "$file"
+    ;;
+
+  *.toml)
+    python3 -c 'import sys,tomllib; tomllib.load(open(sys.argv[1],"rb")); print("✓ TOML صحيح")' "$file"
+    ;;
+
+  *.ini|*.cfg|*.conf)
+    python3 -c 'import configparser,sys; c=configparser.ConfigParser(); c.read(sys.argv[1], encoding="utf-8"); print("✓ INI صحيح — أقسام:", ", ".join(c.sections()) or "—")' "$file"
+    ;;
+
+  *.xml|*.svg)
+    if ! command_exists xmllint; then
+      install_package "libxml2-utils"
+    fi
+    xmllint --noout "$file" && echo "✓ XML صحيح" || error "XML غير صالح"
+    ;;
+
+  *.md|*.markdown)
+    mahdi_auto_deps "$file"
+    if python3 -c "import markdown" 2>/dev/null; then
+      out="${file%.*}.html"
+      python3 -c 'import sys,markdown; open(sys.argv[2],"w",encoding="utf-8").write(markdown.markdown(open(sys.argv[1],encoding="utf-8").read(), extensions=["extra","toc"]))' "$file" "$out"
+      success "تم تحويل Markdown إلى HTML: $out"
+    else
+      info "معاينة Markdown:"; sed -n '1,200p' "$file"
+    fi
+    ;;
+
+  *.html|*.htm|*.xhtml)
+    info "ملف HTML جاهز للمعاينة — استخدم «معاينة HTML» من التطبيق."
+    python3 - "$file" <<'PYEOF'
+import sys, html
+src = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+print("الحجم: %d حرفًا | عدد الوسوم: %d" % (len(src), src.count("<")))
+PYEOF
+    ;;
+
+  *.css|*.scss|*.less)
+    python3 - "$file" <<'PYEOF'
+import sys, re
+src = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+rules = len(re.findall(r"\{", src))
+selectors = len(re.findall(r"[^{}]+\{", src))
+print("✓ تم تحليل الملف: %d قاعدة" % rules)
+if src.count("{") != src.count("}"):
+    print("⚠ الأقواس غير متوازنة: %d { و %d }" % (src.count("{"), src.count("}")))
+else:
+    print("✓ الأقواس متوازنة")
+PYEOF
+    ;;
+
+  *.diff|*.patch)
+    cat "$file"
+    ;;
+
+  *.tex)
+    if ! command_exists pdflatex; then
+      info "تثبيت LaTeX (قد يستغرق دقائق)…"
+      install_package "texlive-latex-base"
+    fi
+    pdflatex -interaction=nonstopmode -halt-on-error "$file" | tail -20
+    ;;
+
+  *.cmake)
+    if ! command_exists cmake; then
+      install_package "cmake make"
+    fi
+    mkdir -p /tmp/mahdi-cmake && cd /tmp/mahdi-cmake
+    cmake -DCMAKE_PROJECT_INCLUDE="$file" . 2>&1 | tail -20
+    cd - >/dev/null
+    ;;
+
+  *.nix)
+    if command_exists nix-instantiate; then
+      nix-instantiate --eval --strict "$file"
+    else
+      info "Nix غير متوفّر في هذه التوزيعة — الملف صالح للتحرير والتنسيق فقط."
+    fi
+    ;;
+
+  *.nim)
+    if ! command_exists nim; then
+      install_package "nim"
+    fi
+    nim c -r --hints:off "$file"
+    ;;
+
+  *.zig)
+    if ! command_exists zig; then
+      info "تنزيل Zig…"
+      mahdi_fetch_fast "https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz" /tmp/zig.tar.xz || true
+      if [ -s /tmp/zig.tar.xz ]; then
+        mkdir -p /opt/zig && tar -xf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 && ln -sf /opt/zig/zig /usr/local/bin/zig
+      fi
+    fi
+    if command_exists zig; then zig run "$file"; else error "تعذّر تجهيز Zig"; fi
+    ;;
+
+  *.dart)
+    if command_exists dart; then
+      dart run "$file"
+    else
+      warn "Dart يحتاج SDK كاملًا (لا يتوفّر كحزمة نظام). الملف يعمل على جهاز فيه Dart SDK."
+    fi
+    ;;
+
+  *.swift)
+    if command_exists swift; then
+      swift "$file"
+    else
+      warn "Swift يحتاج أداة swiftlang الرسمية. الملف صالح للتحرير الآن."
+    fi
+    ;;
+
+  *.ps1)
+    if command_exists pwsh; then
+      pwsh -NoProfile -File "$file"
+    else
+      install_package "wget" >/dev/null 2>&1 || true
+      warn "PowerShell يحتاج حزمة pwsh من مستودع مايكروسوفت. يمكن تثبيته يدويًا: apt install powershell"
+    fi
+    ;;
+
+  *.bat|*.cmd)
+    if command_exists wine; then
+      wine cmd /c "$file"
+    else
+      warn "ملفات .bat تعمل على ويندوز فقط؛ لا يوجد محاكي wine في هذه التوزيعة."
+    fi
+    ;;
+
+  *.asm|*.s)
+    if ! command_exists gcc; then
+      install_package "build-essential"
+    fi
+    gcc -x assembler "$file" -o temp.out && run_code ./temp.out
+    ;;
+
+  *.txt|*.log)
+    cat "$file"
+    ;;
+
+  *)
+    warn "لا يوجد مشغّل لهذا الامتداد بعد — جرّب «تشغيل» من قائمة المشغّلات."
+    ;;
 esac
