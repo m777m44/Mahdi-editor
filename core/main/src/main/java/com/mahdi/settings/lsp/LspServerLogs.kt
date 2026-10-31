@@ -60,7 +60,7 @@ fun LspServerLogs(server: LspServer, id: String) {
     val logText =
         instance?.let { buildLogs(server, it, messageType, messageSources) } ?: strings.instance_not_found.getString()
 
-    LogScreen(logText, "Language Server Error Report", "server_logs") {
+    LogScreen(logText, "server_logs") {
         var dropdownMenuExpanded by remember { mutableStateOf(false) }
 
         ExposedDropdownMenuBox(

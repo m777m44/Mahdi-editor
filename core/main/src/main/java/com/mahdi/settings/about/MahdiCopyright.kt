@@ -14,6 +14,5 @@ const val MAHDI_COPYRIGHT = "© 2026 Mahdi-Editor-Code — جميع الحقوق
 /** رخصة المشروع. */
 const val MAHDI_LICENSE = "MIT"
 
-/** روابط التواصل الرسمية. */
-const val MAHDI_TELEGRAM = "https://t.me/HEROES2002"
+/** هوية المستودع. */
 const val MAHDI_GITHUB = "https://github.com/m777m44/Mahdi-editor"

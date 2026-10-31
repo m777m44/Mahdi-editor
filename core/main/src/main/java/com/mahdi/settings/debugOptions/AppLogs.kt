@@ -47,7 +47,7 @@ fun AppLogs() {
             }
         }
 
-    LogScreen(logText, "App Logs Report", "app_logs", flow = logFlow) { LogLevelDropdown(logLevel, { logLevel = it }) }
+    LogScreen(logText, "app_logs", flow = logFlow) { LogLevelDropdown(logLevel, { logLevel = it }) }
 }
 
 private fun buildLogs(logLevel: LogLevel): String {

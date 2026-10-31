@@ -7,7 +7,6 @@
     <string name="open_directory">فتح مجلد</string>
     <string name="new_file">ملف جديد</string>
     <string name="wait">الرجاء الانتظار…</string>
-    <string name="report_issue">الإبلاغ عن مشكلة</string>
     <string name="copy">نسخ</string>
     <string name="save_all">حفظ الكل</string>
     <string name="undo">تراجع</string>
@@ -116,9 +115,6 @@
     <string name="version">الإصدار</string>
     <string name="version_code">رمز الإصدار</string>
     <string name="github" translatable="false">GitHub</string>
-    <string name="github_desc">ضع نجمة على المستودع في GitHub 🤩</string>
-    <string name="telegram">مجموعة Telegram</string>
-    <string name="telegram_desc">الإبلاغ عن المشاكل وطلب المزايا وغيرها</string>
     <string name="git_commit">بصمة التزام Git</string>
     <string name="check_for_updates">التحقق من التحديثات</string>
     <string name="check_for_updates_desc">التحقق الدوري من وجود تحديثات</string>
@@ -279,7 +275,6 @@
     <string name="format_on_save_desc">تنسيق الملف تلقائيًا عند حفظه</string>
     <string name="developer">المطور</string>
     <string name="build_info">معلومات البناء</string>
-    <string name="community">المجتمع</string>
     <string name="failsafe_mode">وضع الأمان</string>
     <string name="failsafe_mode_desc">بدء الطرفية في وضع الصيانة</string>
     <string name="render_whitespace">إظهار المسافات</string>
@@ -292,8 +287,6 @@
     <string name="cant_write">لا يمكن الكتابة إلى الملف (لا توجد أذونات كتابة)</string>
     <string name="info_lsp">خوادم اللغة هي عمليات منفصلة توفر مزايا ذكية مثل إكمال الشيفرة وإبراز الأخطاء والتوثيق المضمن.</string>
     <string name="storage">التخزين</string>
-    <string name="support">الدعم</string>
-    <string name="support_desc">دعم التطوير</string>
     <string name="translate">الترجمة</string>
     <string name="terminal_feature">الطرفية والمشغّلات</string>
     <string name="folder_name">اسم المجلد</string>
@@ -974,7 +967,6 @@
 
     <!-- Mahdi-Editor additions -->
     <string name="auto_time_mode">تلقائي حسب الوقت</string>
-    <string name="telegram_channel">قناة Telegram</string>
     <string name="license_label">الرخصة</string>
     <string name="package_name">اسم الحزمة</string>
     <string name="app_tagline">محرر أكواد احترافي لأندرويد — 30+ لغة، ثيمات متقدمة بدائرة ألوان، طرفية مدمجة، وبالعربية بالكامل</string>
