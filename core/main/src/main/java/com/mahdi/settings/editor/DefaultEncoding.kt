@@ -98,7 +98,8 @@ fun DefaultEncoding(modifier: Modifier = Modifier) {
         }
 
         // ————— بقية الترميزات —————
-        val recommendedNames = EncodingManager.supported.map { it.name.uppercase() }.toSet() + Charset.defaultCharset().name()
+        val recommendedNames =
+            EncodingManager.supported.map { it.name.uppercase() }.toSet() + Charset.defaultCharset().name().uppercase()
         PreferenceGroup(heading = stringResource(strings.encoding_all)) {
             EncodingManager.others(recommendedNames).forEach { charset ->
                 EncodingRow(

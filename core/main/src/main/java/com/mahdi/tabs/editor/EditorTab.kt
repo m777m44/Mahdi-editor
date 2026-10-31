@@ -117,7 +117,7 @@ open class EditorTab(
      * - إن كان «كشف الترميز تلقائيًا» مفعّلًا، يُخمَّن الترميز من بصمة الملف ثم يُعتمد للملف كله.
      * - وإلا يُستخدم الترميز الافتراضي من الإعدادات، ويظل `.editorconfig` قادرًا على تجاوزه.
      */
-    private fun readContent(file: FileObject): Content {
+    private suspend fun readContent(file: FileObject): Content {
         if (!Settings.encoding_auto_detect) {
             return file.getInputStream().use { ContentIO.createFrom(it, charset) }
         }

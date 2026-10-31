@@ -66,19 +66,32 @@ object EncodingManager {
     const val GROUP_EAST_ASIA = "شرق آسيوي"
 
     /** الترميزات المتاحة فعلًا على هذا الجهاز، بالترتيب المعروض. */
-    val supported: List<MahdiEncoding> =
-        catalog.mapNotNull { entry ->
-            val charset = entry.names.firstNotNullOfOrNull { n -> runCatching { Charset.forName(n) }.getOrNull() }
-            charset?.let { MahdiEncoding(it, entry.labelAr, entry.labelEn, entry.group) }
+    val supported: List<MahdiEncoding> = buildList {
+        for (entry in catalog) {
+            var charset: Charset? = null
+            for (candidate in entry.names) {
+                val c = runCatching { Charset.forName(candidate) }.getOrNull()
+                if (c != null) {
+                    charset = c
+                    break
+                }
+            }
+            val found = charset
+            if (found != null) {
+                add(MahdiEncoding(found, entry.labelAr, entry.labelEn, entry.group))
+            }
         }
+    }
 
     /** الترميزات الموصى بها (المجموعة العربية والعالمية أولًا). */
     val recommended: List<MahdiEncoding>
         get() = supported.filter { it.group != GROUP_EAST_ASIA }.ifEmpty { supported }
 
     /** كل ترميزات المنصّة عدا الموصى بها. */
-    fun others(recommendedNames: Set<String>): List<MahdiEncoding> =
-        Charset.availableCharsets().values.filterNot { it.name() in recommendedNames }.sortedBy { it.name() }
+    fun others(recommendedNames: Set<String>): List<Charset> =
+        Charset.availableCharsets().values
+            .filterNot { it.name().uppercase() in recommendedNames }
+            .sortedBy { it.name() }
 
     /** يعيد ترميزًا بالاسم، أو UTF-8 إن كان الاسم غير معروف. */
     fun byName(name: String?): Charset =
