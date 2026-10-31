@@ -13,6 +13,10 @@ on:
     paths-ignore:
       - "**/*.md"
       - "docs/**"
+  # طلبات الدمج تُبنى أيضًا، حتى يُتحقّق من نجاح التجميع قبل الدمج في main.
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       use_cache:
