@@ -242,7 +242,7 @@
     <string name="seccomp_no_seccomp">بدون seccomp</string>
     <string name="seccomp_seccomp">seccomp</string>
     <string name="non_native_filetype">تشغيل الشيفرة غير مدعوم في هذا الموقع. فكّر في نقل ملفك إلى المجلد الرئيسي للطرفية لتشغيله.</string>
-    <string name="sdcard_filetype">تشغيل الشيفرة غير مستحسن في هذا الموقع. فكّر في نقل ملفك إلى المجلد الرئيسي للطرفية.</string>
+    <string name="sdcard_filetype">ملفك على /sdcard حيث لا يمكن للتطبيقات الكتابة. سيُنسخ السكربت إلى مجلد الطرفية ~/mahdi-run ويُشغَّل من هناك (يمكن للمكتبات والمخرجات أن تُكتب بحرية).</string>
     <string name="rename_file">إعادة تسمية الملف</string>
     <string name="new_name">الاسم الجديد</string>
     <string name="wrapper_type">نوع الغلاف</string>

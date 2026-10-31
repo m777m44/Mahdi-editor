@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -82,8 +83,9 @@ private fun LanguageRow(lang: CodeLanguage, runnable: Boolean) {
             )
         }
 
+        val isArabic = LocalConfiguration.current.locales[0].language == "ar"
         Text(
-            text = lang.nameAr,
+            text = if (isArabic) "${lang.nameAr} (${lang.nameEn})" else lang.nameEn,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),

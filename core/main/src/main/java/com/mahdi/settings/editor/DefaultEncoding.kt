@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.mahdi.components.InfoBlock
@@ -81,10 +82,11 @@ fun DefaultEncoding(modifier: Modifier = Modifier) {
                 },
             )
 
+            val isArabic = LocalConfiguration.current.locales[0].language == "ar"
             EncodingManager.supported.forEach { encoding ->
                 if (!encoding.name.equals(Charset.defaultCharset().name(), ignoreCase = true)) {
                     EncodingRow(
-                        title = encoding.labelAr,
+                        title = if (isArabic) encoding.labelAr else encoding.labelEn,
                         subtitle = encoding.name,
                         selected = encoding.name == selectedEncoding,
                         modifier = modifier,

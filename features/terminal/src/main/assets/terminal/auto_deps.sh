@@ -62,14 +62,74 @@ mahdi_fetch_fast() {
   mahdi_fetch "$1" "$2"
 }
 
+# يكسر أقفال apt الميتة (عملية انتهت وبقي ملف القفل) حتى لا ينتظر التثبيت للأبد
+mahdi_break_stale_apt_locks() {
+  local holder_alive=0
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -x apt-get >/dev/null 2>&1 || pgrep -x apt >/dev/null 2>&1 || pgrep -x dpkg >/dev/null 2>&1 || pgrep -x apt-helper >/dev/null 2>&1
+    holder_alive=$?
+  else
+    ps -e 2>/dev/null | grep -Eq '([ /])(apt-get|apt|dpkg)( |$)' && holder_alive=0 || holder_alive=1
+  fi
+  [ "$holder_alive" -eq 0 ] && return 0
+  local lock
+  for lock in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock /var/lib/apt/lists/lock; do
+    [ -e "$lock" ] && rm -f "$lock" 2>/dev/null
+  done
+  return 0
+}
+
+# تثبيت حزم النظام: بلا انتظار لا نهائي على القفل، وبلا حزم اختيارية، وبمهلة قصيرة
 mahdi_apt_install() {
   export DEBIAN_FRONTEND=noninteractive
+  mahdi_break_stale_apt_locks
+  local lock_file="${TMPDIR:-/tmp}/mahdi-apt.lock"
+  if command -v flock >/dev/null 2>&1; then
+    (
+      # عملية واحدة فقط من التطبيق تستخدم apt في وقت واحد
+      flock -w 60 9 || { warn "apt مشغول بعملية أخرى — تجاوزناه"; exit 0; }
+      if [ ! -f /.cache/mahdi_apt_updated ]; then
+        apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 update -qq >/dev/null 2>&1 || true
+        mkdir -p /.cache 2>/dev/null || true
+        touch /.cache/mahdi_apt_updated 2>/dev/null || true
+      fi
+      apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 install -y \
+        --no-install-recommends "$@" </dev/null
+    ) 9>"$lock_file"
+    return $?
+  fi
   if [ ! -f /.cache/mahdi_apt_updated ]; then
-    apt-get update -qq -o Acquire::Retries=3 >/dev/null 2>&1 || true
+    apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 update -qq >/dev/null 2>&1 || true
     mkdir -p /.cache 2>/dev/null || true
     touch /.cache/mahdi_apt_updated 2>/dev/null || true
   fi
-  apt-get install -y --no-install-recommends -o Acquire::Retries=3 "$@"
+  apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 install -y --no-install-recommends "$@" </dev/null
+}
+
+# تثبيت pip في مجلد المستخدم بلا apt وبلا أقفال (الأسرع والأكثر أمانًا)
+mahdi_bootstrap_pip() {
+  python3 -m pip --version >/dev/null 2>&1 && return 0
+
+  python3 -m ensurepip --upgrade --user >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1 && return 0
+  python3 -m ensurepip --default-pip >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1 && return 0
+
+  info "تنزيل get-pip.py (بلا apt)…"
+  if mahdi_have curl || mahdi_have wget; then
+    if mahdi_have curl; then
+      curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 \
+        https://bootstrap.pypa.io/get-pip.py -o "${TMPDIR:-/tmp}/get-pip.py" || true
+    else
+      wget -q -T 120 -O "${TMPDIR:-/tmp}/get-pip.py" https://bootstrap.pypa.io/get-pip.py || true
+    fi
+    if [ -s "${TMPDIR:-/tmp}/get-pip.py" ]; then
+      python3 "${TMPDIR:-/tmp}/get-pip.py" --user --no-warn-script-location >/dev/null 2>&1 || true
+      python3 -m pip --version >/dev/null 2>&1 && return 0
+    fi
+  fi
+
+  # آخر خيار: apt بمهلة محدودة
+  mahdi_apt_install python3-pip >/dev/null 2>&1 || true
+  python3 -m pip --version >/dev/null 2>&1
 }
 
 mahdi_pip_env() {
@@ -94,9 +154,8 @@ mahdi_ensure_pip() {
   esac
 
   if ! python3 -m pip --version >/dev/null 2>&1; then
-    info "pip غير مثبّت — جاري تثبيته…"
-    mahdi_apt_install python3-pip python3-venv >/dev/null 2>&1 ||
-      python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
+    info "pip غير مثبّت — جاري تجهيزه بلا انتظار أقفال النظام…"
+    mahdi_bootstrap_pip || true
   fi
 
   # بعض السكربتات تستدعي «python» بدل «python3»، وبعضها «pip» بدل «pip3»

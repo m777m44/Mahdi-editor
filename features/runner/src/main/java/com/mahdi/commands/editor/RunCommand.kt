@@ -46,7 +46,8 @@ object RunCommand : Command() {
             forceSelection = forceSelection,
             beforeRun = {
                 if (currentTab != null) {
-                    CommandProvider.SaveCommand.execute(context)
+                    // الحفظ قد يفشل على التخزين الخارجي (Media is read-only) — لا يجب أن يمنع التشغيل
+                    runCatching { CommandProvider.SaveCommand.execute(context) }
                 }
             },
             onMultipleRunners = {
