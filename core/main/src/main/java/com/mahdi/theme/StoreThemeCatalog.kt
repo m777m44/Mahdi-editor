@@ -7,7 +7,7 @@ package com.mahdi.theme
  * كل ثيم يُبنى من نفس ألوان 11 خانة التي يبنيها محرّك ثيمات Mahdi-Editor، فيعمل في الواجهة
  * والمحرّر والطرفية على السواء، ويُحفظ في «المخزون» كأي ثيم مخصّص للمستخدم.
  */
-data class StoreTheme(
+data class FeaturedTheme(
     val slug: String,
     val nameAr: String,
     val nameEn: String,
@@ -31,8 +31,8 @@ private fun storeTheme(
     accent: Long,
     text: Long? = null,
     dark: Boolean = true,
-): StoreTheme =
-    StoreTheme(
+): FeaturedTheme =
+    FeaturedTheme(
         slug = slug,
         nameAr = nameAr,
         nameEn = nameEn,
@@ -55,7 +55,7 @@ private fun storeTheme(
 /** كتالوج الثيمات المميّزة (16 ثيمًا). */
 object StoreThemeCatalog {
 
-    val themes: List<StoreTheme> =
+    val themes: List<FeaturedTheme> =
         listOf(
             storeTheme(
                 "github-dark",
@@ -238,9 +238,9 @@ object StoreThemeCatalog {
             ),
         )
 
-    fun byId(id: String): StoreTheme? = themes.find { it.id == id }
+    fun byId(id: String): FeaturedTheme? = themes.find { it.id == id }
 
-    fun bySlug(slug: String): StoreTheme? = themes.find { it.slug == slug }
+    fun bySlug(slug: String): FeaturedTheme? = themes.find { it.slug == slug }
 
     /** هل هذا الثيم من الثيمات المميّزة؟ */
     fun isStoreTheme(id: String): Boolean = themes.any { it.id == id }

@@ -45,7 +45,7 @@ import com.mahdi.settings.Settings
 import com.mahdi.settings.editor.refreshEditors
 import com.mahdi.theme.SkyAccent
 import com.mahdi.theme.SkyBadge
-import com.mahdi.theme.StoreTheme
+import com.mahdi.theme.FeaturedTheme
 import com.mahdi.theme.StoreThemeCatalog
 import com.mahdi.theme.toThemeHolder
 import com.mahdi.utils.toast
@@ -79,7 +79,7 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
             }
         }
 
-    fun install(theme: StoreTheme) {
+    fun install(theme: FeaturedTheme) {
         runCatching {
                 CustomThemes.save(theme.spec)
                 themeManager.addCustomTheme(theme.spec.toThemeHolder())
@@ -88,7 +88,7 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
             .onFailure { toast(strings.unknown_err) }
     }
 
-    fun apply(theme: StoreTheme) {
+    fun apply(theme: FeaturedTheme) {
         runCatching {
                 if (theme.id !in installedIds) install(theme)
                 Settings.theme = theme.id
