@@ -106,6 +106,13 @@ apt_fast() {
   return $_rc
 }
 
+# مخزن دائم داخل التطبيق (يبقى بعد إغلاق التطبيق فلا يُعاد التنزيل)
+MAHDI_CACHE_DIR="${MAHDI_CACHE_DIR:-$HOME/.mahdi/cache}"
+mkdir -p "$MAHDI_CACHE_DIR/pip" "$MAHDI_CACHE_DIR/npm" "$MAHDI_CACHE_DIR/wheels" 2>/dev/null || true
+export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$MAHDI_CACHE_DIR/pip}"
+export PIP_ROOT_USER_ACTION=ignore
+export npm_config_cache="${npm_config_cache:-$MAHDI_CACHE_DIR/npm}"
+
 # npm سريع وهادئ
 npm_fast() {
   local _label _rc=0

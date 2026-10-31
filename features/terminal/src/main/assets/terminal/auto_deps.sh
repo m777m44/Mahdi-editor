@@ -14,6 +14,7 @@
 #   MAHDI_PIP_INDEX=…        مرآة PyPI (مثال: https://mirror.example/simple)
 #   MAHDI_NPM_REGISTRY=…     مرآة npm
 #   MAHDI_DEP_JOBS=4         عدد التثبيتات المتوازية
+#   MAHDI_CACHE_DIR=…        مجلد المخزن الدائم (افتراضيًا ~/.mahdi/cache)
 # ——————————————————————————————————————————————————————————————————————————————
 
 MAHDI_AUTO_DEPS="${MAHDI_AUTO_DEPS:-1}"
@@ -133,6 +134,12 @@ mahdi_bootstrap_pip() {
 }
 
 mahdi_pip_env() {
+  # مخزن دائم داخل التطبيق: الحزمة المنزَّلة تُحفظ فلا تُنزَّل مرة ثانية
+  MAHDI_CACHE_DIR="${MAHDI_CACHE_DIR:-$HOME/.mahdi/cache}"
+  mkdir -p "$MAHDI_CACHE_DIR/pip" "$MAHDI_CACHE_DIR/npm" "$MAHDI_CACHE_DIR/wheels" 2>/dev/null || true
+  export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$MAHDI_CACHE_DIR/pip}"
+  export npm_config_cache="${npm_config_cache:-$MAHDI_CACHE_DIR/npm}"
+  export PIP_ROOT_USER_ACTION=ignore
   export PIP_DISABLE_PIP_VERSION_CHECK=1
   export PIP_NO_INPUT=1
   export PIP_RETRIES=5
@@ -203,7 +210,7 @@ mahdi_pip_run() {
     mahdi_prog 40 "تثبيت المكتبة" "$name"
   fi
   python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-    --no-input --retries 5 --timeout 30 --progress-bar off "$@" || return 1
+    --root-user-action ignore --quiet --no-input --retries 5 --timeout 30 "$@" || return 1
   declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم التثبيت" "$name"
   return 0
 }
@@ -241,6 +248,7 @@ mahdi_py_plan_write() {
   cat > /tmp/mahdi_py_plan.py <<'PYEOF'
 """يستخرج حزم PyPI الناقصة من سكربت بايثون (impolve: imports + أوامر pip النصية)."""
 import ast
+import importlib.metadata
 import importlib.util
 import os
 import re
@@ -386,6 +394,29 @@ def is_installed(module):
         return False
 
 
+def canonical(name):
+    """اسم الحزمة بصيغة PEP 503 (حروف صغيرة، الشرطات)."""
+    return re.sub(r"[-_.]+", "-", name).strip().lower()
+
+
+def distribution_installed(spec):
+    """هل الحزمة مثبّتة فعلًا؟ (يتجاهل قيود الإصدار وأقواس الميزات)."""
+    name = spec.split("[")[0]
+    name = re.split(r"[<>=!~; ]", name, 1)[0]
+    if not name:
+        return False
+    try:
+        importlib.metadata.version(name)
+        return True
+    except Exception:
+        pass
+    try:
+        importlib.metadata.version(canonical(name))
+        return True
+    except Exception:
+        return False
+
+
 def is_local(module, directory):
     if not directory:
         return False
@@ -448,6 +479,11 @@ def main():
     for pkg in sorted(extra):
         if pkg in stdlib or pkg in IGNORED:
             continue
+        # الحزمة المثبّتة مسبقًا لا تُعاد: يبقى التثبيت للمكتبات الناقصة فقط
+        if distribution_installed(pkg):
+            continue
+        if is_installed(pkg.split("[")[0].split("=")[0].split(">")[0].split("<")[0].strip()):
+            continue
         if pkg not in needed:
             needed.append(pkg)
 
@@ -475,7 +511,7 @@ mahdi_py_deps() {
   dir=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || dir="$(dirname "$file")"
 
   if [ -f "$dir/requirements.txt" ]; then
-    info "تثبيت متطلبات requirements.txt…"
+    info "متطلبات requirements.txt…"
     mahdi_pip_run "requirements.txt" -r "$dir/requirements.txt" ||
       warn "بعض متطلبات requirements.txt لم تُثبَّت"
   fi
@@ -487,11 +523,11 @@ mahdi_py_deps() {
   done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
 
   if [ ${#missing[@]} -eq 0 ]; then
-    info "كل مكتبات السكربت موجودة — لا حاجة لتثبيت شيء"
+    info "كل المكتبات موجودة مسبقًا — لا تثبيت"
     return 0
   fi
 
-  info "مكتبات ناقصة سيتم تثبيت آخر إصدار منها: ${missing[*]}"
+  info "سيُثبَّت: ${missing[*]}"
   mahdi_pip_install_many "${missing[@]}"
 
   local -a still=()
@@ -500,7 +536,7 @@ mahdi_py_deps() {
   done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
 
   if [ ${#still[@]} -gt 0 ]; then
-    info "إعادة المحاولة بعد تثبيت أدوات البناء: ${still[*]}"
+    info "إعادة المحاولة: ${still[*]}"
     mahdi_apt_install build-essential python3-dev >/dev/null 2>&1 || true
     mahdi_pip_install_many "${still[@]}"
   fi
@@ -511,11 +547,11 @@ mahdi_py_deps() {
   done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
 
   if [ ${#final[@]} -gt 0 ]; then
-    warn "لم تُثبَّت: ${final[*]} — سيُشغَّل السكربت، وقد تحتاج تثبيتًا يدويًا لهذه الحزم"
+    warn "لم تُثبَّت: ${final[*]}"
   elif declare -f success >/dev/null 2>&1; then
-    success "المكتبات جاهزة — بدء تشغيل السكربت"
+    success "المكتبات جاهزة — بدء التشغيل"
   else
-    info "المكتبات جاهزة — بدء تشغيل السكربت"
+    info "المكتبات جاهزة — بدء التشغيل"
   fi
   return 0
 }
@@ -581,11 +617,11 @@ mahdi_node_deps() {
   done < <(node /tmp/mahdi_node_scan.js "$file" 2>/dev/null)
 
   if [ ${#missing[@]} -eq 0 ]; then
-    info "كل مكتبات Node موجودة — لا حاجة لتثبيت شيء"
+    info "كل مكتبات Node موجودة مسبقًا"
     return 0
   fi
 
-  info "مكتبات Node ناقصة سيتم تثبيتها: ${missing[*]}"
+  info "سيُثبَّت (Node): ${missing[*]}"
   local registry_args=()
   [ -n "$MAHDI_NPM_REGISTRY" ] && registry_args=(--registry "$MAHDI_NPM_REGISTRY")
 
@@ -607,7 +643,7 @@ mahdi_node_deps() {
     mahdi_node_installed "$name" "$dir" || left+=("$name")
   done
   if [ ${#left[@]} -gt 0 ]; then
-    warn "لم تُثبَّت: ${left[*]} — سيُشغَّل السكربت كما هو"
+    warn "لم تُثبَّت: ${left[*]}"
   elif declare -f success >/dev/null 2>&1; then
     success "مكتبات Node جاهزة — بدء التشغيل"
   fi

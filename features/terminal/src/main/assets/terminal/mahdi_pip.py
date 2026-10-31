@@ -31,10 +31,17 @@ os.environ.setdefault("PIP_BREAK_SYSTEM_PACKAGES", "1")
 os.environ.setdefault("PIP_DISABLE_PIP_VERSION_CHECK", "1")
 os.environ.setdefault("PIP_NO_INPUT", "1")
 os.environ.setdefault("PYTHONUNBUFFERED", "1")
+# إخفاء تحذير «Running pip as the 'root' user» الذي يزحم الطرفية بلا فائدة
+os.environ.setdefault("PIP_ROOT_USER_ACTION", "ignore")
 
 HOME = os.path.expanduser("~")
 PROG_DIR = os.path.join(HOME, ".mahdi")
 PROG_FILE = os.path.join(PROG_DIR, "progress.json")
+
+# مخزن دائم داخل التطبيق: الحزم المنزَّلة تبقى هنا ولا تُنزَّل مرة ثانية
+CACHE_DIR = os.path.join(HOME, ".mahdi", "cache", "wheels")
+MANIFEST = os.path.join(HOME, ".mahdi", "cache", "installed.json")
+os.environ.setdefault("PIP_CACHE_DIR", os.path.join(HOME, ".mahdi", "cache", "pip"))
 
 SESSION_ID = "%d-%d" % (int(time.time()), os.getpid())
 NAME = ""
@@ -62,6 +69,8 @@ STAGE_EN = {
     "إعادة المحاولة بمصدر بديل": "Retrying with a mirror",
     "%d ملف": "files",
     "تثبيت مباشر": "Direct install",
+    "التحقق من المخزن": "Checking local cache",
+    "مثبّتة مسبقًا — من المخزن": "Already installed — from cache",
 }
 
 
@@ -160,6 +169,40 @@ def _download_one(url, dest_dir):
         return None
 
 
+def file_name(url):
+    """اسم ملف الحزمة من رابط التنزيل (يُستخدم مفتاحًا في المخزن)."""
+    return os.path.basename(url.split("?")[0]) or "package"
+
+
+def cached_path(url):
+    candidate = os.path.join(CACHE_DIR, file_name(url))
+    return candidate if os.path.exists(candidate) else None
+
+
+def cached_versions():
+    try:
+        with open(MANIFEST, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def remember_installed(items):
+    """يحفظ سجلًّا بما ثُبِّت ليُعرف في المرات القادمة بلا شبكة."""
+    try:
+        os.makedirs(os.path.dirname(MANIFEST), exist_ok=True)
+        data = cached_versions()
+        now = int(time.time())
+        for name, version, _ in items:
+            data[name.lower()] = {"version": version, "ts": now}
+        tmp = MANIFEST + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=0)
+        os.replace(tmp, MANIFEST)
+    except Exception:
+        pass
+
+
 def pip_cmd(*args):
     return [sys.executable, "-m", "pip", "--disable-pip-version-check", "--no-input"] + list(args)
 
@@ -197,7 +240,8 @@ def install_from_dir(directory, items):
     specs = ["%s==%s" % (n, v) if v else n for n, v, _ in items]
     cmd = pip_cmd(
         "install", "--upgrade", "--no-deps", "--find-links", directory,
-        "--prefer-binary", "--retries", "3", "--timeout", "30", *specs,
+        "--prefer-binary", "--retries", "3", "--timeout", "30",
+        "--root-user-action", "ignore", "--quiet", *specs,
     )
     try:
         proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -226,6 +270,23 @@ def plain_install(targets):
         return False
 
 
+def try_offline(targets, label):
+    """تثبيت من المخزن الداخلي فقط: بلا شبكة، وبلا تنزيل، وسريع جدًا."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    if not os.listdir(CACHE_DIR):
+        return False
+    cmd = pip_cmd(
+        "install", "--upgrade", "--no-index", "--find-links", CACHE_DIR,
+        "--disable-pip-version-check", "--root-user-action", "ignore",
+        "--retries", "1", "--timeout", "10", "--quiet", *targets,
+    )
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+    except Exception:
+        return False
+    return proc.returncode == 0
+
+
 def main(argv):
     global NAME
     if not argv:
@@ -243,35 +304,53 @@ def main(argv):
     if not NAME:
         NAME = targets[0].replace("-r", "").strip() or "Python"
 
-    emit(2, "التحقق من الإصدارات", NAME)
+    # ٠) المخزن الداخلي أولًا: المكتبة المثبّتة سابقًا لا تُنزَّل مرة أخرى
+    emit(2, "التحقق من المخزن", NAME)
+    if try_offline(targets, NAME):
+        emit(100, "مثبّتة مسبقًا — من المخزن", NAME, done=True)
+        return 0
+
+    emit(4, "التحقق من الإصدارات", NAME)
     items = resolve(targets)
 
     if items:
-        work = tempfile.mkdtemp(prefix="mahdi-wheels-")
         try:
-            with _lock:
-                _state.update(
-                    {"total": 0, "downloaded": 0, "files": len(items), "files_done": 0, "sized": False}
-                )
-            emit(5, "تنزيل الحزم", "%d ملف" % len(items))
+            os.makedirs(CACHE_DIR, exist_ok=True)
+        except Exception:
+            pass
 
-            # أحجام الملفات أولًا (طلب HEAD سريع ومتوازٍ) حتى تكون النسبة دقيقة من البداية
+        with _lock:
+            _state.update(
+                {"total": 0, "downloaded": 0, "files": len(items), "files_done": 0, "sized": False}
+            )
+
+        pending = [item for item in items if not cached_path(item[2])]
+        cached_count = len(items) - len(pending)
+        emit(
+            5,
+            "تنزيل الحزم",
+            "%d ملف · %d من المخزن" % (len(items), cached_count) if cached_count else "%d ملف" % len(items),
+        )
+
+        if pending:
             with ThreadPoolExecutor(max_workers=8) as pool:
-                sizes = list(pool.map(lambda item: _content_length(item[2]), items))
+                sizes = list(pool.map(lambda item: _content_length(item[2]), pending))
             with _lock:
                 _state["total"] = sum(sizes)
                 _state["sized"] = True
 
             with ThreadPoolExecutor(max_workers=6) as pool:
-                results = list(pool.map(lambda item: _download_one(item[2], work), items))
+                results = list(pool.map(lambda item: _download_one(item[2], CACHE_DIR), pending))
+            downloaded_ok = all(results)
+        else:
+            downloaded_ok = True
 
-            if all(results):
-                emit(97, "تثبيت المكتبة", NAME)
-                if install_from_dir(work, items):
-                    emit(100, "تم التثبيت بنجاح", NAME, done=True)
-                    return 0
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
+        if downloaded_ok:
+            emit(97, "تثبيت المكتبة", NAME)
+            if install_from_dir(CACHE_DIR, items):
+                remember_installed(items)
+                emit(100, "تم التثبيت بنجاح", NAME, done=True)
+                return 0
 
     if plain_install(targets):
         emit(100, "تم التثبيت بنجاح", NAME, done=True)

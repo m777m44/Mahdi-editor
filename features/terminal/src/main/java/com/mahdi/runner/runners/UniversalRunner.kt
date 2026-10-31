@@ -17,6 +17,7 @@ import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.runner.FileRunner
 import com.mahdi.terminal.setupAssetFile
+import com.mahdi.terminal.setupPythonFile
 import com.mahdi.utils.dialogRes
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,8 @@ object UniversalRunner : FileRunner() {
         setupAssetFile("universal_runner")
         // محرّك التثبيت التلقائي للمكتبات (يفشل بصمت إن لم يوجد)
         setupAssetFile("auto_deps")
+        // مثبّت بايثون الذكي + المخزن الدائم (يعمل حتى قبل إنشاء جلسة طرفية جديدة)
+        setupPythonFile("mahdi_pip")
 
         if (fileObject !is FileWrapper) {
             dialogRes(title = strings.attention.getString(), msg = strings.non_native_filetype.getString(), onOk = {})

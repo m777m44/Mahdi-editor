@@ -94,6 +94,13 @@ public final class TerminalRenderer {
             final char[] line = lineObject.mText;
             final int charsUsedInLine = lineObject.getSpaceUsed();
 
+            // سطر يحتوي عربيًا/عبريًا: نرسمه بمقاطع ثنائية الاتجاه حتى تظهر الكلمات متّصلة ومرتّبة
+            if (charsUsedInLine > 0 && BidiText.hasRtl(line, 0, charsUsedInLine)) {
+                drawBidiRow(canvas, lineObject, line, charsUsedInLine, palette, columns, heightOffset,
+                        selx1, selx2, cursorX, cursorShape, reverseVideo);
+                continue;
+            }
+
             long lastRunStyle = 0;
             boolean lastRunInsideCursor = false;
             boolean lastRunInsideSelection = false;
@@ -158,6 +165,144 @@ public final class TerminalRenderer {
             drawTextRun(canvas, line, palette, heightOffset, lastRunStartColumn, columnWidthSinceLastRun, lastRunStartIndex, charsSinceLastRun,
                     measuredWidthForRun, cursorColor, cursorShape, lastRunStyle, reverseVideo || invertCursorTextColor || lastRunInsideSelection);
         }
+    }
+
+    /** لونان محسوبان لمقطع نصّي (يُعاد استخدامهما لتفادي تخصيص كائنات في كل إطار). */
+    private final int[] mScratchColors = new int[2];
+
+    /**
+     * يرسم سطرًا يحتوي نصًا عربيًا/عبريًا.
+     *
+     * الطرفية شبكة خانات ثابتة العرض، فتقطيع السطر إلى «مقاطع» ثم رسم كل مقطع باتجاهه
+     * هو ما يجعل الكلمات متّصلة (تثبيت) بدل منفصلة (ت ي ب ث ت) أو معكوسة (ةيبرعلا).
+     */
+    private void drawBidiRow(Canvas canvas, TerminalRow lineObject, char[] line, int charsUsedInLine,
+                             int[] palette, int columns, float y, int selx1, int selx2,
+                             int cursorX, int cursorShape, boolean reverseVideo) {
+        final int end = BidiText.trimmedEnd(line, 0, Math.min(charsUsedInLine, line.length));
+        if (end <= 0) return;
+
+        // خريطة: فهرس الحرف → الخانة + نمط الخانة (لألوان كل مقطع)
+        final long[] charStyle = new long[end];
+        final int[] charColumn = new int[end];
+        int ci = 0;
+        int column = 0;
+        long lastStyle = 0;
+        while (ci < end && column < columns) {
+            lastStyle = lineObject.getStyle(column);
+            final char c = line[ci];
+            final boolean surrogate = Character.isHighSurrogate(c) && ci + 1 < end;
+            final int chars = surrogate ? 2 : 1;
+            final int codePoint = surrogate ? Character.toCodePoint(c, line[ci + 1]) : c;
+            int width = WcWidth.width(codePoint);
+            if (width <= 0) width = 1;
+            for (int k = 0; k < chars && ci + k < end; k++) {
+                charStyle[ci + k] = lastStyle;
+                charColumn[ci + k] = column;
+            }
+            ci += chars;
+            column += width;
+        }
+        for (int k = ci; k < end; k++) {
+            charStyle[k] = lastStyle;
+            charColumn[k] = column;
+        }
+
+        final BidiText.Segment[] segments = BidiText.segments(line, 0, end);
+        if (segments.length == 0) return;
+
+        final float[] segWidth = new float[segments.length];
+        float total = 0f;
+        for (int i = 0; i < segments.length; i++) {
+            segWidth[i] = Math.max(0f, mTextPaint.measureText(line, segments[i].start, segments[i].length));
+            total += segWidth[i];
+        }
+        if (total <= 0f) return;
+
+        // إن تجاوز النص عرض الشاشة نضغطه أفقيًا بدل أن يُقتطع
+        final float available = columns * mFontWidth;
+        final float scale = (available > 0f && total > available) ? available / total : 1f;
+
+        final boolean rtlBase = BidiText.isRtlBase(line, 0, end);
+        final float textY = y - mFontLineSpacingAndAscent;
+        final float rectTop = y - mFontLineSpacingAndAscent + mFontAscent;
+        final float rectBottom = y;
+
+        boolean savedMatrix = false;
+        if (Math.abs(scale - 1f) > 0.01f) {
+            canvas.save();
+            canvas.scale(scale, 1f);
+            savedMatrix = true;
+        }
+
+        // السطر العربي يُحاذى إلى اليمين (كتابة عربية طبيعية)، واللاتيني يبقى يسارًا
+        float x = rtlBase ? Math.max(0f, available / (scale <= 0f ? 1f : scale) - total) : 0f;
+        for (int k = 0; k < segments.length; k++) {
+            final int index = rtlBase ? (segments.length - 1 - k) : k;
+            final BidiText.Segment segment = segments[index];
+            final float width = segWidth[index];
+            final long style = charStyle[Math.min(segment.start, end - 1)];
+            final int effect = TextStyle.decodeEffect(style);
+            final boolean insideSelection = selx1 >= 0
+                    && charColumn[Math.min(segment.start, end - 1)] >= selx1
+                    && charColumn[Math.min(segment.start, end - 1)] <= selx2;
+            final boolean invert = reverseVideo
+                    ^ ((effect & TextStyle.CHARACTER_ATTRIBUTE_INVERSE) != 0)
+                    ^ insideSelection;
+            resolveColors(style, palette, invert);
+
+            if (mScratchColors[1] != palette[TextStyle.COLOR_INDEX_BACKGROUND]) {
+                mTextPaint.setColor(mScratchColors[1]);
+                canvas.drawRect(x, rectTop, x + width, rectBottom, mTextPaint);
+            }
+
+            if ((effect & TextStyle.CHARACTER_ATTRIBUTE_INVISIBLE) == 0) {
+                mTextPaint.setFakeBoldText((effect & (TextStyle.CHARACTER_ATTRIBUTE_BOLD | TextStyle.CHARACTER_ATTRIBUTE_BLINK)) != 0);
+                mTextPaint.setUnderlineText((effect & TextStyle.CHARACTER_ATTRIBUTE_UNDERLINE) != 0);
+                mTextPaint.setTextSkewX((effect & TextStyle.CHARACTER_ATTRIBUTE_ITALIC) != 0 ? -0.35f : 0f);
+                mTextPaint.setStrikeThruText((effect & TextStyle.CHARACTER_ATTRIBUTE_STRIKETHROUGH) != 0);
+                mTextPaint.setColor(mScratchColors[0]);
+                canvas.drawTextRun(line, segment.start, segment.length, segment.start, segment.length,
+                        x, textY, segment.rtl, mTextPaint);
+            }
+
+            x += width;
+        }
+
+        // مؤشّر الكتابة: شريط رفيع عند خانة المؤشّر (لا يغطّي النص العربي)
+        if (cursorX >= 0 && cursorX <= columns) {
+            mTextPaint.setColor(palette[TextStyle.COLOR_INDEX_CURSOR]);
+            final float cursorLeft = cursorX * mFontWidth;
+            final float cursorWidth = Math.max(2f, mFontWidth / 5f);
+            if (cursorShape == TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE) {
+                canvas.drawRect(cursorLeft, rectBottom - Math.max(2f, (rectBottom - rectTop) / 8f),
+                        cursorLeft + mFontWidth, rectBottom, mTextPaint);
+            } else {
+                canvas.drawRect(cursorLeft, rectTop, cursorLeft + cursorWidth, rectBottom, mTextPaint);
+            }
+        }
+
+        if (savedMatrix) canvas.restore();
+    }
+
+    /** يحسب لون النص والخلفية لنمط خانة، مع عكس الألوان عند التحديد. */
+    private void resolveColors(long textStyle, int[] palette, boolean reverse) {
+        int foreColor = TextStyle.decodeForeColor(textStyle);
+        final int effect = TextStyle.decodeEffect(textStyle);
+        int backColor = TextStyle.decodeBackColor(textStyle);
+        final boolean bold = (effect & (TextStyle.CHARACTER_ATTRIBUTE_BOLD | TextStyle.CHARACTER_ATTRIBUTE_BLINK)) != 0;
+        if ((foreColor & 0xff000000) != 0xff000000) {
+            if (bold && foreColor >= 0 && foreColor < 8) foreColor += 8;
+            foreColor = palette[foreColor];
+        }
+        if ((backColor & 0xff000000) != 0xff000000) backColor = palette[backColor];
+        if (reverse) {
+            int tmp = foreColor;
+            foreColor = backColor;
+            backColor = tmp;
+        }
+        mScratchColors[0] = foreColor;
+        mScratchColors[1] = backColor;
     }
 
     private void drawTextRun(Canvas canvas, char[] text, int[] palette, float y, int startColumn, int runWidthColumns,
@@ -238,13 +383,7 @@ public final class TerminalRenderer {
             mTextPaint.setColor(foreColor);
 
             // The text alignment is the default Paint.Align.LEFT.
-            if (runWidthChars > 0 && BidiText.hasRtl(text, startCharIndex, runWidthChars)) {
-                // نص عربي/عبري: ترتيب بصري صحيح وتشكيل حروف متّصلة بدل الحروف المنفصلة المعكوسة
-                BidiText.draw(canvas, mTextPaint, text, startCharIndex, runWidthChars,
-                        left, y - mFontLineSpacingAndAscent);
-            } else {
-                canvas.drawTextRun(text, startCharIndex, runWidthChars, startCharIndex, runWidthChars, left, y - mFontLineSpacingAndAscent, false, mTextPaint);
-            }
+            canvas.drawTextRun(text, startCharIndex, runWidthChars, startCharIndex, runWidthChars, left, y - mFontLineSpacingAndAscent, false, mTextPaint);
         }
 
         if (savedMatrix) canvas.restore();
