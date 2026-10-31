@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -195,6 +196,8 @@ fun ColorWheel(
     val current = hslToColor(hue, saturation, lightness)
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    // تُقرأ داخل Canvas (lambda غير composable) — لذا نأخذها هنا
+    val outlineColor = MaterialTheme.colorScheme.outline
 
     // نُبلّغ الأب عند كل تغيير فعلي فقط
     LaunchedEffect(hue, saturation, lightness) { onColorChange(current) }
@@ -306,7 +309,7 @@ fun ColorWheel(
 
             // حدود رقيقة تفصل القرص عن الحلقة
             drawCircle(
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                color = outlineColor.copy(alpha = 0.35f),
                 radius = discRadius,
                 center = center,
                 style = Stroke(width = 1.5f),
