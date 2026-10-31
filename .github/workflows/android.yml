@@ -144,6 +144,9 @@ jobs:
 
             - المتطلبات: أندرويد 8.0 (API 26) أو أحدث.
             - الرخصة: GPLv3 — راجع ملف `NOTICE` في المستودع.
+
+            **Mahdi-Editor-Code © 2026 — جميع الحقوق محفوظة**
+            GitHub: https://github.com/m777m44/Mahdi-editor · Telegram: https://t.me/HEROES2002
           files: |
             out/Mahdi-Editor.apk
             out/Mahdi-Editor-v${{ env.APP_VERSION }}.apk
