@@ -61,21 +61,6 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
     PreferenceLayout(label = stringResource(strings.themes)) {
         PreferenceGroup(heading = stringResource(strings.theme_settings)) {
             SettingsItem(
-                label = stringResource(id = strings.theme_customizer),
-                description = stringResource(id = strings.theme_customizer_desc),
-                showSwitch = false,
-                default = false,
-                startWidget = {
-                    Icon(
-                        modifier = Modifier.padding(start = 16.dp),
-                        painter = painterResource(drawables.arrow_outward),
-                        contentDescription = null,
-                    )
-                },
-                sideEffect = { navController.navigate(SettingsRoutes.ThemeCustomizer.route) },
-            )
-
-            SettingsItem(
                 label = stringResource(id = strings.theme_mode),
                 description = stringResource(id = strings.theme_mode_desc),
                 showSwitch = false,

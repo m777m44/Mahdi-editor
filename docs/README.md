@@ -5,7 +5,7 @@
 | الملف | المحتوى |
 |---|---|
 | [BUILDING.md](BUILDING.md) | المتطلبات، البناء، التوقيع، حلّ مشكلات البناء |
-| [REBRAND.md](REBRAND.md) | كل التغييرات مقابل المشروع الأصلي (لأغراض رخصة GPLv3) |
+| [REBRAND.md](REBRAND.md) | هوية المشروع ومسار التطوّر والإصدارات |
 | [EXTENSIONS.md](EXTENSIONS.md) | صيغة حزم الإضافات والثيمات وحزم الأيقونات |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | كيف تساهم في المشروع |
 | [KEYBINDS.md](KEYBINDS.md) | اختصارات لوحة المفاتيح |

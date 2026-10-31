@@ -211,6 +211,7 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                         CommandProvider.SearchFileFolderCommand,
                         CommandProvider.getForId("editor.run"),
                         CommandProvider.getForId("global.terminal"),
+                        CommandProvider.getForId("global.store"),
                         CommandProvider.DocumentationCommand,
                         CommandProvider.SettingsCommand,
                     )

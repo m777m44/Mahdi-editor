@@ -1034,4 +1034,22 @@ Thank you for using Mahdi-Editor.</string>
     <string name="languages_supported_stats">Syntax highlighting: %1$d languages — direct running: %2$d languages</string>
     <string name="theme_suggestions">Theme suggestions</string>
     <string name="run_direct">Run</string>
+    <string name="browse_extensions_desc">Language servers, runners, themes and icon packs — one tap away</string>
+    <string name="servers_runners">Servers & runners</string>
+    <string name="search_servers">Search servers and runners</string>
+    <string name="lsp_servers">Language servers (LSP)</string>
+    <string name="language_runners">Runners & languages</string>
+    <string name="install_action">Install</string>
+    <string name="uninstall_action">Remove</string>
+    <string name="installed_state">Installed</string>
+    <string name="install_interpreter">Install interpreter</string>
+    <string name="servers_hint">Install a language server for completion and diagnostics, and an interpreter to run any file instantly.</string>
+    <string name="terminal_tools">Quick tools</string>
+    <string name="terminal_tool_clear">Clear</string>
+    <string name="terminal_tool_interrupt">Stop</string>
+    <string name="terminal_tool_paste">Paste</string>
+    <string name="terminal_tool_zoom_in">Zoom in</string>
+    <string name="terminal_tool_zoom_out">Zoom out</string>
+    <string name="open_store">Browse extensions</string>
+    <string name="ready_state">Ready</string>
 </resources>

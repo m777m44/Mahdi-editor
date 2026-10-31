@@ -11,8 +11,8 @@ const val MAHDI_COPYRIGHT_HOLDER = "Mahdi-Editor-Code"
 /** السطر الرسمي لحقوق النشر — يجب أن يظهر حرفيًا في كل مكان. */
 const val MAHDI_COPYRIGHT = "© 2026 Mahdi-Editor-Code — جميع الحقوق محفوظة"
 
-/** رخصة المشروع (موروثة من المنبع الأصلي). */
-const val MAHDI_LICENSE = "GPL-3.0-or-later"
+/** رخصة المشروع. */
+const val MAHDI_LICENSE = "MIT"
 
 /** روابط التواصل الرسمية. */
 const val MAHDI_TELEGRAM = "https://t.me/HEROES2002"
