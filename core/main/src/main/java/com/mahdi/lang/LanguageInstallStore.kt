@@ -83,7 +83,8 @@ object LanguageInstallStore {
      */
     fun installCommand(id: String): String {
         val packages = LanguageToolchain.packagesFor(id)
-        val marker = "mkdir -p ~/$MARKER_DIR && printf '%s' \"$(date +%Y-%m-%dT%H:%M:%S)\" > ~/$MARKER_DIR/$id"
+        val marker =
+            "mkdir -p ~/$MARKER_DIR && printf '%s' \"${'$'}(date +%Y-%m-%dT%H:%M:%S)\" > ~/$MARKER_DIR/$id"
         return if (packages.isBlank()) {
             "set -e; $marker; echo \"✔ $id ready\""
         } else {

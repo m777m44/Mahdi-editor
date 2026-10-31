@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -108,6 +109,7 @@ fun ServersAndRunnersSection(
         totalLanguages = LanguageRegistry.all.size,
         serverCount = servers.size,
         modifier = modifier,
+        onRefresh = { LanguageInstallStore.refresh() },
     )
 
     Text(
@@ -329,6 +331,7 @@ fun InventoryCard(
     totalLanguages: Int,
     serverCount: Int,
     modifier: Modifier = Modifier,
+    onRefresh: () -> Unit = {},
 ) {
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val progress = if (totalLanguages == 0) 0f else installedCount.toFloat() / totalLanguages
@@ -353,6 +356,13 @@ fun InventoryCard(
                     text = "$installedCount / $totalLanguages",
                     showDot = false,
                 )
+                TextButton(onClick = onRefresh, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                    Text(
+                        text = stringResource(strings.refresh),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SkyAccent,
+                    )
+                }
             }
 
             Spacer(Modifier.height(10.dp))
