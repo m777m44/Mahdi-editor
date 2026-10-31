@@ -1,0 +1,582 @@
+# shellcheck shell=bash
+# ——————————————————————————————————————————————————————————————————————————————
+# Mahdi-Editor — التعرّف التلقائي على المكتبات وتثبيتها قبل تشغيل السكربت
+#
+# يستخدمه universal_runner قبل تشغيل ملفات Python وJavaScript/TypeScript وPHP:
+#   1. يقرأ السكربت ويستخرج كل المكتبات المستوردة (import / from / require).
+#   2. يستخرج أيضًا أوامر `pip install …` و`npm install …` المكتوبة داخل السكربت.
+#   3. يستبعد مكتبات بايثون القياسية والمكتبات المحلية الموجودة بجانب الملف.
+#   4. يثبّت الناقص فقط، بآخر إصدار، على دفعات متوازية (أسرع)، مع إعادة المحاولة.
+#   5. يعيد التحقق؛ وإن فشل شيء يثبّت أدوات البناء ثم يعيد المحاولة مرة واحدة.
+#
+# متغيرات يمكن ضبطها من ~/.bashrc أو من الطرفية:
+#   MAHDI_AUTO_DEPS=0        تعطيل الميزة كاملة
+#   MAHDI_PIP_INDEX=…        مرآة PyPI (مثال: https://mirror.example/simple)
+#   MAHDI_NPM_REGISTRY=…     مرآة npm
+#   MAHDI_DEP_JOBS=4         عدد التثبيتات المتوازية
+# ——————————————————————————————————————————————————————————————————————————————
+
+MAHDI_AUTO_DEPS="${MAHDI_AUTO_DEPS:-1}"
+MAHDI_DEP_JOBS="${MAHDI_DEP_JOBS:-4}"
+MAHDI_PIP_INDEX="${MAHDI_PIP_INDEX:-}"
+MAHDI_NPM_REGISTRY="${MAHDI_NPM_REGISTRY:-}"
+
+# في حال تشغيل الملف مستقلة دون utils
+if ! declare -f info >/dev/null 2>&1; then
+  info() { printf '\n[INFO] %s\n' "$*"; }
+fi
+if ! declare -f warn >/dev/null 2>&1; then
+  warn() { printf '\n[WARN] %s\n' "$*"; }
+fi
+
+mahdi_have() { command -v "$1" >/dev/null 2>&1; }
+
+# ————————————————————————————— أدوات مساعدة —————————————————————————————
+
+# تنزيل سريع: aria2c بثمانية اتصالات إن وُجد، وإلا curl مع استئناف وإعادة محاولة
+mahdi_fetch() {
+  local url="$1" out="$2"
+  mkdir -p "$(dirname "$out")" 2>/dev/null || true
+  if mahdi_have aria2c; then
+    aria2c -x8 -s8 -k1M --allow-overwrite=true --auto-file-renaming=false \
+      --console-log-level=warn --summary-interval=0 \
+      -d "$(dirname "$out")" -o "$(basename "$out")" "$url" && return 0
+  fi
+  if mahdi_have curl; then
+    curl -fL --retry 5 --retry-delay 2 --connect-timeout 20 -C - -o "$out" "$url" && return 0
+  fi
+  wget -c -O "$out" "$url"
+}
+
+# يثبّت aria2 عند الحاجة فقط (تنزيل متعدد الاتصالات = أسرع بكثير للملفات الكبيرة)
+mahdi_ensure_aria2() {
+  [ "${MAHDI_FAST_DOWNLOADS:-1}" = "0" ] && return 1
+  mahdi_have aria2c && return 0
+  mahdi_apt_install aria2 >/dev/null 2>&1 || return 1
+  mahdi_have aria2c
+}
+
+# تنزيل «سريع»: يضمن aria2 أولًا ثم ينزّل بعدة اتصالات
+mahdi_fetch_fast() {
+  mahdi_ensure_aria2 || true
+  mahdi_fetch "$1" "$2"
+}
+
+mahdi_apt_install() {
+  export DEBIAN_FRONTEND=noninteractive
+  if [ ! -f /.cache/mahdi_apt_updated ]; then
+    apt-get update -qq -o Acquire::Retries=3 >/dev/null 2>&1 || true
+    mkdir -p /.cache 2>/dev/null || true
+    touch /.cache/mahdi_apt_updated 2>/dev/null || true
+  fi
+  apt-get install -y --no-install-recommends -o Acquire::Retries=3 "$@"
+}
+
+mahdi_pip_env() {
+  export PIP_DISABLE_PIP_VERSION_CHECK=1
+  export PIP_NO_INPUT=1
+  export PIP_RETRIES=5
+  export PIP_TIMEOUT=30
+  # يتجاوز حماية PEP 668 في Ubuntu الحديثة التي تُفشل «pip install» خارج بيئة معزولة
+  export PIP_BREAK_SYSTEM_PACKAGES=1
+  export PYTHONUNBUFFERED=1
+  [ -n "$MAHDI_PIP_INDEX" ] && export PIP_INDEX_URL="$MAHDI_PIP_INDEX"
+  return 0
+}
+
+# يضمن وجود pip ويعيد بناءه كأمر مستقل (pip وpip3) داخل ~/.local/bin
+mahdi_ensure_pip() {
+  mahdi_pip_env
+  mkdir -p "$HOME/.local/bin" 2>/dev/null || true
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) export PATH="$HOME/.local/bin:$PATH" ;;
+  esac
+
+  if ! python3 -m pip --version >/dev/null 2>&1; then
+    info "pip غير مثبّت — جاري تثبيته…"
+    mahdi_apt_install python3-pip python3-venv >/dev/null 2>&1 ||
+      python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
+  fi
+
+  # بعض السكربتات تستدعي «python» بدل «python3»، وبعضها «pip» بدل «pip3»
+  if ! mahdi_have python; then
+    printf '#!/bin/sh\nexec python3 "$@"\n' > "$HOME/.local/bin/python" 2>/dev/null || true
+    chmod +x "$HOME/.local/bin/python" 2>/dev/null || true
+  fi
+
+  local shim
+  for shim in pip pip3; do
+    if ! mahdi_have "$shim"; then
+      printf '#!/bin/sh\nexec python3 -m pip "$@"\n' > "$HOME/.local/bin/$shim" 2>/dev/null || true
+      chmod +x "$HOME/.local/bin/$shim" 2>/dev/null || true
+    fi
+  done
+  hash -r 2>/dev/null || true
+  python3 -m pip --version >/dev/null 2>&1
+}
+
+# ————————————————————————— تثبيت حزم بايثون (متوازٍ) —————————————————————————
+
+mahdi_pip_one() {
+  local pkg="$1"
+  # --prefer-binary: يفضّل الحزم الجاهزة على بناء المصدر (أسرع بكثير)
+  python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+    --no-input --retries 5 --timeout 30 "$pkg" && return 0
+  # إعادة محاولة عبر المصدر الرسمي، ثم عبر مرآة بديلة
+  python3 -m pip install --upgrade --prefer-binary --no-input --retries 3 --timeout 30 "$pkg" && return 0
+  python3 -m pip install --upgrade --prefer-binary --no-input --retries 3 --timeout 30 \
+    -i "https://pypi.org/simple" "$pkg" && return 0
+  warn "تعذّر تثبيت $pkg"
+  return 1
+}
+
+mahdi_pip_install_many() {
+  local pkgs=("$@")
+  local total=${#pkgs[@]}
+  [ "$total" -eq 0 ] && return 0
+
+  if [ "$total" -le 2 ] || [ "$MAHDI_DEP_JOBS" -le 1 ]; then
+    python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+      --no-input --retries 5 --timeout 30 "${pkgs[@]}" || {
+      local p
+      for p in "${pkgs[@]}"; do mahdi_pip_one "$p" || true; done
+    }
+    return 0
+  fi
+
+  export -f mahdi_pip_one 2>/dev/null || true
+  export -f warn 2>/dev/null || true
+  printf '%s\n' "${pkgs[@]}" |
+    xargs -r -P "$MAHDI_DEP_JOBS" -I{} bash -c 'mahdi_pip_one "$@"' _ {} || true
+  return 0
+}
+
+# ————————————————————————— تحليل سكربتات بايثون —————————————————————————
+
+mahdi_py_plan_write() {
+  cat > /tmp/mahdi_py_plan.py <<'PYEOF'
+"""يستخرج حزم PyPI الناقصة من سكربت بايثون (impolve: imports + أوامر pip النصية)."""
+import ast
+import importlib.util
+import os
+import re
+import sys
+
+# أسماء الوحدات المشهورة التي تختلف عن اسم الحزمة على PyPI
+PACKAGE_MAP = {
+    "PIL": "pillow",
+    "cv2": "opencv-python",
+    "sklearn": "scikit-learn",
+    "skimage": "scikit-image",
+    "bs4": "beautifulsoup4",
+    "yaml": "PyYAML",
+    "dotenv": "python-dotenv",
+    "Crypto": "pycryptodome",
+    "Cryptodome": "pycryptodome",
+    "dateutil": "python-dateutil",
+    "jwt": "PyJWT",
+    "serial": "pyserial",
+    "MySQLdb": "mysqlclient",
+    "psycopg2": "psycopg2-binary",
+    "fitz": "PyMuPDF",
+    "docx": "python-docx",
+    "pptx": "python-pptx",
+    "magic": "python-magic",
+    "slugify": "python-slugify",
+    "Levenshtein": "python-Levenshtein",
+    "telegram": "python-telegram-bot",
+    "telebot": "pyTelegramBotAPI",
+    "pkg_resources": "setuptools",
+    "OpenSSL": "pyopenssl",
+    "win32com": "pywin32",
+    "win32api": "pywin32",
+    "socketio": "python-socketio",
+    "engineio": "python-engineio",
+    "OpenGL": "PyOpenGL",
+    "gi": "PyGObject",
+    "wx": "wxPython",
+    "usb": "pyusb",
+    "nanoid": "nanoid",
+    "websocket": "websocket-client",
+    "pyaudio": "PyAudio",
+    "speech_recognition": "SpeechRecognition",
+    "uno": None,
+}
+
+# وحدات تُشحن مع بايثون أو لا تُثبّت من PyPI بهذا الاسم
+IGNORED = {
+    "__future__", "site", "sitecustomize", "typing_extensions", "pip", "setuptools",
+    "wheel", "venv", "virtualenv", "pkgutil", "distutils", "test", "ensurepip",
+}
+
+
+def add_module(mods, name):
+    if not name:
+        return
+    top = name.split(".")[0]
+    if top and not top.startswith("_"):
+        mods.add(top)
+
+
+def parse_imports(src, mods):
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        # ملف غير مكتمل أو يحتوي تعبيرات خاصة: نسقط إلى تعبير نمطي
+        for m in re.finditer(r"^[ \t]*(?:from|import)[ \t]+([A-Za-z_][A-Za-z0-9_.]*)", src, re.M):
+            add_module(mods, m.group(1))
+        return
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                add_module(mods, alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0 and node.module:
+                add_module(mods, node.module)
+
+
+PIP_ALIASES = {
+    "request": "requests",
+    "bs4": "beautifulsoup4",
+    "sklearn": "scikit-learn",
+    "cv2": "opencv-python",
+    "opencv": "opencv-python",
+    "pil": "pillow",
+    "PIL": "pillow",
+    "yaml": "PyYAML",
+    "dotenv": "python-dotenv",
+    "mysql": "mysqlclient",
+    "jwt": "PyJWT",
+    "serial": "pyserial",
+    "win32": "pywin32",
+    "telegram-bot": "python-telegram-bot",
+    "speechrecognition": "SpeechRecognition",
+}
+
+
+def _add_tokens(tokens, extra):
+    skip_next = False
+    for token in tokens:
+        token = token.strip().strip("'\"")
+        if not token:
+            continue
+        if skip_next:
+            skip_next = False
+            continue
+        if token.startswith("-"):
+            # الخيارات التي تأخذ قيمة بعدها
+            if token in ("-i", "--index-url", "--extra-index-url", "-r", "--requirement",
+                         "-c", "--constraint", "-t", "--target", "-f", "--find-links",
+                         "--upgrade-strategy", "--timeout", "--retries"):
+                skip_next = True
+            continue
+        if token in ("install", "&&", "||", "python", "python3", "pip", "pip3", "-m"):
+            continue
+        clean = re.split(r"[=<>!~\[]", token)[0].strip()
+        if clean and re.match(r"^[A-Za-z0-9_.-]+$", clean):
+            clean = PIP_ALIASES.get(clean, PIP_ALIASES.get(clean.lower(), clean))
+            extra.add(clean)
+
+
+def parse_pip_lines(src, extra):
+    """أوامر pip المكتوبة داخل السكربت: نصية (os.system) أو على شكل قائمة (subprocess)."""
+    # 1) «pip install …» نصًّا داخل الاقتباسات أو التعليقات
+    for m in re.finditer(r"\bpip3?\s+install\b([^\n\"'`|;&]*)", src):
+        _add_tokens(m.group(1).replace("\\\n", " ").split(), extra)
+
+    # 2) subprocess.run(["pip", "install", "x"]) أو ["python", "-m", "pip", "install", …]
+    list_patterns = [
+        r"\[\s*['\"]pip3?['\"]\s*,\s*['\"]install['\"]\s*,([^\]]*)\]",
+        r"\[\s*['\"]python3?['\"]\s*,\s*['\"]-m['\"]\s*,\s*['\"]pip['\"]\s*,\s*['\"]install['\"]\s*,([^\]]*)\]",
+        r"\[\s*['\"]pip3?['\"]\s*,\s*['\"]install['\"]\s*\]\s*\+\s*\[([^\]]*)\]",
+    ]
+    for pattern in list_patterns:
+        for m in re.finditer(pattern, src):
+            _add_tokens(re.findall(r"['\"]([^'\"]+)['\"]", m.group(1)), extra)
+
+
+def is_installed(module):
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError, AttributeError):
+        return False
+
+
+def is_local(module, directory):
+    if not directory:
+        return False
+    candidates = [
+        os.path.join(directory, module + ".py"),
+        os.path.join(directory, module, "__init__.py"),
+    ]
+    return any(os.path.exists(p) for p in candidates)
+
+
+def main():
+    path = sys.argv[1]
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            src = fh.read()
+    except OSError:
+        return 0
+
+    stdlib = set(getattr(sys, "stdlib_module_names", ()))
+    stdlib.update(sys.builtin_module_names)
+    if not stdlib:
+        # بايثون أقدم من 3.10: قائمة أساسية تغطي الواردات الشائعة
+        stdlib = {
+            "abc", "argparse", "array", "ast", "asyncio", "base64", "binascii", "bisect",
+            "builtins", "bz2", "calendar", "codecs", "collections", "colorsys", "concurrent",
+            "configparser", "contextlib", "copy", "csv", "ctypes", "dataclasses", "datetime",
+            "decimal", "difflib", "dis", "email", "enum", "errno", "faulthandler", "filecmp",
+            "fileinput", "fnmatch", "fractions", "ftplib", "functools", "gc", "getopt",
+            "getpass", "gettext", "glob", "gzip", "hashlib", "heapq", "hmac", "html", "http",
+            "imaplib", "imp", "importlib", "inspect", "io", "ipaddress", "itertools", "json",
+            "keyword", "linecache", "locale", "logging", "lzma", "mailbox", "math", "mimetypes",
+            "mmap", "multiprocessing", "netrc", "numbers", "operator", "optparse", "os",
+            "pathlib", "pdb", "pickle", "pipes", "pkgutil", "platform", "plistlib", "pprint",
+            "profile", "pstats", "queue", "quopri", "random", "re", "readline", "reprlib",
+            "sched", "secrets", "select", "selectors", "shelve", "shlex", "shutil", "signal",
+            "site", "smtplib", "socket", "socketserver", "sqlite3", "ssl", "stat", "statistics",
+            "string", "stringprep", "struct", "subprocess", "sys", "sysconfig", "tarfile",
+            "tempfile", "textwrap", "threading", "time", "timeit", "token", "tokenize",
+            "traceback", "tracemalloc", "types", "typing", "unicodedata", "unittest", "urllib",
+            "uuid", "venv", "warnings", "wave", "weakref", "webbrowser", "xml", "xmlrpc",
+            "zipapp", "zipfile", "zipimport", "zlib", "zoneinfo",
+        }
+
+    mods, extra = set(), set()
+    parse_imports(src, mods)
+    parse_pip_lines(src, extra)
+
+    directory = os.path.dirname(os.path.abspath(path))
+    needed = []
+
+    for mod in sorted(mods):
+        if mod in stdlib or mod in IGNORED or is_local(mod, directory):
+            continue
+        if is_installed(mod):
+            continue
+        pkg = PACKAGE_MAP.get(mod, mod)
+        if pkg:
+            needed.append(pkg)
+
+    for pkg in sorted(extra):
+        if pkg in stdlib or pkg in IGNORED:
+            continue
+        if pkg not in needed:
+            needed.append(pkg)
+
+    for name in needed:
+        print(name)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+PYEOF
+}
+
+mahdi_py_deps() {
+  local file="$1"
+  [ "$MAHDI_AUTO_DEPS" = "0" ] && return 0
+  [ -z "$file" ] && return 0
+
+  mahdi_ensure_pip || {
+    warn "pip غير متاح — سيُشغَّل السكربت كما هو"
+    return 0
+  }
+
+  local dir
+  dir=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || dir="$(dirname "$file")"
+
+  if [ -f "$dir/requirements.txt" ]; then
+    info "تثبيت متطلبات requirements.txt…"
+    python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+      --no-input --retries 5 --timeout 30 -r "$dir/requirements.txt" ||
+      warn "بعض متطلبات requirements.txt لم تُثبَّت"
+  fi
+
+  mahdi_py_plan_write
+  local -a missing=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && missing+=("$line")
+  done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
+
+  if [ ${#missing[@]} -eq 0 ]; then
+    info "كل مكتبات السكربت موجودة — لا حاجة لتثبيت شيء"
+    return 0
+  fi
+
+  info "مكتبات ناقصة سيتم تثبيت آخر إصدار منها: ${missing[*]}"
+  mahdi_pip_install_many "${missing[@]}"
+
+  local -a still=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && still+=("$line")
+  done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
+
+  if [ ${#still[@]} -gt 0 ]; then
+    info "إعادة المحاولة بعد تثبيت أدوات البناء: ${still[*]}"
+    mahdi_apt_install build-essential python3-dev >/dev/null 2>&1 || true
+    mahdi_pip_install_many "${still[@]}"
+  fi
+
+  local -a final=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && final+=("$line")
+  done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
+
+  if [ ${#final[@]} -gt 0 ]; then
+    warn "لم تُثبَّت: ${final[*]} — سيُشغَّل السكربت، وقد تحتاج تثبيتًا يدويًا لهذه الحزم"
+  elif declare -f success >/dev/null 2>&1; then
+    success "المكتبات جاهزة — بدء تشغيل السكربت"
+  else
+    info "المكتبات جاهزة — بدء تشغيل السكربت"
+  fi
+  return 0
+}
+
+# ————————————————————————— تحليل سكربتات Node —————————————————————————
+
+mahdi_node_scan_write() {
+  cat > /tmp/mahdi_node_scan.js <<'JSEOF'
+const fs = require('fs');
+const builtins = new Set(require('module').builtinModules);
+const src = fs.readFileSync(process.argv[2], 'utf8');
+const names = new Set();
+const patterns = [
+  /require\(\s*['"]([^'"]+)['"]\s*\)/g,
+  /\bfrom\s+['"]([^'"]+)['"]\s*/g,
+  /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  /\bimport\s+['"]([^'"]+)['"]\s*;?/g,
+];
+for (const re of patterns) {
+  for (const m of src.matchAll(re)) {
+    const spec = m[1];
+    if (!spec) continue;
+    if (spec.startsWith('.') || spec.startsWith('/') || spec.startsWith('node:')) continue;
+    const parts = spec.split('/');
+    const name = spec.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+    if (!name || builtins.has(name)) continue;
+    names.add(name);
+  }
+}
+const list = [...names];
+if (list.length) console.log(list.join('\n'));
+JSEOF
+}
+
+mahdi_node_installed() {
+  local name="$1" dir="$2"
+  (cd "$dir" 2>/dev/null || cd /) &&
+    node -e "try{require.resolve(process.argv[1]);process.exit(0)}catch(e){process.exit(1)}" "$name" >/dev/null 2>&1
+}
+
+mahdi_node_deps() {
+  local file="$1"
+  [ "$MAHDI_AUTO_DEPS" = "0" ] && return 0
+  [ -z "$file" ] && return 0
+  mahdi_have node || return 0
+
+  local dir
+  dir=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || dir="$(dirname "$file")"
+
+  if [ -f "$dir/package.json" ] && mahdi_have npm; then
+    info "تثبيت متطلبات package.json…"
+    (cd "$dir" && npm install --no-fund --no-audit --loglevel=error) || warn "تعذّر تثبيت package.json كاملًا"
+  fi
+
+  mahdi_node_scan_write
+  local -a missing=()
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    mahdi_node_installed "$name" "$dir" && continue
+    mahdi_node_installed "$name" "$HOME" && continue
+    # الاعتماد العالمي يظهر عبر NODE_PATH فقط
+    missing+=("$name")
+  done < <(node /tmp/mahdi_node_scan.js "$file" 2>/dev/null)
+
+  if [ ${#missing[@]} -eq 0 ]; then
+    info "كل مكتبات Node موجودة — لا حاجة لتثبيت شيء"
+    return 0
+  fi
+
+  info "مكتبات Node ناقصة سيتم تثبيتها: ${missing[*]}"
+  local registry_args=()
+  [ -n "$MAHDI_NPM_REGISTRY" ] && registry_args=(--registry "$MAHDI_NPM_REGISTRY")
+
+  if [ -w "$dir" ]; then
+    (cd "$dir" && npm install --no-fund --no-audit --loglevel=error "${registry_args[@]}" "${missing[@]}") || {
+      npm install -g --no-fund --no-audit --loglevel=error "${registry_args[@]}" "${missing[@]}" ||
+        warn "تعذّر تثبيت بعض مكتبات Node"
+      export NODE_PATH="$(npm root -g 2>/dev/null):${NODE_PATH:-}"
+    }
+  else
+    npm install -g --no-fund --no-audit --loglevel=error "${registry_args[@]}" "${missing[@]}" ||
+      warn "تعذّر تثبيت بعض مكتبات Node"
+    export NODE_PATH="$(npm root -g 2>/dev/null):${NODE_PATH:-}"
+  fi
+
+  local -a left=()
+  local name
+  for name in "${missing[@]}"; do
+    mahdi_node_installed "$name" "$dir" || left+=("$name")
+  done
+  if [ ${#left[@]} -gt 0 ]; then
+    warn "لم تُثبَّت: ${left[*]} — سيُشغَّل السكربت كما هو"
+  elif declare -f success >/dev/null 2>&1; then
+    success "مكتبات Node جاهزة — بدء التشغيل"
+  fi
+  return 0
+}
+
+# ————————————————————————— تحليل سكربتات PHP —————————————————————————
+
+mahdi_php_deps() {
+  local file="$1"
+  [ "$MAHDI_AUTO_DEPS" = "0" ] && return 0
+  [ -z "$file" ] && return 0
+
+  local dir
+  dir=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || dir="$(dirname "$file")"
+  [ -f "$dir/composer.json" ] || return 0
+
+  if ! mahdi_have composer; then
+    info "تنزيل Composer…"
+    mahdi_fetch "https://getcomposer.org/composer-stable.phar" "$HOME/.local/bin/composer" >/dev/null 2>&1 || true
+    chmod +x "$HOME/.local/bin/composer" 2>/dev/null || true
+    case ":$PATH:" in
+      *":$HOME/.local/bin:"*) ;;
+      *) export PATH="$HOME/.local/bin:$PATH" ;;
+    esac
+  fi
+
+  if mahdi_have composer; then
+    info "تثبيت حزم Composer…"
+    (cd "$dir" && composer install --no-interaction --prefer-dist --no-progress) ||
+      warn "تعذّر تثبيت حزم Composer"
+  else
+    warn "لم يُعثر على Composer — سيُشغَّل السكربت كما هو"
+  fi
+  return 0
+}
+
+# ————————————————————————— نقطة الدخول —————————————————————————
+
+mahdi_auto_deps() {
+  local file="$1"
+  [ "$MAHDI_AUTO_DEPS" = "0" ] && return 0
+  case "$file" in
+    *.py) mahdi_py_deps "$file" ;;
+    *.js | *.mjs | *.cjs | *.ts | *.tsx) mahdi_node_deps "$file" ;;
+    *.php) mahdi_php_deps "$file" ;;
+  esac
+  return 0
+}
+
+# تشغيل مباشر:  bash auto_deps.sh /path/to/script.py
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  mahdi_auto_deps "$1"
+fi
