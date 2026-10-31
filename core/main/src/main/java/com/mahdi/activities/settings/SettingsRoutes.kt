@@ -15,8 +15,6 @@ sealed class SettingsRoutes(val route: String) {
 
     data object TerminalCheck : SettingsRoutes("terminal_check")
 
-    data object About : SettingsRoutes("about")
-
     data object EditorFontScreen : SettingsRoutes("editor_font_screen")
 
     data object AppFontScreen : SettingsRoutes("app_font_screen")
@@ -42,8 +40,6 @@ sealed class SettingsRoutes(val route: String) {
     data object DeveloperOptions : SettingsRoutes("developer_options")
 
     data object AppLogs : SettingsRoutes("app_logs")
-
-    data object Support : SettingsRoutes("support")
 
     data object Formatters : SettingsRoutes("formatters")
 

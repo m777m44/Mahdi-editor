@@ -115,15 +115,8 @@ class ExtensionFeature : Feature {
             extensionManager.indexStoreExtensions()
         }
 
-        // Register settings category
-        settingsCategory =
-            SettingsCategory(
-                    label = strings.store.getString(),
-                    description = strings.store_desc.getString(),
-                    icon = Icon.ResourceIcon(drawables.store),
-                    route = SettingsRoutes.Extensions.route,
-                )
-                .also { SettingsRegistry.registerCategory(it) }
+        // ملاحظة 2.5.0: أُزيل زر «المتجر» من الإعدادات بطلب من صاحب التطبيق.
+        // تبقى مسارات التمديدات نفسها مسجّلة (تُفتح من الأوامر) لكن دون عنصر ظاهر للمستخدم.
 
         // Register settings routes
         routes.add(

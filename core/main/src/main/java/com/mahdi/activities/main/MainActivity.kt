@@ -36,16 +36,13 @@ import com.mahdi.lsp.LspRegistry
 import com.mahdi.resources.getFilledString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
-import com.mahdi.settings.support.handleSupport
 import com.mahdi.tabs.editor.applyHighlightingAndConnectLSP
 import com.mahdi.utils.errorDialog
 import com.mahdi.utils.toast
 import java.lang.ref.WeakReference
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 var mainNavController = WeakReference<NavController?>(null)
@@ -102,9 +99,6 @@ class MainActivity : AppCompatActivity() {
                     .filterWithFiles { _, file -> affectedExtensions.contains(file.getExtension()) }
                     .forEach { it.applyHighlightingAndConnectLSP() }
             }
-
-            delay(1000.milliseconds)
-            handleSupport()
         }
     }
 

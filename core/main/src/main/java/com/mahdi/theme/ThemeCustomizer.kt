@@ -171,6 +171,13 @@ fun ThemeCustomizer(navController: NavController, modifier: Modifier = Modifier)
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
+            // اقتراحات ثيمات مصغّرة تتبدّل مع اللون الحالي (2.5.0)
+            ThemeSuggestions(
+                baseColor = Color(colors.get(slot)),
+                onSelect = { colors = colors.set(slot, it.toArgbLong()) },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

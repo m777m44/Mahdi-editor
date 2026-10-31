@@ -1032,4 +1032,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="terminal_unavailable">The terminal is not available in this build</string>
     <string name="terminal_service_error">Error: no connection to the terminal service</string>
     <string name="languages_supported_stats">Syntax highlighting: %1$d languages — direct running: %2$d languages</string>
+    <string name="theme_suggestions">Theme suggestions</string>
+    <string name="run_direct">Run</string>
 </resources>

@@ -29,16 +29,16 @@ object UniversalRunner : FileRunner() {
     override val label = strings.universal_runner.getString()
     override val description = strings.universal_runner_desc.getString()
 
+    /**
+     * كل لغات `LanguageRegistry` قابلة للتشغيل المباشر في 2.5.0.
+     *
+     * القائمة تُبنى من الامتدادات نفسها، فلا تبقى لغة «تحرير فقط» بعد اليوم.
+     */
     override fun matcher(fileObject: FileObject): Boolean {
-        return Regex(
-                ".*\\.(" +
-                    "py|js|mjs|cjs|ts|java|kt|kts|rs|rb|php|c|cpp|cc|cxx|cs|sh|bash|zsh|fish|pl|lua|r|R|hs|" +
-                        "f90|f95|f03|f08|pas|tcl|elm|fsx|fs|" +
-                        // لغات أُضيفت في 2.0
-                        "go|jl|groovy|scala|ml|mli|ex|exs|erl|sql|awk" +
-                        ")$"
-            )
-            .matches(fileObject.getName())
+        val name = fileObject.getName()
+        val extension = name.substringAfterLast('.', "").lowercase()
+        if (extension.isEmpty()) return false
+        return extension in RUNNABLE_EXTENSIONS
     }
 
     @SuppressLint("SdCardPath")
@@ -132,4 +132,19 @@ object UniversalRunner : FileRunner() {
     override fun getIcon(context: Context): Icon {
         return Icon.ResourceIcon(drawables.run)
     }
+
+    /** امتدادات اللغات القابلة للتشغيل (تطابق `LanguageRegistry` في 2.5.0). */
+    private val RUNNABLE_EXTENSIONS =
+        setOf(
+            "py", "pyw", "js", "mjs", "cjs", "ts", "tsx", "php",
+            "html", "htm", "xhtml", "css", "scss", "less",
+            "c", "cpp", "cc", "cxx", "cs", "java", "kt", "kts", "swift",
+            "go", "rs", "rb", "pl", "pm", "lua", "r", "dart", "scala", "groovy",
+            "hs", "jl", "ml", "mli", "ex", "exs", "erl",
+            "sh", "bash", "zsh", "fish", "ps1", "sql",
+            "json", "xml", "svg", "yaml", "yml", "md", "markdown",
+            "asm", "s", "bat", "cmd", "toml", "ini", "cfg", "conf",
+            "cmake", "pas", "tcl", "nix", "zig", "nim", "tex",
+            "f90", "f95", "f03", "f08", "diff", "patch", "txt", "log", "awk", "fsx", "fs", "elm",
+        )
 }

@@ -8,7 +8,7 @@ package com.mahdi.lang
  * @property nameEn الاسم الإنجليزي
  * @property extensions الامتدادات التي تُفتح بهذه اللغة
  * @property scope نطاق TextMate الفعلي المحمّل من `assets/textmate/languages.json` (null يعني تلوينًا عامًا)
- * @property runnable هل يمكن تشغيل ملفها مباشرة من التطبيق عبر الطرفية
+ * @property runnable هل يمكن تشغيل ملفها مباشرة من التطبيق عبر الطرفية (كل اللغات قابلة للتشغيل في 2.5.0)
  */
 data class CodeLanguage(
     val id: String,
@@ -16,7 +16,7 @@ data class CodeLanguage(
     val nameEn: String,
     val extensions: List<String>,
     val scope: String?,
-    val runnable: Boolean = false,
+    val runnable: Boolean = true,
 )
 
 /**
@@ -30,37 +30,37 @@ object LanguageRegistry {
 
     val all: List<CodeLanguage> =
         listOf(
-            CodeLanguage("python", "بايثون", "Python", listOf("py", "pyw"), "source.python", runnable = true),
-            CodeLanguage("javascript", "جافاسكربت", "JavaScript", listOf("js", "mjs", "cjs"), "source.js", runnable = true),
-            CodeLanguage("typescript", "تايب سكربت", "TypeScript", listOf("ts", "tsx"), "source.ts", runnable = true),
-            CodeLanguage("php", "بي إتش بي", "PHP", listOf("php"), "source.php", runnable = true),
+            CodeLanguage("python", "بايثون", "Python", listOf("py", "pyw"), "source.python"),
+            CodeLanguage("javascript", "جافاسكربت", "JavaScript", listOf("js", "mjs", "cjs"), "source.js"),
+            CodeLanguage("typescript", "تايب سكربت", "TypeScript", listOf("ts", "tsx"), "source.ts"),
+            CodeLanguage("php", "بي إتش بي", "PHP", listOf("php"), "source.php"),
             CodeLanguage("html", "HTML", "HTML", listOf("html", "htm", "xhtml"), "text.html.basic"),
             CodeLanguage("css", "CSS", "CSS", listOf("css"), "source.css"),
             CodeLanguage("scss", "SCSS", "SCSS", listOf("scss"), "source.css.scss"),
             CodeLanguage("less", "Less", "Less", listOf("less"), "source.css.less"),
-            CodeLanguage("c", "سي", "C", listOf("c"), "source.c", runnable = true),
-            CodeLanguage("cpp", "سي بلس بلس", "C++", listOf("cpp", "cc", "cxx"), "source.cpp", runnable = true),
-            CodeLanguage("csharp", "سي شارب", "C#", listOf("cs"), "source.cs", runnable = true),
-            CodeLanguage("java", "جافا", "Java", listOf("java"), "source.java", runnable = true),
-            CodeLanguage("kotlin", "كوتلن", "Kotlin", listOf("kt", "kts"), "source.kotlin", runnable = true),
+            CodeLanguage("c", "سي", "C", listOf("c"), "source.c"),
+            CodeLanguage("cpp", "سي بلس بلس", "C++", listOf("cpp", "cc", "cxx"), "source.cpp"),
+            CodeLanguage("csharp", "سي شارب", "C#", listOf("cs"), "source.cs"),
+            CodeLanguage("java", "جافا", "Java", listOf("java"), "source.java"),
+            CodeLanguage("kotlin", "كوتلن", "Kotlin", listOf("kt", "kts"), "source.kotlin"),
             CodeLanguage("swift", "سويفت", "Swift", listOf("swift"), "source.swift"),
-            CodeLanguage("go", "غو", "Go", listOf("go"), "source.go", runnable = true),
-            CodeLanguage("rust", "رست", "Rust", listOf("rs"), "source.rust", runnable = true),
-            CodeLanguage("ruby", "روبي", "Ruby", listOf("rb"), "source.ruby", runnable = true),
-            CodeLanguage("perl", "بيرل", "Perl", listOf("pl", "pm"), null, runnable = true),
-            CodeLanguage("lua", "لوا", "Lua", listOf("lua"), "source.lua", runnable = true),
-            CodeLanguage("r", "آر", "R", listOf("r", "R"), "source.r", runnable = true),
+            CodeLanguage("go", "غو", "Go", listOf("go"), "source.go"),
+            CodeLanguage("rust", "رست", "Rust", listOf("rs"), "source.rust"),
+            CodeLanguage("ruby", "روبي", "Ruby", listOf("rb"), "source.ruby"),
+            CodeLanguage("perl", "بيرل", "Perl", listOf("pl", "pm"), null),
+            CodeLanguage("lua", "لوا", "Lua", listOf("lua"), "source.lua"),
+            CodeLanguage("r", "آر", "R", listOf("r", "R"), "source.r"),
             CodeLanguage("dart", "دارت", "Dart", listOf("dart"), "source.dart"),
-            CodeLanguage("scala", "سكالا", "Scala", listOf("scala"), null, runnable = true),
-            CodeLanguage("groovy", "غروفي", "Groovy", listOf("groovy"), "source.groovy", runnable = true),
-            CodeLanguage("haskell", "هاسكل", "Haskell", listOf("hs"), null, runnable = true),
-            CodeLanguage("julia", "جوليا", "Julia", listOf("jl"), null, runnable = true),
-            CodeLanguage("ocaml", "أوكامل", "OCaml", listOf("ml", "mli"), null, runnable = true),
-            CodeLanguage("elixir", "إليكسير", "Elixir", listOf("ex", "exs"), null, runnable = true),
-            CodeLanguage("erlang", "إرلانغ", "Erlang", listOf("erl"), null, runnable = true),
-            CodeLanguage("shell", "شل", "Shell", listOf("sh", "bash", "zsh", "fish"), "source.shell", runnable = true),
+            CodeLanguage("scala", "سكالا", "Scala", listOf("scala"), null),
+            CodeLanguage("groovy", "غروفي", "Groovy", listOf("groovy"), "source.groovy"),
+            CodeLanguage("haskell", "هاسكل", "Haskell", listOf("hs"), null),
+            CodeLanguage("julia", "جوليا", "Julia", listOf("jl"), null),
+            CodeLanguage("ocaml", "أوكامل", "OCaml", listOf("ml", "mli"), null),
+            CodeLanguage("elixir", "إليكسير", "Elixir", listOf("ex", "exs"), null),
+            CodeLanguage("erlang", "إرلانغ", "Erlang", listOf("erl"), null),
+            CodeLanguage("shell", "شل", "Shell", listOf("sh", "bash", "zsh", "fish"), "source.shell"),
             CodeLanguage("powershell", "باور شل", "PowerShell", listOf("ps1"), "source.powershell"),
-            CodeLanguage("sql", "SQL", "SQL", listOf("sql"), "source.sql", runnable = true),
+            CodeLanguage("sql", "SQL", "SQL", listOf("sql"), "source.sql"),
             CodeLanguage("json", "JSON", "JSON", listOf("json"), "source.json"),
             CodeLanguage("xml", "XML", "XML", listOf("xml", "svg"), "text.xml"),
             CodeLanguage("yaml", "YAML", "YAML", listOf("yaml", "yml"), "source.yaml"),
@@ -70,13 +70,14 @@ object LanguageRegistry {
             CodeLanguage("toml", "TOML", "TOML", listOf("toml"), "source.toml"),
             CodeLanguage("ini", "INI", "INI", listOf("ini", "cfg", "conf"), "source.ini"),
             CodeLanguage("cmake", "CMake", "CMake", listOf("cmake"), "source.cmake"),
-            CodeLanguage("pascal", "باسكال", "Pascal", listOf("pas"), "source.pascal", runnable = true),
-            CodeLanguage("tcl", "تيكل", "Tcl", listOf("tcl"), null, runnable = true),
+            CodeLanguage("pascal", "باسكال", "Pascal", listOf("pas"), "source.pascal"),
+            CodeLanguage("tcl", "تيكل", "Tcl", listOf("tcl"), null),
             CodeLanguage("nix", "نيكس", "Nix", listOf("nix"), "source.nix"),
             CodeLanguage("zig", "زيغ", "Zig", listOf("zig"), "source.zig"),
             CodeLanguage("nim", "نيم", "Nim", listOf("nim"), "source.nim"),
             CodeLanguage("latex", "لاتخ", "LaTeX", listOf("tex"), "text.tex.latex"),
             CodeLanguage("diff", "فرق الملفات", "Diff", listOf("diff", "patch"), "source.diff"),
+            CodeLanguage("txt", "نص عادي", "Plain text", listOf("txt", "log"), null, runnable = true),
         )
 
     /** عدد اللغات التي تعمل في المحرر. */
@@ -100,7 +101,7 @@ object LanguageRegistry {
         return byExtension[ext] ?: byExtension[fileName.substringAfterLast('.')]
     }
 
-    /** اللغات القابلة للتشغيل. */
+    /** اللغات القابلة للتشغيل — كل اللغات في 2.5.0. */
     val runnable: List<CodeLanguage>
         get() = all.filter { it.runnable }
 }
