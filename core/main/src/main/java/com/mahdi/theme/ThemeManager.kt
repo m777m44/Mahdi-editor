@@ -95,7 +95,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val _storeThemes = MutableStateFlow<Map<String, StoreTheme>>(emptyMap())
     val storeThemes: StateFlow<Map<String, StoreTheme>> = _storeThemes.asStateFlow()
 
-    val currentTheme by derivedStateOf { loadedThemesState.value.find { it.id == Settings.theme } ?: blueberry }
+    val currentTheme by derivedStateOf { loadedThemesState.value.find { it.id == Settings.theme } ?: defaultTheme }
 
     private val _activeThemeReady = mutableStateOf(false)
     val activeThemeReady: Boolean
@@ -111,7 +111,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
         val id = Settings.theme
 
         val holder =
-            if (builtInThemes.any { it.id == id }) {
+            if (builtInThemes.any { it.id == id } || CustomThemes.themes.any { it.id == id }) {
                 null
             } else {
                 withContext(Dispatchers.IO) {
@@ -136,6 +136,25 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
             ensureThemeMode()
             _activeThemeReady.value = true
         }
+    }
+
+    /** يضيف ثيمًا مخصّصًا (أو يحدّثه) إلى قائمة الثيمات المعروضة. */
+    fun addCustomTheme(holder: ThemeHolder) {
+        _loadedThemesState.value = _loadedThemesState.value.filterNot { it.id == holder.id } + holder
+    }
+
+    /** يزيل ثيمًا مخصّصًا من القائمة. */
+    fun removeCustomTheme(id: String) {
+        _loadedThemesState.value = _loadedThemesState.value.filterNot { it.id == id }
+    }
+
+    /** يُدمج ثيمات المستخدم المحفوظة في القائمة (يُستدعى عند بدء التطبيق). */
+    fun registerCustomThemes() {
+        val customs = runCatching { CustomThemes.themes }.getOrDefault(emptyList())
+        if (customs.isEmpty()) return
+        val existing = _loadedThemesState.value.map { it.id }.toSet()
+        val missing = customs.filterNot { it.id in existing }
+        if (missing.isNotEmpty()) _loadedThemesState.value = _loadedThemesState.value + missing
     }
 
     private fun setLoadedThemes(themes: List<ThemeHolder>) {
@@ -192,7 +211,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     fun removeLocalTheme(id: String) {
         if (Settings.theme == id) {
             val oldTheme = currentTheme
-            Settings.theme = blueberry.id
+            Settings.theme = DEFAULT_THEME_ID
             refreshEditors()
             DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(currentTheme, oldTheme)) }
         }

@@ -66,6 +66,21 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
             )
 
             SettingsItem(
+                label = stringResource(strings.languages_supported),
+                description = stringResource(strings.languages_supported_desc),
+                showSwitch = false,
+                default = false,
+                endWidget = {
+                    Icon(
+                        modifier = Modifier.padding(16.dp),
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                    )
+                },
+                sideEffect = { navController.navigate(SettingsRoutes.SupportedLanguages.route) },
+            )
+
+            SettingsItem(
                 label = stringResource(strings.check_for_updates),
                 description = stringResource(strings.check_for_updates_desc),
                 default = Settings.check_for_update,

@@ -44,6 +44,7 @@ import com.mahdi.editor.intelligent.IntelligentFeatureRegistry
 import com.mahdi.events.EditorTabEvent
 import com.mahdi.events.Events
 import com.mahdi.extension.api.MahdiExtensionPoint
+import com.mahdi.encoding.EncodingManager
 import com.mahdi.file.FileObject
 import com.mahdi.file.FileTypeManager
 import com.mahdi.lsp.LspConnector
@@ -60,6 +61,7 @@ import com.mahdi.utils.errorDialog
 import com.mahdi.utils.hasBinaryChars
 import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.text.ContentIO
+import java.io.ByteArrayInputStream
 import java.nio.charset.Charset
 import java.nio.file.Paths
 import java.util.UUID
@@ -109,6 +111,20 @@ open class EditorTab(
 
     private var charset = Charset.forName(Settings.encoding)
     var lspConnector: LspConnector? = null
+
+    /**
+     * يقرأ محتوى الملف بالترميز الصحيح:
+     * - إن كان «كشف الترميز تلقائيًا» مفعّلًا، يُخمَّن الترميز من بصمة الملف ثم يُعتمد للملف كله.
+     * - وإلا يُستخدم الترميز الافتراضي من الإعدادات، ويظل `.editorconfig` قادرًا على تجاوزه.
+     */
+    private fun readContent(file: FileObject): Content {
+        if (!Settings.encoding_auto_detect) {
+            return file.getInputStream().use { ContentIO.createFrom(it, charset) }
+        }
+        val bytes = file.getInputStream().use { it.readBytes() }
+        charset = EncodingManager.detect(bytes)
+        return ContentIO.createFrom(ByteArrayInputStream(bytes), charset)
+    }
 
     override val icon: ImageVector
         get() = Icons.Outlined.Edit
@@ -210,7 +226,7 @@ open class EditorTab(
                 withContext(Dispatchers.IO) {
                     runCatching {
                         withTask {
-                            editorState.content = file.getInputStream().use { ContentIO.createFrom(it, charset) }
+                            editorState.content = readContent(file)
 
                             if (Settings.detect_bin_files && hasBinaryChars(editorState.content.toString())) {
                                 editorState.editable = false
@@ -336,7 +352,7 @@ open class EditorTab(
         scope.launch(Dispatchers.IO) {
             if (!file.exists() || !file.canRead()) return@launch
 
-            val newContent = file.getInputStream().use { ContentIO.createFrom(it, charset) }
+            val newContent = readContent(file)
 
             withContext(Dispatchers.Main) {
                 editorState.updateLock.withLock {

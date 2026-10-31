@@ -21,21 +21,23 @@ import com.mahdi.components.InfoBlock
 import com.mahdi.components.compose.preferences.base.PreferenceGroup
 import com.mahdi.components.compose.preferences.base.PreferenceLayout
 import com.mahdi.components.compose.preferences.base.PreferenceTemplate
+import com.mahdi.encoding.EncodingManager
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import java.nio.charset.Charset
-import java.util.Locale
 
-object DefaultEncoding {
-    val charsets = Charset.availableCharsets().map { it.value }
-}
-
+/**
+ * شاشة الترميز الافتراضي.
+ *
+ * تعرض الترميزات الأكثر استخدامًا أولًا بأسماء عربية (يبدأ بالعربية والـUTF)، ثم بقية ترميزات
+ * المنصّة، مع مفتاح «كشف الترميز تلقائيًا» الذي يجعل المحرر يخمّن ترميز كل ملف عند فتحه.
+ */
 @Composable
 fun DefaultEncoding(modifier: Modifier = Modifier) {
-    PreferenceLayout(label = stringResource(strings.default_encoding), backArrowVisible = true) {
+    PreferenceLayout(label = stringResource(strings.default_encoding), modifier = modifier, backArrowVisible = true) {
         var selectedEncoding by remember { mutableStateOf(Settings.encoding) }
-        val interaction = remember { MutableInteractionSource() }
+        var autoDetect by remember { mutableStateOf(Settings.encoding_auto_detect) }
 
         InfoBlock(
             icon = { Icon(imageVector = Icons.Outlined.Warning, contentDescription = null) },
@@ -43,46 +45,91 @@ fun DefaultEncoding(modifier: Modifier = Modifier) {
             warning = true,
         )
 
-        PreferenceGroup {
+        // ————— الكشف التلقائي —————
+        PreferenceGroup(heading = stringResource(strings.encoding_detect_title)) {
             PreferenceTemplate(
                 modifier =
-                    modifier.clickable(indication = ripple(), interactionSource = interaction) {
-                        // MainActivity.instance?.adapter?.clearAllFragments()
-                        selectedEncoding = Charset.defaultCharset().name()
-                        Settings.encoding = selectedEncoding
+                    modifier.clickable(
+                        indication = ripple(),
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) {
+                        autoDetect = !autoDetect
+                        Settings.encoding_auto_detect = autoDetect
                     },
                 contentModifier = Modifier.fillMaxHeight(),
-                title = {
-                    Text(
-                        fontWeight = FontWeight.Bold,
-                        text = Charset.defaultCharset().name() + " (${stringResource(strings.default_option)})",
-                    )
-                },
+                title = { Text(fontWeight = FontWeight.Bold, text = stringResource(strings.encoding_detect_title)) },
+                description = { Text(text = stringResource(strings.encoding_detect_desc)) },
                 enabled = true,
                 applyPaddings = true,
-                startWidget = {
-                    RadioButton(selected = Charset.defaultCharset().name() == selectedEncoding, onClick = null)
+                startWidget = { RadioButton(selected = autoDetect, onClick = null) },
+            )
+
+            InfoBlock(
+                text = "${Charset.defaultCharset().name()} — ${EncodingManager.displayName(Charset.defaultCharset())}",
+            )
+        }
+
+        // ————— الترميزات الموصى بها —————
+        PreferenceGroup(heading = stringResource(strings.encoding_recommended)) {
+            EncodingRow(
+                title = Charset.defaultCharset().name() + " (${stringResource(strings.default_option)})",
+                selected = selectedEncoding == Charset.defaultCharset().name(),
+                modifier = modifier,
+                onClick = {
+                    selectedEncoding = Charset.defaultCharset().name()
+                    Settings.encoding = selectedEncoding
                 },
             )
 
-            DefaultEncoding.charsets.forEach { charset ->
-                val interaction = remember { MutableInteractionSource() }
-                if (charset.name().lowercase(Locale.getDefault()) != "utf-8") {
-                    PreferenceTemplate(
-                        modifier =
-                            modifier.clickable(indication = ripple(), interactionSource = interaction) {
-                                // MainActivity.instance?.adapter?.clearAllFragments()
-                                selectedEncoding = charset.name()
-                                Settings.encoding = charset.name()
-                            },
-                        contentModifier = Modifier.fillMaxHeight(),
-                        title = { Text(fontWeight = FontWeight.Bold, text = charset.name()) },
-                        enabled = true,
-                        applyPaddings = true,
-                        startWidget = { RadioButton(selected = charset.name() == selectedEncoding, onClick = null) },
+            EncodingManager.supported.forEach { encoding ->
+                if (!encoding.name.equals(Charset.defaultCharset().name(), ignoreCase = true)) {
+                    EncodingRow(
+                        title = encoding.labelAr,
+                        subtitle = encoding.name,
+                        selected = encoding.name == selectedEncoding,
+                        modifier = modifier,
+                        onClick = {
+                            selectedEncoding = encoding.name
+                            Settings.encoding = selectedEncoding
+                        },
                     )
                 }
             }
         }
+
+        // ————— بقية الترميزات —————
+        val recommendedNames = EncodingManager.supported.map { it.name.uppercase() }.toSet() + Charset.defaultCharset().name()
+        PreferenceGroup(heading = stringResource(strings.encoding_all)) {
+            EncodingManager.others(recommendedNames).forEach { charset ->
+                EncodingRow(
+                    title = charset.name(),
+                    selected = charset.name() == selectedEncoding,
+                    modifier = modifier,
+                    onClick = {
+                        selectedEncoding = charset.name()
+                        Settings.encoding = selectedEncoding
+                    },
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun EncodingRow(
+    title: String,
+    subtitle: String? = null,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    PreferenceTemplate(
+        modifier = modifier.clickable(indication = ripple(), interactionSource = remember { MutableInteractionSource() }) { onClick() },
+        contentModifier = Modifier.fillMaxHeight(),
+        title = { Text(fontWeight = FontWeight.Bold, text = title) },
+        description = { subtitle?.let { Text(text = it) } },
+        enabled = true,
+        applyPaddings = true,
+        startWidget = { RadioButton(selected = selected, onClick = null) },
+    )
 }

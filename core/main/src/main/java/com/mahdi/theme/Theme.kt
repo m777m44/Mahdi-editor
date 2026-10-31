@@ -45,7 +45,7 @@ fun MahdiTheme(
                 }
 
             // Use default theme
-            themeHolder = blueberry
+            themeHolder = defaultTheme
 
             baseColorScheme
         } else {

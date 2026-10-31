@@ -45,6 +45,12 @@ const val MAHDI_GITHUB_REPO = "https://github.com/m777m44/Mahdi-editor"
 const val MAHDI_TELEGRAM_URL = "https://t.me/HEROES2002"
 const val MAHDI_LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
 
+/** اسم الجهة صاحبة الحقوق (العلامة التجارية للمشروع). */
+const val MAHDI_COPYRIGHT_HOLDER = "Mahdi-Editor-Code"
+
+/** سطر الحقوق المعروض في شاشة «حول» وفي التوثيق. */
+const val MAHDI_COPYRIGHT = "© 2026 Mahdi-Editor-Code — جميع الحقوق محفوظة"
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AboutScreen() {
@@ -85,6 +91,17 @@ fun AboutScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp),
+            )
+
+            Text(
+                text = MAHDI_COPYRIGHT,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .padding(top = 12.dp, start = 24.dp, end = 24.dp, bottom = 8.dp)
+                        .combinedClickable(onClick = {}, onLongClick = { copyToClipboard(MAHDI_COPYRIGHT) }),
             )
         }
 
