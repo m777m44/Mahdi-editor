@@ -238,7 +238,13 @@ public final class TerminalRenderer {
             mTextPaint.setColor(foreColor);
 
             // The text alignment is the default Paint.Align.LEFT.
-            canvas.drawTextRun(text, startCharIndex, runWidthChars, startCharIndex, runWidthChars, left, y - mFontLineSpacingAndAscent, false, mTextPaint);
+            if (runWidthChars > 0 && BidiText.hasRtl(text, startCharIndex, runWidthChars)) {
+                // نص عربي/عبري: ترتيب بصري صحيح وتشكيل حروف متّصلة بدل الحروف المنفصلة المعكوسة
+                BidiText.draw(canvas, mTextPaint, text, startCharIndex, runWidthChars,
+                        left, y - mFontLineSpacingAndAscent);
+            } else {
+                canvas.drawTextRun(text, startCharIndex, runWidthChars, startCharIndex, runWidthChars, left, y - mFontLineSpacingAndAscent, false, mTextPaint);
+            }
         }
 
         if (savedMatrix) canvas.restore();

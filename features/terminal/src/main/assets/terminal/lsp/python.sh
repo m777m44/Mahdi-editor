@@ -5,6 +5,8 @@ source "$LOCAL/bin/utils"
 info 'Installing Pyright (Python language server)...'
 
 install() {
+  # بطاقة التقدّم: اسم الخادم ونسبته من 0 إلى 100 داخل التطبيق
+  declare -f mahdi_prog_start >/dev/null 2>&1 && (mahdi_prog_start "Pyright (Python)" "تجهيز الخادم…") || true
   if ! command_exists node || ! command_exists npm; then
     install_nodejs
   fi
@@ -12,6 +14,7 @@ install() {
   info 'Installing Pyright language server...'
   npm_fast install -g --prefix /usr pyright
 
+  declare -f mahdi_prog_done >/dev/null 2>&1 && (mahdi_prog_done 'تم تثبيت الخادم') || true
   success 'Python language server installed successfully.'
   exit 0
 }

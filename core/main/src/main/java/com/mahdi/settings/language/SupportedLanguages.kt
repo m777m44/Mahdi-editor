@@ -35,7 +35,11 @@ fun SupportedLanguages(modifier: Modifier = Modifier) {
             text =
                 stringResource(strings.languages_supported_desc) +
                     "\n\n" +
-                    "التلوين النحوي: ${LanguageRegistry.supportedCount} لغة — التشغيل المباشر: ${LanguageRegistry.runnableCount} لغة",
+                    stringResource(
+                        strings.languages_supported_stats,
+                        LanguageRegistry.supportedCount,
+                        LanguageRegistry.runnableCount,
+                    ),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )

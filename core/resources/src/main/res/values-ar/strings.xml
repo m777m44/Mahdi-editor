@@ -1056,4 +1056,8 @@
     <string name="git">Git</string>
     <string name="template_id">ID</string>
     <string name="crc_32">CRC-32</string>
+    <string name="indexer_error">خطأ في الفهرسة: %s</string>
+    <string name="terminal_unavailable">الطرفية غير متوفرة في هذا الإصدار</string>
+    <string name="terminal_service_error">خطأ: لا يوجد اتصال بخدمة الطرفية</string>
+    <string name="languages_supported_stats">التلوين النحوي: %1$d لغة — التشغيل المباشر: %2$d لغة</string>
 </resources>

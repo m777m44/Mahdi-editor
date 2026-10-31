@@ -13,7 +13,9 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.lifecycleScope
 import com.mahdi.DefaultScope
 import com.mahdi.activities.main.ui.fileTreeViewModel
+import com.mahdi.resources.getFilledString
 import com.mahdi.resources.getString
+import com.mahdi.resources.strings
 import com.mahdi.utils.application
 import com.mahdi.utils.logDebug
 import com.mahdi.utils.logError
@@ -164,7 +166,7 @@ class FileManager(private val activity: ComponentActivity) {
                 this.activity.lifecycleScope.launch(Dispatchers.IO) {
                     val fileObject = uri.toFileObject(expectedIsFile = true)
                     if (fileObject.hasChild(fileName)) {
-                        toast("File with name $fileName already exists")
+                        toast(strings.file_already_exists.getFilledString(fileName))
                         callback(null)
                     } else {
                         val newFile = fileObject.createChild(true, fileName)

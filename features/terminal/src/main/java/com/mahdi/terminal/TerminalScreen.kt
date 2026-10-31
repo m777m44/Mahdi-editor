@@ -62,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -239,6 +240,13 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                     }
                 }
             },
+        )
+
+        // بطاقة تقدّم تنزيل/تثبيت المكتبات: تظهر تلقائيًا أعلى شريط المفاتيح
+        val downloadProgress = rememberDownloadProgress()
+        DownloadProgressOverlay(
+            progress = downloadProgress,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp).zIndex(3f),
         )
     }
 }

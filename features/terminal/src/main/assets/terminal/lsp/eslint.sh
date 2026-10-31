@@ -3,6 +3,8 @@ set -e
 source "$LOCAL/bin/utils"
 
 install() {
+  # بطاقة التقدّم: اسم الخادم ونسبته من 0 إلى 100 داخل التطبيق
+  declare -f mahdi_prog_start >/dev/null 2>&1 && (mahdi_prog_start "ESLint" "تجهيز الخادم…") || true
   if ! command_exists node || ! command_exists npm; then
     install_nodejs
   fi

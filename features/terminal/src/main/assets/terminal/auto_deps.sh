@@ -177,12 +177,41 @@ mahdi_ensure_pip() {
 
 # ————————————————————————— تثبيت حزم بايثون (متوازٍ) —————————————————————————
 
+# مسار مثبّت الحزم الذكي (يعرض نسبة تقدّم حقيقية في التطبيق)
+mahdi_pip_runner() {
+  local candidate="${LOCAL:-/home}/bin/mahdi_pip.py"
+  if [ ! -f "$candidate" ]; then
+    candidate="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/mahdi_pip.py"
+  fi
+  printf '%s' "$candidate"
+}
+
+# تثبيت معروض بنسبة 0→100: mahdi_pip_run "العرض" pkg1 pkg2…
+mahdi_pip_run() {
+  local name="$1"
+  shift
+  local script
+  script="$(mahdi_pip_runner)"
+  if [ -f "$script" ]; then
+    if python3 "$script" --name "$name" "$@"; then
+      return 0
+    fi
+    # خطة بديلة صامتة إن فشل المثبّت الذكي لأي سبب
+  fi
+  if declare -f mahdi_prog_start >/dev/null 2>&1; then
+    mahdi_prog_start "$name" "تثبيت مباشر بـ pip…"
+    mahdi_prog 40 "تثبيت المكتبة" "$name"
+  fi
+  python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+    --no-input --retries 5 --timeout 30 --progress-bar off "$@" || return 1
+  declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم التثبيت" "$name"
+  return 0
+}
+
 mahdi_pip_one() {
   local pkg="$1"
-  # --prefer-binary: يفضّل الحزم الجاهزة على بناء المصدر (أسرع بكثير)
-  python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-    --no-input --retries 5 --timeout 30 "$pkg" && return 0
-  # إعادة محاولة عبر المصدر الرسمي، ثم عبر مرآة بديلة
+  mahdi_pip_run "$pkg" "$pkg" && return 0
+  # إعادة محاولة عبر المصدر الرسمي
   python3 -m pip install --upgrade --prefer-binary --no-input --retries 3 --timeout 30 "$pkg" && return 0
   python3 -m pip install --upgrade --prefer-binary --no-input --retries 3 --timeout 30 \
     -i "https://pypi.org/simple" "$pkg" && return 0
@@ -195,19 +224,14 @@ mahdi_pip_install_many() {
   local total=${#pkgs[@]}
   [ "$total" -eq 0 ] && return 0
 
-  if [ "$total" -le 2 ] || [ "$MAHDI_DEP_JOBS" -le 1 ]; then
-    python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-      --no-input --retries 5 --timeout 30 "${pkgs[@]}" || {
-      local p
-      for p in "${pkgs[@]}"; do mahdi_pip_one "$p" || true; done
-    }
+  local label="${pkgs[*]}"
+  if mahdi_pip_run "$label" "${pkgs[@]}"; then
+    declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم تثبيت المكتبات" "$label"
     return 0
   fi
 
-  export -f mahdi_pip_one 2>/dev/null || true
-  export -f warn 2>/dev/null || true
-  printf '%s\n' "${pkgs[@]}" |
-    xargs -r -P "$MAHDI_DEP_JOBS" -I{} bash -c 'mahdi_pip_one "$@"' _ {} || true
+  local p
+  for p in "${pkgs[@]}"; do mahdi_pip_one "$p" || true; done
   return 0
 }
 
@@ -452,8 +476,7 @@ mahdi_py_deps() {
 
   if [ -f "$dir/requirements.txt" ]; then
     info "تثبيت متطلبات requirements.txt…"
-    python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-      --no-input --retries 5 --timeout 30 -r "$dir/requirements.txt" ||
+    mahdi_pip_run "requirements.txt" -r "$dir/requirements.txt" ||
       warn "بعض متطلبات requirements.txt لم تُثبَّت"
   fi
 

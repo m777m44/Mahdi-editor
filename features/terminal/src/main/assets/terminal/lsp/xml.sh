@@ -6,6 +6,8 @@ LLEMINX_VERSION="0.31.0"
 INSTALL_DIR="$HOME/.lsp/lemminx"
 
 install() {
+  # بطاقة التقدّم: اسم الخادم ونسبته من 0 إلى 100 داخل التطبيق
+  declare -f mahdi_prog_start >/dev/null 2>&1 && (mahdi_prog_start "LemMinX (XML)" "تجهيز الخادم…") || true
   info 'Installing LemMinX language server...'
 
   mkdir -p "$INSTALL_DIR"
@@ -13,6 +15,7 @@ install() {
   apt_fast curl ca-certificates default-jdk
   fetch_faster "https://download.eclipse.org/staging/2025-09/plugins/org.eclipse.lemminx.uber-jar_${LLEMINX_VERSION}.jar" "server.jar"
   echo "$LLEMINX_VERSION" > version.txt
+  declare -f mahdi_prog_done >/dev/null 2>&1 && (mahdi_prog_done 'تم تثبيت الخادم') || true
   info 'LemMinX language server installed successfully.'
   exit 0
 }

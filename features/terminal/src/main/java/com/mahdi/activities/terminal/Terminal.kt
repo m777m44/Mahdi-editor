@@ -181,7 +181,7 @@ class Terminal : AppCompatActivity() {
                         TerminalScreenHost(this)
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Error: No service connection")
+                            Text(strings.terminal_service_error.getString())
                         }
                     }
                 }
