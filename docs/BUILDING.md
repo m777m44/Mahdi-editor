@@ -83,8 +83,21 @@ keyPassword=******
 ### البناء في GitHub Actions
 
 سير العمل `.github/workflows/android.yml` يبني `assembleCommunityRelease` تلقائيًا عند كل دفعة
-إلى `main`، ويرفع APK كـ Artifact، وينشر Release عند دفع وسم يبدأ بـ `v` (مثل `v1.0.0`).
-إن لم تكن أسرار التوقيع مضبوطة، سيُوقّع APK بمفتاح الاختبار.
+إلى `main`، وعند كل طلب دمج، وعند كل وسم إصدار. يرفع الـAPK كـ Artifact، وينشر Release عند دفع
+وسم يبدأ بـ `v` (مثل `v1.0.0`). إن لم تكن أسرار التوقيع مضبوطة، سيُوقّع APK بمفتاح الاختبار.
+
+### إصدار نسخة جديدة
+
+```bash
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+ينشر هذا الأمر إصدارًا جديدًا تلقائيًا. **اسم ملف الـAPK داخل كل إصدار ثابت دائمًا**
+(`Mahdi-Editor.apk`)، ولذلك يعمل رابط التنزيل الدائم التالي مع كل إصدار جديد دون تغييره:
+
+<https://github.com/m777m44/Mahdi-editor/releases/latest/download/Mahdi-Editor.apk>
+
+وإلى جانبه نسخة باسم الإصدار (`Mahdi-Editor-v1.0.1.apk`) للأرشفة.
 
 ## حلّ المشكلات
 

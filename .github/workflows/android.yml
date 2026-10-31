@@ -1,18 +1,14 @@
 name: Mahdi-Editor CI
 
-# بناء حزمة APK تلقائيًا عند كل دفعة إلى main، أو يدويًا من تبويب Actions.
-# Builds the app on every push to main and on manual dispatch.
-
+# بناء APK تلقائيًا عند كل دفعة إلى main، وعند كل طلب دمج، وعند كل وسم إصدار (v*).
+# الوسم v* ينشر إصدارًا جديدًا باسم ملف ثابت «Mahdi-Editor.apk» ليبقى رابط التنزيل الدائم صالحًا:
+#   https://github.com/m777m44/Mahdi-editor/releases/latest/download/Mahdi-Editor.apk
 on:
   push:
     branches:
       - main
-    # الوسوم تُطلق بناء الإصدار ونشره (راجع خطوة «Publish release»)
     tags:
       - "v*"
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   # طلبات الدمج تُبنى أيضًا، حتى يُتحقّق من نجاح التجميع قبل الدمج في main.
   pull_request:
     branches:
@@ -75,28 +71,53 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
-      - name: Set short commit hash
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - name: Set build metadata
+        run: |
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "APP_VERSION=$(grep -m1 'versionName' app/build.gradle.kts | cut -d'"' -f2)" >> "$GITHUB_ENV"
 
       - name: Build release APK
         run: |
           ./gradlew assembleCommunityRelease --no-daemon --stacktrace
           mkdir -p out
-          cp app/build/outputs/apk/community/release/*.apk "out/Mahdi-Editor-${SHORT_SHA}.apk"
+          # اسم الملف ثابت دائمًا: عليه يعتمد رابط «أحدث إصدار» في README
+          cp app/build/outputs/apk/community/release/*.apk "out/Mahdi-Editor.apk"
+          # نسخة إضافية باسم الإصدار، للرجوع إليها لاحقًا
+          cp "out/Mahdi-Editor.apk" "out/Mahdi-Editor-v${APP_VERSION}.apk"
+          ls -lh out
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Mahdi-Editor-${{ env.SHORT_SHA }}
-          path: out/*.apk
+          path: out/Mahdi-Editor.apk
           retention-days: 30
 
       - name: Publish release (tags only)
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         uses: softprops/action-gh-release@v2
         with:
-          files: out/*.apk
+          name: Mahdi-Editor ${{ github.ref_name }}
+          body: |
+            ## Mahdi-Editor ${{ github.ref_name }}
+
+            محرر أكواد عربي بالكامل، مبنيّ من المصدر عبر GitHub Actions.
+
+            ### التثبيت
+            1. نزّل ملف `Mahdi-Editor.apk` من هذه الصفحة (أو من الرابط الدائم
+               <https://github.com/m777m44/Mahdi-editor/releases/latest/download/Mahdi-Editor.apk>).
+            2. اسمح بتثبيت التطبيقات من هذا المصدر إن طلب أندرويد ذلك.
+            3. ثبّت التطبيق وافتحه.
+
+            - المتطلبات: أندرويد 8.0 (API 26) أو أحدث.
+            - الرخصة: GPLv3 — راجع ملف `NOTICE` في المستودع.
+          files: |
+            out/Mahdi-Editor.apk
+            out/Mahdi-Editor-v${{ env.APP_VERSION }}.apk
           generate_release_notes: true
+          draft: false
+          prerelease: false
+          make_latest: true
 
       - name: Delete signing material
         if: always()
