@@ -12,6 +12,7 @@ import com.mahdi.file.child
 import com.mahdi.file.sandboxHomeDir
 import com.mahdi.file.localBinDir
 import com.mahdi.icons.Icon
+import com.mahdi.lang.LanguageRegistry
 import com.mahdi.resources.drawables
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
@@ -133,18 +134,24 @@ object UniversalRunner : FileRunner() {
         return Icon.ResourceIcon(drawables.run)
     }
 
-    /** امتدادات اللغات القابلة للتشغيل (تطابق `LanguageRegistry` في 2.5.0). */
-    private val RUNNABLE_EXTENSIONS =
+    /** امتدادات إضافية عملية تُشغَّل عبر المحرّك الموحّد. */
+    private val EXTRA_EXTENSIONS =
         setOf(
-            "py", "pyw", "js", "mjs", "cjs", "ts", "tsx", "php",
-            "html", "htm", "xhtml", "css", "scss", "less",
-            "c", "cpp", "cc", "cxx", "cs", "java", "kt", "kts", "swift",
-            "go", "rs", "rb", "pl", "pm", "lua", "r", "dart", "scala", "groovy",
-            "hs", "jl", "ml", "mli", "ex", "exs", "erl",
-            "sh", "bash", "zsh", "fish", "ps1", "sql",
-            "json", "xml", "svg", "yaml", "yml", "md", "markdown",
-            "asm", "s", "bat", "cmd", "toml", "ini", "cfg", "conf",
-            "cmake", "pas", "tcl", "nix", "zig", "nim", "tex",
-            "f90", "f95", "f03", "f08", "diff", "patch", "txt", "log", "awk", "fsx", "fs", "elm",
+            "pyw", "mjs", "cjs", "tsx", "cc", "cxx", "kts", "htm", "xhtml",
+            "zsh", "fish", "svg", "yml", "markdown", "s", "cmd", "cfg", "conf",
+            "patch", "log", "f90", "f95", "f03", "f08", "awk", "fsx", "fs", "elm",
         )
+
+    /**
+     * امتدادات اللغات القابلة للتشغيل.
+     *
+     * **مصدر واحد للحقيقة:** تُشتق مباشرةً من `LanguageRegistry`، فأي لغة تُضاف هناك تصبح
+     * قابلة للتشغيل تلقائيًا بلا تعديل يدوي هنا. وأُضيفت بضع الامتدادات الشائعة التي لا تظهر
+     * كمدخلات لغة مستقلة (ملفات البناء والسجلات والفروقات).
+     */
+    private val RUNNABLE_EXTENSIONS: Set<String> by lazy {
+        LanguageRegistry.all.flatMap { language -> language.extensions.map { it.lowercase() } }
+            .toSet() + EXTRA_EXTENSIONS
+    }
+
 }

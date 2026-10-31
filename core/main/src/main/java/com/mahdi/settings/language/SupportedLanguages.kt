@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +24,9 @@ import com.mahdi.components.compose.preferences.base.PreferenceLayout
 import com.mahdi.lang.CodeLanguage
 import com.mahdi.lang.LanguageRegistry
 import com.mahdi.resources.strings
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mahdi.lang.LanguageInstallStore
+import com.mahdi.theme.SkyBadge
 
 /**
  * شاشة «اللغات المدعومة»: تعرض ما يدعمه المحرر فعليًا — التلوين النحوي لكل لغة،
@@ -30,6 +34,8 @@ import com.mahdi.resources.strings
  */
 @Composable
 fun SupportedLanguages(modifier: Modifier = Modifier) {
+    val installed by LanguageInstallStore.installed.collectAsStateWithLifecycle()
+
     PreferenceLayout(label = stringResource(strings.languages_supported), modifier = modifier, backArrowVisible = true) {
         Text(
             text =
@@ -46,7 +52,9 @@ fun SupportedLanguages(modifier: Modifier = Modifier) {
 
         // 2.5.0: كل اللغات صارت قابلة للتشغيل المباشر — لا توجد مجموعة «تلوين فقط».
         PreferenceGroup(heading = stringResource(strings.language_runnable)) {
-            LanguageRegistry.all.forEach { lang -> LanguageRow(lang, runnable = lang.runnable) }
+            LanguageRegistry.all.forEach { lang ->
+                LanguageRow(lang, runnable = lang.runnable, installed = lang.id in installed)
+            }
         }
 
         Text(
@@ -59,7 +67,7 @@ fun SupportedLanguages(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun LanguageRow(lang: CodeLanguage, runnable: Boolean) {
+private fun LanguageRow(lang: CodeLanguage, runnable: Boolean, installed: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -108,5 +116,10 @@ private fun LanguageRow(lang: CodeLanguage, runnable: Boolean) {
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        // شارة «مثبت» سمائية — تظهر بعد تثبيت اللغة من متجر الإضافات (2.7.0)
+        if (installed) {
+            SkyBadge(text = stringResource(strings.installed_state))
+        }
     }
 }
