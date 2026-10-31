@@ -135,7 +135,7 @@ fun rememberDownloadProgress(): DownloadProgress? {
             }
             delay(if (snapshot?.done == true) 150 else 260)
         }
-    }
+    }.value
 }
 
 /** الغلاف المتحرّك: يظهر بانزلاق ناعم من الأسفل ويختفي بتلاشٍ. */
