@@ -194,6 +194,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                                 StoreCategory.EXTENSIONS -> extensionManager.indexLocalExtensions()
                                 StoreCategory.THEMES -> themeManager.indexLocalThemes()
                                 StoreCategory.ICON_PACKS -> iconPackManager.indexLocalPacks()
+                                StoreCategory.SERVERS -> Unit
                             }
                         }
                         isIndexing = false
@@ -208,6 +209,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                                 StoreCategory.EXTENSIONS -> extensionManager.indexStoreExtensions()
                                 StoreCategory.THEMES -> themeManager.indexStoreThemes()
                                 StoreCategory.ICON_PACKS -> iconPackManager.indexStoreIconPacks()
+                                StoreCategory.SERVERS -> Unit
                             }
                         }
                         isFetching = false
