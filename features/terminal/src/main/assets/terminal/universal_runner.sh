@@ -19,6 +19,13 @@ if [ ! -f "$file" ]; then
   exit 1
 fi
 
+# نسخة المجلد الرئيسي (مأخوذة من /sdcard لأنها للقراءة فقط)
+case "$file" in
+  /home/mahdi-run/*)
+    info "تشغيل نسخة قابلة للكتابة داخل الطرفية: $file"
+    ;;
+esac
+
 run_code() {
     echo -e "\e[32;1m[✓]\e[37m Compilation successful! Running...\e[0m"
     chmod +x "$1" 2>/dev/null || true
@@ -44,10 +51,14 @@ install_package() {
   fi
 
   info "Installing $packages..."
-  # بدون apt upgrade (بطيء جدًا) وبدون الحزم الاختيارية — يقلّل زمن التجهيز كثيرًا
+  # بدون apt upgrade وبدون الحزم الاختيارية، وبمهلة قفل محدودة — لا انتظار للأبد
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq -o Acquire::Retries=3
-  apt-get install -y --no-install-recommends -o Acquire::Retries=3 $packages
+  if declare -f apt_fast >/dev/null 2>&1; then
+    apt_fast $packages
+    return $?
+  fi
+  apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 update -qq || true
+  apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 install -y --no-install-recommends $packages </dev/null
 }
 
 install_nodejs() {

@@ -44,6 +44,9 @@ import kotlinx.coroutines.withContext
 // Data class to hold locale with its availability status
 data class LocaleInfo(val locale: Locale, val isInstalled: Boolean, val displayName: String)
 
+/** اللغات التي تُشحن ترجماتها كاملة داخل التطبيق (values/ = العربية و values-en/ = الإنجليزية). */
+private val BUNDLED_LANGUAGES = setOf("ar", "en")
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LanguageScreen(modifier: Modifier = Modifier) {
@@ -62,9 +65,12 @@ fun LanguageScreen(modifier: Modifier = Modifier) {
             // Process all data at once
             val processed = supportedLocales.map { locale ->
                 val tag = locale.toLanguageTag()
+                // اللغات المترجمة فعليًا في هذا الإصدار: العربية والإنجليزية.
+                // أي لغة أخرى في الملف ستظهر معطّلة حتى تتوفّر ترجمتها.
+                val bundled = tag in BUNDLED_LANGUAGES || installedTags.contains(tag)
                 LocaleInfo(
                     locale = locale,
-                    isInstalled = installedTags.contains(tag),
+                    isInstalled = bundled,
                     displayName = "${locale.getDisplayLanguage(locale)} ($tag)",
                 )
             }

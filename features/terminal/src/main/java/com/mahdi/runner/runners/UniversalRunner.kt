@@ -10,6 +10,7 @@ import com.mahdi.exec.launchTerminal
 import com.mahdi.file.FileObject
 import com.mahdi.file.FileWrapper
 import com.mahdi.file.child
+import com.mahdi.file.sandboxHomeDir
 import com.mahdi.file.localBinDir
 import com.mahdi.icons.Icon
 import com.mahdi.resources.drawables
@@ -18,7 +19,10 @@ import com.mahdi.resources.strings
 import com.mahdi.runner.FileRunner
 import com.mahdi.terminal.setupAssetFile
 import com.mahdi.utils.dialogRes
+import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object UniversalRunner : FileRunner() {
 
@@ -50,22 +54,68 @@ object UniversalRunner : FileRunner() {
         }
 
         val path = fileObject.getAbsolutePath()
-        if (
-            path.startsWith("/sdcard") ||
-                path.startsWith("/storage/") ||
-                path.startsWith(Environment.getExternalStorageDirectory().absolutePath)
-        ) {
+        if (isOnExternalStorage(path)) {
+            // ملفات /sdcard للقراءة فقط على أندرويد الحديث (Media is read-only)،
+            // لذلك ننسخ السكربت إلى المجلد الرئيسي للطرفية ونشغّله من هناك.
             dialogRes(
                 title = strings.attention.getString(),
                 msg = strings.sdcard_filetype.getString(),
                 okRes = strings.continue_action,
                 onCancel = {},
-                onOk = { DefaultScope.launch { launchUniversalRunner(activity, fileObject) } },
+                onOk = { DefaultScope.launch { launchFromSandboxHome(activity, fileObject) } },
             )
             return
         }
 
         launchUniversalRunner(activity, fileObject)
+    }
+
+    /** هل المسار على التخزين الخارجي (‏/sdcard أو /storage)؟ */
+    @SuppressLint("SdCardPath")
+    private fun isOnExternalStorage(path: String): Boolean =
+        path.startsWith("/sdcard") ||
+            path.startsWith("/storage/") ||
+            path.startsWith(Environment.getExternalStorageDirectory().absolutePath)
+
+    /**
+     * ينسخ الملف إلى `~/mahdi-run` داخل الطرفية ثم يشغّله هناك.
+     *
+     * السبب: مجلد `/sdcard` جاهز للقراءة فقط في أندرويد 11+، فتشغيل الملف من مكانه يمنع السكربت
+     * من كتابة أي مخرجات بجانبه، ويمنع `chmod`. النسخة تعمل في مجلد قابل للكتابة.
+     */
+    suspend fun launchFromSandboxHome(activity: Activity, fileObject: FileObject) {
+        val name = fileObject.getName()
+        val runDir = sandboxHomeDir().child("mahdi-run").also { it.mkdirs() }
+        val target = File(runDir, name)
+
+        val copied =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    fileObject.getInputStream().use { input ->
+                        target.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    target.exists()
+                }.getOrDefault(false)
+            }
+
+        if (!copied) {
+            // تعذّر النسخ: نشغّل الملف الأصلي كما هو
+            launchUniversalRunner(activity, fileObject)
+            return
+        }
+
+        launchTerminal(
+            activity = activity,
+            terminalCommand =
+                TerminalCommand(
+                    sandbox = true,
+                    exe = "/bin/bash",
+                    args = arrayOf(localBinDir().child("universal_runner").absolutePath, "/home/mahdi-run/$name"),
+                    id = strings.universal_runner.getString(),
+                    terminatePreviousSession = true,
+                    workingDir = "/home/mahdi-run",
+                ),
+        )
     }
 
     suspend fun launchUniversalRunner(activity: Activity, fileObject: FileObject) {

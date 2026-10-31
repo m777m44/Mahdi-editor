@@ -8,10 +8,10 @@ install() {
   fi
 
   info 'Installing Bash language server...'
-  npm install -g --prefix /usr bash-language-server
+  npm_fast install -g --prefix /usr bash-language-server
 
   info 'Installing ShellCheck...'
-  apt install -y shellcheck
+  apt_fast shellcheck
 
   info 'Bash language server installed successfully.'
   exit 0
@@ -19,7 +19,7 @@ install() {
 
 uninstall() {
   info 'Uninstalling Bash language server...'
-  npm uninstall -g --prefix /usr bash-language-server
+  npm_fast uninstall -g --prefix /usr bash-language-server
   info 'Bash language server uninstalled successfully.'
   uninstall_nodejs
   exit 0
@@ -27,7 +27,7 @@ uninstall() {
 
 update() {
   info 'Updating Bash language server...'
-  npm update -g --prefix /usr bash-language-server
+  npm_fast update -g --prefix /usr bash-language-server
   info 'Bash language server updated successfully.'
   exit 0
 }

@@ -10,8 +10,8 @@ install() {
 
   mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR"
-  apt install -y curl ca-certificates default-jdk
-  curl -L -o "server.jar" "https://download.eclipse.org/staging/2025-09/plugins/org.eclipse.lemminx.uber-jar_${LLEMINX_VERSION}.jar"
+  apt_fast curl ca-certificates default-jdk
+  fetch_faster "https://download.eclipse.org/staging/2025-09/plugins/org.eclipse.lemminx.uber-jar_${LLEMINX_VERSION}.jar" "server.jar"
   echo "$LLEMINX_VERSION" > version.txt
   info 'LemMinX language server installed successfully.'
   exit 0
@@ -24,8 +24,8 @@ uninstall() {
 
   if ask "Do you want to uninstall OpenJDK? It was installed as a dependency of this language server."; then
     info "Uninstalling OpenJDK..."
-    apt remove -y default-jdk
-    apt autoremove -y
+    apt-get -o DPkg::Lock::Timeout=60 remove -y default-jdk
+    apt-get -o DPkg::Lock::Timeout=60 autoremove -y
     info "OpenJDK uninstalled successfully."
   fi
   exit 0
@@ -34,8 +34,8 @@ uninstall() {
 update() {
   info 'Updating LemMinX language server...'
   cd "$INSTALL_DIR"
-  rm "server.jar"
-  curl -L -o "server.jar" "https://download.eclipse.org/staging/2025-09/plugins/org.eclipse.lemminx.uber-jar_${LLEMINX_VERSION}.jar"
+  rm -f "server.jar"
+  fetch_faster "https://download.eclipse.org/staging/2025-09/plugins/org.eclipse.lemminx.uber-jar_${LLEMINX_VERSION}.jar" "server.jar"
   echo "$LLEMINX_VERSION" > version.txt
   info 'LemMinX language server updated successfully.'
   exit 0
