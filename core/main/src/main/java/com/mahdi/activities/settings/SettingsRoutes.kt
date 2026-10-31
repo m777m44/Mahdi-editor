@@ -49,6 +49,8 @@ sealed class SettingsRoutes(val route: String) {
 
     data object LanguageScreen : SettingsRoutes("language")
 
+    data object SupportedLanguages : SettingsRoutes("supported_languages")
+
     data object Runners : SettingsRoutes("runners")
 
     data object HtmlRunner : SettingsRoutes("html_preview")
@@ -56,6 +58,8 @@ sealed class SettingsRoutes(val route: String) {
     data object Themes : SettingsRoutes("theme")
 
     data object ThemeDetail : SettingsRoutes("theme_detail")
+
+    data object ThemeCustomizer : SettingsRoutes("theme_customizer")
 
     data object IconPackDetail : SettingsRoutes("icon_pack_detail")
 

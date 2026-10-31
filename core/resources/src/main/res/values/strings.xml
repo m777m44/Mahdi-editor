@@ -977,7 +977,7 @@
     <string name="telegram_channel">قناة Telegram</string>
     <string name="license_label">الرخصة</string>
     <string name="package_name">اسم الحزمة</string>
-    <string name="app_tagline">محرر نصوص وأكواد متقدم لأندرويد — بالعربية بالكامل</string>
+    <string name="app_tagline">محرر أكواد احترافي لأندرويد — 30+ لغة، ثيمات متقدمة بدائرة ألوان، طرفية مدمجة، وبالعربية بالكامل</string>
     <string name="themes_arabic">ثيمات عربية</string>
     <string name="license_notice">Mahdi-Editor نسخة معدّلة من مشروع برمجي حر يُوزَّع بموجب رخصة GNU General Public License الإصدار 3.0. راجع ملفَّي LICENSE وNOTICE في المستودع للاطلاع على نص الرخصة الكامل وإشعارات حقوق النشر الأصلية.</string>
 
@@ -987,4 +987,68 @@
 
     <!-- Mahdi-Editor additions -->
     <string name="store_unavailable_msg">المتجر الإلكتروني غير متاح في هذه النسخة لأنه مرتبط بخوادم المشروع الأصلي وحزمه غير متوافقة. يمكنك تثبيت الإضافات والثيمات وحزم الأيقونات من ملف محلي عبر «التثبيت من التخزين».</string>
+
+    <!-- ===== Mahdi-Editor 2.0: تخصيص الثيم (Color Wheel) ===== -->
+    <string name="theme_customizer">تخصيص الثيم</string>
+    <string name="theme_customizer_desc">عدّل الألوان الأحد عشر بدائرة ألوان ومعاينة حية</string>
+    <string name="theme_details">اسم الثيم ونمطه</string>
+    <string name="theme_name">اسم الثيم</string>
+    <string name="color_wheel">دائرة الألوان</string>
+    <string name="hue">درجة اللون</string>
+    <string name="saturation">التشبع</string>
+    <string name="lightness">السطوع</string>
+    <string name="editing_color">اللون الحالي: %1$s</string>
+    <string name="theme_colors">ألوان الثيم</string>
+    <string name="slot_background">الخلفية</string>
+    <string name="slot_surface">السطح</string>
+    <string name="slot_primary">الأساسي</string>
+    <string name="slot_secondary">الثانوي</string>
+    <string name="slot_accent">التمييز</string>
+    <string name="slot_text">النص</string>
+    <string name="slot_text_secondary">النص الثانوي</string>
+    <string name="slot_outline">الحدود</string>
+    <string name="slot_success">النجاح</string>
+    <string name="slot_error">الخطأ</string>
+    <string name="slot_warning">التحذير</string>
+    <string name="live_preview">معاينة حية</string>
+    <string name="preview_description">هكذا ستبدو الواجهة بثيمك الجديد</string>
+    <string name="preview_primary">أساسي</string>
+    <string name="preview_secondary">ثانوي</string>
+    <string name="preview_accent">تمييز</string>
+    <string name="preview_surface">هذه بطاقة سطحية بحدود الثيم</string>
+    <string name="contrast_check">فحص التباين (WCAG AA)</string>
+    <string name="contrast_pass">مطابق</string>
+    <string name="contrast_fail">غير مطابق</string>
+    <string name="theme_actions">حفظ وتصدير</string>
+    <string name="save_theme">حفظ الثيم وتطبيقه</string>
+    <string name="reset">إعادة تعيين</string>
+    <string name="export_json">تصدير JSON</string>
+    <string name="import_json">استيراد JSON</string>
+    <string name="theme_saved">تم حفظ الثيم وتطبيقه</string>
+    <string name="theme_exported">تم نسخ الثيم بصيغة JSON</string>
+    <string name="theme_imported">تم استيراد الثيم</string>
+    <string name="invalid_theme_json">محتوى الحافظة لا يحتوي ثيمًا صالحًا</string>
+    <string name="my_theme">ثيمي</string>
+    <string name="palette_generate">توليد باليت من اللون الأساسي</string>
+    <string name="palette_complementary">متكامل</string>
+    <string name="palette_triadic">ثلاثي</string>
+    <string name="palette_analogous">متجاور</string>
+    <string name="palette_applied">تم توليد الباليت</string>
+
+    <!-- ===== Mahdi-Editor 2.0: الترميزات ===== -->
+    <string name="encoding_recommended">ترميزات شائعة</string>
+    <string name="encoding_all">كل الترميزات المتاحة</string>
+    <string name="encoding_detect_title">كشف الترميز تلقائيًا</string>
+    <string name="encoding_detect_desc">يُحدَّد الترميز من بصمة الملف (BOM) ثم يُتحقَّق من صحة UTF-8 ثم يُخمَّن الترميز العربي</string>
+
+    <!-- ===== Mahdi-Editor 2.0: اللغات والتشغيل ===== -->
+    <string name="languages_supported">اللغات المدعومة</string>
+    <string name="languages_supported_desc">تلوين نحوي لأكثر من 30 لغة، وتشغيل مباشر داخل طرفية Ubuntu</string>
+    <string name="language_highlight">تلوين نحوي</string>
+    <string name="language_runnable">تشغيل مباشر</string>
+    <string name="language_files">الامتدادات</string>
+    <string name="run_in_terminal">تشغيل في الطرفية</string>
+    <string name="runner_hint">أول تشغيل قد يثبّت المفسّر تلقائيًا داخل Ubuntu (يحتاج إنترنت).</string>
+    <string name="install_terminal_first">ثبّت مكوّن الطرفية من الإعدادات أولًا لتشغيل الأكواد.</string>
+
 </resources>

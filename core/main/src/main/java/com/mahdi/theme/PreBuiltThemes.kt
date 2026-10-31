@@ -309,4 +309,4 @@ val lime =
             },
     )
 
-val builtInThemes = listOf(blueberry, lime) + arabicThemes
+val builtInThemes = listOf(blueberry, lime) + catalogThemes

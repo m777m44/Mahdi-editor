@@ -15,7 +15,7 @@ import com.mahdi.settings.editor.DEFAULT_EXCLUDED_FILES_DRAWER
 import com.mahdi.settings.editor.DEFAULT_EXCLUDED_FILES_SEARCH
 import com.mahdi.settings.editor.DEFAULT_EXTRA_KEYS_COMMANDS
 import com.mahdi.settings.editor.DEFAULT_EXTRA_KEYS_SYMBOLS
-import com.mahdi.theme.blueberry
+import com.mahdi.theme.DEFAULT_THEME_ID
 import com.mahdi.utils.application
 import com.mahdi.utils.hasHardwareKeyboard
 import com.mahdi.utils.logError
@@ -187,7 +187,7 @@ object Settings {
 
     // String settings
     var font_gson by CachedPreference("selected_font", "")
-    var theme by CachedPreference("theme", blueberry.id)
+    var theme by CachedPreference("theme", DEFAULT_THEME_ID)
     var icon_pack: String by CachedPreference("icon_pack", "")
     var editor_font_path by CachedPreference("selected_font_path", "")
     var app_font_path by CachedPreference("app_font_path", "")
@@ -195,6 +195,9 @@ object Settings {
     var terminal_cursor_style by CachedPreference("terminal_cursor_style", "block")
     var terminal_extra_keys by CachedPreference("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)
     var encoding: String by CachedPreference("encoding", Charset.defaultCharset().name())
+
+    /** كشف ترميز الملفات تلقائيًا عند الفتح (BOM ← UTF-8 ← ترميز عربي). */
+    var encoding_auto_detect: Boolean by CachedPreference("encoding_auto_detect", true)
     var line_ending by CachedPreference("line_ending", "lf")
     // اللغة الافتراضية للتطبيق هي العربية؛ يمكن للمستخدم تغييرها من شاشة اللغة.
     var current_lang: String by CachedPreference("current_lang", "ar")

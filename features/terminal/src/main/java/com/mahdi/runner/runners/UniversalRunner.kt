@@ -28,7 +28,12 @@ object UniversalRunner : FileRunner() {
 
     override fun matcher(fileObject: FileObject): Boolean {
         return Regex(
-                ".*\\.(py|js|ts|java|kt|rs|rb|php|c|cpp|cc|cxx|cs|sh|bash|zsh|fish|pl|lua|r|R|hs|f90|f95|f03|f08|pas|tcl|elm|fsx|fs)$"
+                ".*\\.(" +
+                    "py|js|mjs|cjs|ts|java|kt|kts|rs|rb|php|c|cpp|cc|cxx|cs|sh|bash|zsh|fish|pl|lua|r|R|hs|" +
+                        "f90|f95|f03|f08|pas|tcl|elm|fsx|fs|" +
+                        // لغات أُضيفت في 2.0
+                        "go|jl|groovy|scala|ml|mli|ex|exs|erl|sql|awk" +
+                        ")$"
             )
             .matches(fileObject.getName())
     }

@@ -25,12 +25,14 @@ import com.mahdi.settings.editor.FormatterSettings
 import com.mahdi.settings.editor.SettingsEditorScreen
 import com.mahdi.settings.keybinds.KeybindingsScreen
 import com.mahdi.settings.language.LanguageScreen
+import com.mahdi.settings.language.SupportedLanguages
 import com.mahdi.settings.lsp.LspInitializationOptions
 import com.mahdi.settings.lsp.LspServerDetail
 import com.mahdi.settings.lsp.LspServerLogs
 import com.mahdi.settings.lsp.LspSettings
 import com.mahdi.settings.support.Support
 import com.mahdi.settings.theme.ThemeScreen
+import com.mahdi.theme.ThemeCustomizer
 
 @Composable
 fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity) {
@@ -98,6 +100,8 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
             LspServerLogs(server, instanceId)
         }
         composable(SettingsRoutes.Themes.route) { ThemeScreen(navController) }
+        composable(SettingsRoutes.ThemeCustomizer.route) { ThemeCustomizer(navController) }
+        composable(SettingsRoutes.SupportedLanguages.route) { SupportedLanguages() }
 
         SettingsRegistry.routes.value.forEach { customRoute ->
             composable(customRoute.route, arguments = customRoute.arguments) { backStackEntry ->

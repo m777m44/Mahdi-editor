@@ -90,6 +90,9 @@ open class App : Application() {
         CommandProvider.buildCommands()
         KeybindingsManager.loadKeybindings()
 
+        // ثيمات المستخدم المخصّصة (Color Wheel) تُدمج في القائمة قبل بناء الواجهة
+        themeManager.registerCustomThemes()
+
         val currentLocale = Locale.forLanguageTag(Settings.current_lang)
         val appLocale = LocaleListCompat.create(currentLocale)
         AppCompatDelegate.setApplicationLocales(appLocale)

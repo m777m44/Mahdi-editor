@@ -287,4 +287,83 @@ case "$file" in
     fi
     dotnet fsi "$file"
     ;;
+
+  # ——— لغات أُضيفت في Mahdi-Editor 2.0 ———
+  *.go)
+    if ! command_exists go; then
+      install_package "golang-go"
+    fi
+    go run "$file"
+    ;;
+
+  *.jl)
+    if ! command_exists julia; then
+      install_package "julia"
+    fi
+    julia "$file"
+    ;;
+
+  *.groovy)
+    if ! command_exists groovy; then
+      install_package "groovy"
+    fi
+    groovy "$file"
+    ;;
+
+  *.scala)
+    if ! command_exists scala; then
+      install_package "scala"
+    fi
+    scala "$file"
+    ;;
+
+  *.ml|*.mli)
+    if ! command_exists ocaml; then
+      install_package "ocaml"
+    fi
+    ocaml "$file"
+    ;;
+
+  *.ex|*.exs)
+    if ! command_exists elixir; then
+      install_package "elixir"
+    fi
+    elixir "$file"
+    ;;
+
+  *.erl)
+    if ! command_exists escript; then
+      install_package "erlang"
+    fi
+    escript "$file"
+    ;;
+
+  *.hs)
+    if ! command_exists runghc; then
+      install_package "ghc"
+    fi
+    runghc "$file"
+    ;;
+
+  *.sql)
+    if ! command_exists sqlite3; then
+      install_package "sqlite3"
+    fi
+    info "تشغيل ملف SQL على قاعدة بيانات مؤقتة…"
+    sqlite3 /tmp/mahdi_sql_run.db < "$file"
+    ;;
+
+  *.awk)
+    if ! command_exists awk; then
+      install_package "gawk"
+    fi
+    awk -f "$file"
+    ;;
+
+  *.vb|*.vbs)
+    if ! command_exists dotnet; then
+      install_dotnet
+    fi
+    info "ملفات Visual Basic تحتاج مشروعًا كاملًا؛ استخدم مشروعًا بامتداد .vbproj"
+    ;;
 esac
