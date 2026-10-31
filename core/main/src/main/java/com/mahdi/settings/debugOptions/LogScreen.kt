@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import com.mahdi.activities.settings.SettingsActivity
-import com.mahdi.crashhandler.CrashHandler.logErrorOrExit
 import com.mahdi.editor.Editor
 import com.mahdi.file.BuiltinFileType
 import com.mahdi.resources.drawables
@@ -48,8 +47,6 @@ import com.mahdi.theme.MahdiTheme
 import com.mahdi.utils.copyToClipboard
 import com.mahdi.utils.dialogRes
 import java.lang.ref.WeakReference
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -57,7 +54,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun LogScreen(
     logText: String,
-    issueTitle: String,
     copyLabel: String,
     flow: Flow<String>? = null,
     toolbarButtons: @Composable RowScope.() -> Unit,
@@ -108,17 +104,7 @@ fun LogScreen(
                                 Text(stringResource(strings.copy))
                             }
 
-                            TextButton(
-                                onClick = {
-                                    runCatching {
-                                        val currentText = editorState.editor.get()?.text
-                                        reportLogs(currentText?.toString() ?: logText, issueTitle, copyLabel)
-                                    }
-                                        .onFailure { logErrorOrExit(it) }
-                                }
-                            ) {
-                                Text(stringResource(strings.report_issue))
-                            }
+                            // «الإبلاغ عن مشكلة» أُزيل في 2.7.1: لا روابط دعم خارجية داخل التطبيق.
                         },
                     )
                     HorizontalDivider()
@@ -195,29 +181,3 @@ fun LogScreen(
     }
 }
 
-private fun reportLogs(logText: String, issueTitle: String, copyLabel: String) {
-    val context = SettingsActivity.instance!!
-
-    val encodedTitle = URLEncoder.encode(issueTitle, StandardCharsets.UTF_8.toString())
-    val urlStart = "https://github.com/m777m44/Mahdi-editor/issues/new?title=$encodedTitle&body="
-    val url = urlStart + URLEncoder.encode("```log \n${logText}\n ```", StandardCharsets.UTF_8.toString())
-    if (url.length > 2048) {
-        val trimmedUrl =
-            urlStart + URLEncoder.encode("```log \nPaste the logs here\n ```", StandardCharsets.UTF_8.toString())
-        dialogRes(
-            activity = context,
-            title = strings.logs_too_long.getString(),
-            msg = strings.logs_too_long_desc.getString(),
-            okRes = strings.continue_action,
-            onOk = {
-                copyToClipboard(copyLabel, logText, true)
-                val browserIntent = Intent(Intent.ACTION_VIEW, trimmedUrl.toUri())
-                context.startActivity(browserIntent)
-            },
-            cancelable = false,
-        )
-        return
-    }
-    val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
-    context.startActivity(browserIntent)
-}

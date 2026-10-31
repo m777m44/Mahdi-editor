@@ -27,7 +27,7 @@ icon.png           (اختياري)
   "mainClass": "com.example.MyExtension",
   "repository": "https://github.com/example/my-extension",
   "minAppVersion": 1,
-  "license": "GPL-3.0",
+  "license": "MIT",
   "localization": ["ar"],
   "dependencies": [],
   "recommendations": [],

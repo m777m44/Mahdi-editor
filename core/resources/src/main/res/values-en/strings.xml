@@ -7,7 +7,6 @@
     <string name="open_directory">Open a directory</string>
     <string name="new_file">New file</string>
     <string name="wait">Please wait…</string>
-    <string name="report_issue">Report issue</string>
     <string name="copy">Copy</string>
     <string name="save_all">Save all</string>
     <string name="undo">Undo</string>
@@ -116,9 +115,6 @@
     <string name="version">Version</string>
     <string name="version_code">Version code</string>
     <string name="github">GitHub</string>
-    <string name="github_desc">Star it on GitHub 🤩</string>
-    <string name="telegram">Telegram group</string>
-    <string name="telegram_desc">Report issues, feature requests etc.</string>
     <string name="git_commit">Git commit hash</string>
     <string name="check_for_updates">Check for updates</string>
     <string name="check_for_updates_desc">Periodically check for updates</string>
@@ -279,7 +275,6 @@
     <string name="format_on_save_desc">Format the file automatically when saved</string>
     <string name="developer">Developer</string>
     <string name="build_info">Build info</string>
-    <string name="community">Community</string>
     <string name="failsafe_mode">Failsafe mode</string>
     <string name="failsafe_mode_desc">Start terminal in maintenance mode</string>
     <string name="render_whitespace">Render whitespace</string>
@@ -292,8 +287,6 @@
     <string name="cant_write">Cannot write to the file (no write permissions)</string>
     <string name="info_lsp">Language servers are separate processes that provide intelligent features, such as code completion, error highlighting and inline documentation.</string>
     <string name="storage">Storage</string>
-    <string name="support">Support</string>
-    <string name="support_desc">Support development</string>
     <string name="translate">Translate</string>
     <string name="terminal_feature">Terminal and runners</string>
     <string name="folder_name">Folder name</string>
@@ -962,7 +955,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="input_behavior">Input behavior</string>
     <string name="input_behavior_msg">The actual input behavior may vary depending on the IME. Users of CJK languages should avoid the \'No suggestions\' option, as these languages rely on suggestions.</string>
     <string name="auto_time_mode">Automatic by time</string>
-    <string name="telegram_channel">Telegram channel</string>
     <string name="license_label">License</string>
     <string name="package_name">Package name</string>
     <string name="app_tagline">A professional code editor for Android — 30+ languages, advanced color-wheel themes, an integrated terminal, and full Arabic support</string>

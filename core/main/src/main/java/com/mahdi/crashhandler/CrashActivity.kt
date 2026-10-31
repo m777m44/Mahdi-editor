@@ -37,16 +37,12 @@ import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.theme.GitColorScheme
 import com.mahdi.theme.MahdiTheme
-import com.mahdi.utils.SourceCodeProvider
 import com.mahdi.utils.copyToClipboard
 import com.mahdi.utils.logError
-import com.mahdi.utils.openUrl
 import com.mahdi.utils.origin
 import com.mahdi.editor.BuildConfig
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -187,18 +183,7 @@ class CrashActivity : ComponentActivity() {
                                             Text(stringResource(strings.copy))
                                         }
 
-                                        val showReport = remember { intent.getBooleanExtra("force_crash", false).not() }
-
-                                        if (showReport) {
-                                            TextButton(
-                                                onClick = {
-                                                    runCatching { reportLogs(crashText, context) }
-                                                        .onFailure { logErrorOrExit(it) }
-                                                }
-                                            ) {
-                                                Text(stringResource(strings.report_issue))
-                                            }
-                                        }
+                                        // زرّ «الإبلاغ عن مشكلة» أُزيل في 2.7.1: لا روابط دعم خارجية داخل التطبيق.
                                     },
                                 )
                                 HorizontalDivider()
@@ -238,25 +223,6 @@ class CrashActivity : ComponentActivity() {
                 runCatching { finishAffinity() }
                 exitProcess(1)
             }
-    }
-
-    private fun reportLogs(crashText: String, context: Context) {
-        val repo = intent.getStringExtra("repository")
-        val baseUrl =
-            if (!repo.isNullOrEmpty()) {
-                repo.removeSuffix("/")
-            } else {
-                "https://github.com/m777m44/Mahdi-editor"
-            }
-        if (SourceCodeProvider.fromUrl(baseUrl) != SourceCodeProvider.GitHub) {
-            context.openUrl(baseUrl)
-            return
-        }
-
-        val issueUrl =
-            "$baseUrl/issues/new?title=Crash%20Report&body=" +
-                URLEncoder.encode("``` \n$crashText\n ```", StandardCharsets.UTF_8.toString())
-        context.openUrl(issueUrl)
     }
 
     private fun buildCrashReport(): String {
