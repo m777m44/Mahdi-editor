@@ -140,6 +140,27 @@ keytool -genkey -v -keystore mahdi-editor.jks -keyalg RSA -keysize 2048 -validit
 - **توليد باليت** متكامل/ثلاثي/متجاور من اللون الأساسي.
 - **حفظ** الثيم داخل التطبيق، و**تصدير/استيراد JSON**.
 
+## تجهيز المكتبات تلقائيًا
+
+قبل أن يُشغَّل أي سكربت بـ**تشغيل**، يقرأ المشغّل السكربت ويتعرّف على مكتباته ثم يثبّت الناقص فقط بآخر إصدار:
+
+- **بايثون:** يحلّل شجرة `import` / `from` (AST) ويستبعد المكتبة القياسية والملفات المحلية،
+  ويحوّل الأسماء الشائعة تلقائيًا (`PIL`→pillow، `cv2`→opencv-python، `sklearn`→scikit-learn، `bs4`→beautifulsoup4…).
+- **JavaScript/TypeScript:** يقرأ `require` و`import` ويستبعد الوحدات المدمجة والمسارات النسبية.
+- **PHP:** يشغّل `composer install` تلقائيًا عند وجود `composer.json`.
+- يلتقط أوامر `pip install …` المكتوبة **داخل** السكربت (نصًّا أو على شكل قائمة في `subprocess`) ويجهّزها مسبقًا،
+  ويصلح الأخطاء الشائعة مثل `pip install request` → `requests`.
+- يثبّت على دفعات متوازية (أسرع)، ويعيد المحاولة، ويضيف أدوات البناء تلقائيًا إذا احتاجت مكتبة ترجمة.
+- `pip` و`pip3` و`python` تصبح متاحة دائمًا، ويتجاوز `PEP 668` الذي كان يُفشل `pip install` في Ubuntu الحديثة.
+
+للتحكم: `MAHDI_AUTO_DEPS=0` للتعطيل، و`MAHDI_PIP_INDEX` / `MAHDI_NPM_REGISTRY` لاستخدام مرآة أسرع.
+
+### تنزيل أسرع
+```bash
+mahdi_dl https://example.com/big-archive.tar.gz
+```
+ينزّل الملف بعدة اتصالات متوازية (aria2c)، مع استئناف تلقائي وإعادة محاولة عبر curl/wget.
+
 ## اللغات والتشغيل
 
 - **47 لغة** للتلوين النحوي بقواعد TextMate مضمّنة (Python، JavaScript، TypeScript، PHP، C، C++، C#،

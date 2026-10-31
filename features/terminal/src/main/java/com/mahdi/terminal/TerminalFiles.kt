@@ -29,7 +29,8 @@ fun setupTerminalFiles() {
         }
     }
 
-    val internalFiles = listOf("init", "sandbox", "setup", "utils")
+    // auto_deps: محرّك التعرّف التلقائي على مكتبات السكربتات وتثبيتها قبل التشغيل
+    val internalFiles = listOf("init", "sandbox", "setup", "utils", "auto_deps", "mahdi_dl")
     internalFiles.forEach { setupAssetFile(it) }
 
     application!!.assets.list("terminal/lsp")?.forEach { setupLspFile(it.removeSuffix(".sh")) }
@@ -38,11 +39,18 @@ fun setupTerminalFiles() {
 fun setupLspFile(fileName: String) = setupAssetFile("lsp/$fileName")
 
 fun setupAssetFile(fileName: String) {
+    val assetText =
+        runCatching {
+            application!!.assets.open("terminal/$fileName.sh").bufferedReader().use { it.readText() }
+        }.getOrNull() ?: return
+
     with(localBinDir().child(fileName)) {
         parentFile?.mkdir()
-        if (exists().not()) {
+        // يُكتب الملف إن كان غائبًا أو تغيّر محتواه، حتى تصل إصلاحات السكربتات إلى التثبيتات القائمة
+        val currentText = if (exists()) runCatching { readText() }.getOrNull() else null
+        if (currentText != assetText) {
             createFileIfNot()
-            writeText(application!!.assets.open("terminal/$fileName.sh").bufferedReader().use { it.readText() })
+            writeText(assetText)
         }
     }
 }

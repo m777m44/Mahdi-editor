@@ -3,6 +3,17 @@ file="$1"
 
 source "$LOCAL/bin/utils"
 
+# التعرّف التلقائي على مكتبات السكربت وتثبيتها قبل التشغيل (Python/Node/PHP)
+if [ -f "$LOCAL/bin/auto_deps" ]; then
+  # shellcheck disable=SC1091
+  source "$LOCAL/bin/auto_deps"
+fi
+
+# دالة بديلة إن لم يُنزَّل ملف auto_deps بعد (تثبيت قديم للتطبيق)
+if ! declare -f mahdi_auto_deps >/dev/null 2>&1; then
+  mahdi_auto_deps() { return 0; }
+fi
+
 if [ ! -f "$file" ]; then
   error "File not found -> $file"
   exit 1
@@ -10,7 +21,7 @@ fi
 
 run_code() {
     echo -e "\e[32;1m[✓]\e[37m Compilation successful! Running...\e[0m"
-    chmod +x "$1"
+    chmod +x "$1" 2>/dev/null || true
     if [ -x "$1" ]; then
         "$1"
         rm "$1"
@@ -33,8 +44,10 @@ install_package() {
   fi
 
   info "Installing $packages..."
-  apt update -y && apt upgrade -y
-  apt install -y $packages
+  # بدون apt upgrade (بطيء جدًا) وبدون الحزم الاختيارية — يقلّل زمن التجهيز كثيرًا
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq -o Acquire::Retries=3
+  apt-get install -y --no-install-recommends -o Acquire::Retries=3 $packages
 }
 
 install_nodejs() {
@@ -55,7 +68,11 @@ install_rust() {
 
 install_dotnet() {
   info "Installing .NET SDK..."
-  wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+  if declare -f mahdi_fetch_fast >/dev/null 2>&1; then
+    mahdi_fetch_fast https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb packages-microsoft-prod.deb
+  else
+    wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+  fi
   dpkg -i packages-microsoft-prod.deb
   rm packages-microsoft-prod.deb
   apt update -qq
@@ -77,7 +94,13 @@ install_kotlin() {
     fi
 
     info "Downloading from: $url"
-    curl -L -o /tmp/kotlin.zip "$url"
+    if declare -f mahdi_fetch_fast >/dev/null 2>&1; then
+        mahdi_fetch_fast "$url" /tmp/kotlin.zip
+    elif declare -f mahdi_fetch >/dev/null 2>&1; then
+        mahdi_fetch "$url" /tmp/kotlin.zip
+    else
+        curl -fL --retry 5 -C - -o /tmp/kotlin.zip "$url"
+    fi
 
     info "Extracting to /opt/kotlinc ..."
     mkdir -p /opt/kotlinc
@@ -94,20 +117,25 @@ case "$file" in
     if ! command_exists python3; then
       install_package "python3 python3-pip python3-venv"
     fi
+    # 1) يكتشف كل import في الملف + أوامر pip المكتوبة داخله، 2) يثبّت الناقص بآخر إصدار، 3) يشغّل
+    mahdi_auto_deps "$file"
     python3 "$file"
     ;;
 
-  *.js)
+  *.js|*.mjs|*.cjs)
     if ! command_exists node; then
       install_nodejs
     fi
+    mahdi_auto_deps "$file"
     node "$file"
     ;;
 
-  *.ts)
+  *.ts|*.tsx)
     if ! command_exists node; then
       install_nodejs
     fi
+
+    mahdi_auto_deps "$file"
 
     if ! command_exists tsc; then
       info "Installing TypeScript compiler..."
@@ -170,6 +198,7 @@ case "$file" in
     if ! command_exists php; then
       install_package "php-cli"
     fi
+    mahdi_auto_deps "$file"
     php "$file"
     ;;
 
@@ -205,7 +234,7 @@ case "$file" in
     ;;
 
   *.sh|*.bash)
-    chmod +x "$file"
+    chmod +x "$file" 2>/dev/null || true
     bash "$file"
     ;;
 
@@ -213,7 +242,7 @@ case "$file" in
     if ! command_exists zsh; then
       install_package "zsh"
     fi
-    chmod +x "$file"
+    chmod +x "$file" 2>/dev/null || true
     zsh "$file"
     ;;
 
@@ -221,7 +250,7 @@ case "$file" in
     if ! command_exists fish; then
       install_package "fish"
     fi
-    chmod +x "$file"
+    chmod +x "$file" 2>/dev/null || true
     fish "$file"
     ;;
 

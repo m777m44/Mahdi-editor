@@ -41,6 +41,8 @@ object UniversalRunner : FileRunner() {
     @SuppressLint("SdCardPath")
     override suspend fun run(activity: Activity, fileObject: FileObject) {
         setupAssetFile("universal_runner")
+        // محرّك التثبيت التلقائي للمكتبات (يفشل بصمت إن لم يوجد)
+        setupAssetFile("auto_deps")
 
         if (fileObject !is FileWrapper) {
             dialogRes(title = strings.attention.getString(), msg = strings.non_native_filetype.getString(), onOk = {})
