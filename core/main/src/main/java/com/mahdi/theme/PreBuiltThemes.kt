@@ -309,4 +309,10 @@ val lime =
             },
     )
 
-val builtInThemes = listOf(blueberry, lime) + catalogThemes
+/**
+ * الثيمات المتاحة داخل التطبيق: أربعة فقط (فاتح، داكن، مظلم، سمائي).
+ *
+ * `blueberry` و`lime` بقيا كاحتياط لبناء مخطط Material عند فشل تحميل ثيم مخصّص،
+ * لكنهما لم يعودا معروضين في قائمة الثيمات.
+ */
+val builtInThemes: List<ThemeHolder> = catalogThemes

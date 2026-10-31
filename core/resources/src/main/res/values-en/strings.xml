@@ -1028,4 +1028,8 @@ Thank you for using Mahdi-Editor.</string>
     <string name="run_in_terminal">Run in terminal</string>
     <string name="runner_hint">The first run may install the interpreter automatically inside Ubuntu (requires internet).</string>
     <string name="install_terminal_first">Install the terminal component from Settings first to run code.</string>
+    <string name="indexer_error">Indexing error: %s</string>
+    <string name="terminal_unavailable">The terminal is not available in this build</string>
+    <string name="terminal_service_error">Error: no connection to the terminal service</string>
+    <string name="languages_supported_stats">Syntax highlighting: %1$d languages — direct running: %2$d languages</string>
 </resources>

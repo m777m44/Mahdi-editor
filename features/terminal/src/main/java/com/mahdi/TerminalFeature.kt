@@ -133,7 +133,7 @@ class TerminalFeature : Feature {
                 val intent = Intent(activity, Terminal::class.java)
                 activity.startActivity(intent)
             } catch (_: Exception) {
-                toast("Terminal feature is not available in this build")
+                toast(strings.terminal_unavailable.getString())
             }
         }
 

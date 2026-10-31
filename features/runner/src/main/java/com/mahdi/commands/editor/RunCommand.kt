@@ -1,5 +1,6 @@
 package com.mahdi.commands.editor
 
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import com.mahdi.commands.ActionContext
 import com.mahdi.commands.Command
@@ -31,6 +32,11 @@ object RunCommand : Command() {
     }
 
     private fun launchRunner(context: ActionContext, forceSelection: Boolean) {
+        // استجابة لمسية خفيفة عند التشغيل: إحساس فوري بالضغط
+        runCatching {
+            context.currentActivity.window?.decorView?.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+        }
+
         val mainViewModel = commandContext.mainViewModel
         val drawerViewModel = commandContext.drawerViewModel
 

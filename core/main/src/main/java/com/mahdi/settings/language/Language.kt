@@ -33,6 +33,7 @@ import com.mahdi.components.compose.preferences.base.PreferenceGroup
 import com.mahdi.components.compose.preferences.base.PreferenceLayout
 import com.mahdi.events.AppEvent
 import com.mahdi.events.Events
+import com.mahdi.resources.Res
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.utils.application
@@ -158,6 +159,8 @@ fun setAppLanguage(locale: Locale, oldLocale: Locale) {
     val appLocale = LocaleListCompat.create(locale)
     AppCompatDelegate.setApplicationLocales(appLocale)
     Settings.current_lang = locale.toLanguageTag()
+    // تحديث سياق الموارد فورًا حتى تصبح كل الرسائل خارج Compose باللغة الجديدة
+    Res.updateLocale(locale)
 
     DefaultScope.launch { Events.publish(AppEvent.LanguageChanged(locale, oldLocale)) }
 }

@@ -61,7 +61,7 @@ ARGS="$ARGS --link2symlink"
 ARGS="$ARGS --sysvipc"
 ARGS="$ARGS -L"
 
-chmod -R +x $LOCAL/bin
+chmod -R +x "$LOCAL/bin" 2>/dev/null || true
 
 if [ $# -gt 0 ]; then
     $PROOT $ARGS /bin/bash --rcfile $LOCAL/bin/init -i -c 'exec "$@"' -- "$@"

@@ -305,103 +305,70 @@ private fun spec(
 // ——————————————————————————————————————————————————————————————
 
 /** معرّف الثيم الافتراضي عند أول تشغيل. */
-const val DEFAULT_THEME_ID = "mahdi-kiyani"
-
-/**
- * **Mahdi Kiyani** — الثيم الافتراضي: أسود تركوازي عميق، أساسي تركوازي، تمييز ذهبي ملكي.
- */
-val MahdiKiyani =
-    ThemeSpec(
-        id = DEFAULT_THEME_ID,
-        name = "Mahdi Kiyani",
-        style = ThemeStyle.SOLID,
-        colors =
-            MahdiColors(
-                background = 0xFF0A1F1F,
-                surface = 0xFF112E2E,
-                primary = 0xFF14B8A6,
-                secondary = 0xFF0D9488,
-                accent = 0xFFF5D76E,
-                text = 0xFFE6F4F1,
-                textSecondary = 0xFF8EA9A9,
-                outline = 0xFF1F3D3D,
-                success = 0xFF10B981,
-                error = 0xFFEF4444,
-                warning = 0xFFF59E0B,
-            ),
-        extras = listOf(0xFF0A1F1F, 0xFF112E2E, 0xFF0D9488),
-    )
+const val DEFAULT_THEME_ID = "mahdi-dark"
 
 // ——————————————————————————————————————————————————————————————
-// مكتبة الثيمات (25 + 3 متوافقة مع الإصدار 1)
+// مكتبة الثيمات — أربعة ثيمات فقط: الفاتح، الداكن، المظلم، السمائي
+//
+// اختصارًا وبساطةً ووضوحًا: لا عشرات الثيمات المتشابهة، بل أربعة ثيمات مصمّمة بعناية،
+// لكلٍّ منها نسختاه الفاتحة والداكنة تلقائيًا مع وضع النظام.
 // ——————————————————————————————————————————————————————————————
 
-val themeCatalog: List<ThemeSpec> =
-    listOf(
-        MahdiKiyani,
-        // 2 — الملكي
-        spec("royal", "الملكي (Royal)", ThemeStyle.GRADIENT, 0xFF1A0B2E, 0xFF241040, 0xFF7C3AED, 0xFF6D28D9, 0xFFFFD700, extras = listOf(0xFF7C3AED, 0xFFFFD700)),
-        // 3 — الزجاجي
-        spec("glass", "الزجاجي (Glass)", ThemeStyle.GLASS, 0xFF0B1418, 0xFF16242B, 0xFF7DD3FC, 0xFF38BDF8, 0xFFF0ABFC, extras = listOf(0x44FFFFFF)),
-        // 4 — المستقبلي
-        spec("futuristic", "المستقبلي (Futuristic)", ThemeStyle.NEON, 0xFF0A0A0A, 0xFF121218, 0xFF00F0FF, 0xFFFF00E5, 0xFF00F0FF, extras = listOf(0xFF00F0FF, 0xFFFF00E5)),
-        // 5 — سايبربانك
-        spec("cyberpunk", "سايبربانك (Cyberpunk)", ThemeStyle.NEON, 0xFF0A0A0A, 0xFF141410, 0xFFFACC15, 0xFFEF4444, 0xFF22D3EE, extras = listOf(0xFFFACC15, 0xFF22D3EE)),
-        // 6 — AMOLED
-        spec("amoled", "AMOLED أسود", ThemeStyle.SOLID, 0xFF000000, 0xFF0A0A0A, 0xFFFFFFFF, 0xFF9CA3AF, 0xFF38BDF8),
-        // 7 — Ocean
-        spec("ocean", "المحيط (Ocean)", ThemeStyle.GRADIENT, 0xFF082F49, 0xFF0C3B58, 0xFF0EA5E9, 0xFF0284C7, 0xFF67E8F9, extras = listOf(0xFF0EA5E9, 0xFF082F49)),
-        // 8 — Forest
-        spec("forest", "الغابة (Forest)", ThemeStyle.MESH, 0xFF052E16, 0xFF0A3D1E, 0xFF16A34A, 0xFF15803D, 0xFF86EFAC),
-        // 9 — Sunset
-        spec("sunset", "الغروب (Sunset)", ThemeStyle.AURORA, 0xFF7C2D12, 0xFF8A3418, 0xFFF97316, 0xFFEA580C, 0xFFFDE68A, extras = listOf(0xFFF97316, 0xFF7C2D12, 0xFFFDE68A)),
-        // 10 — Rose Gold
-        spec("rosegold", "الذهبي الوردي (Rose Gold)", ThemeStyle.GRADIENT, 0xFF2A0F14, 0xFF3A1620, 0xFFF43F5E, 0xFFE11D48, 0xFFFFD700, extras = listOf(0xFFF43F5E, 0xFFFFD700)),
-        // 11 — Midnight
-        spec("midnight", "منتصف الليل (Midnight)", ThemeStyle.SOLID, 0xFF0A0E27, 0xFF111634, 0xFF1E40AF, 0xFF3B82F6, 0xFF60A5FA),
-        // 12 — Dracula
-        spec("dracula", "دراكولا (Dracula)", ThemeStyle.SOLID, 0xFF282A36, 0xFF333544, 0xFFBD93F9, 0xFFFF79C6, 0xFF8BE9FD, 0xFFF8F8F2, 0xFF6272A4, 0xFF44475A),
-        // 13 — Nord
-        spec("nord", "نورد (Nord)", ThemeStyle.SOLID, 0xFF2E3440, 0xFF3B4252, 0xFF88C0D0, 0xFF81A1C1, 0xFFA3BE8C, 0xFFECEFF4, 0xFF8FBCBB, 0xFF434C5E),
-        // 14 — Tokyo Night
-        spec("tokyo-night", "طوكيو الليلية (Tokyo Night)", ThemeStyle.NEON, 0xFF1A1B26, 0xFF24283B, 0xFF7AA2F7, 0xFFBB9AF7, 0xFF7DCFFF, 0xFFC0CAF5, 0xFF565F89, 0xFF3B4261),
-        // 15 — Catppuccin
-        spec("catppuccin", "كاتبوتشينو (Catppuccin)", ThemeStyle.SOLID, 0xFF1E1E2E, 0xFF2A2A3C, 0xFFCBA6F7, 0xFF89B4FA, 0xFFF5C2E7, 0xFFCDD6F4, 0xFF7F849C, 0xFF45475A),
-        // 16 — Gruvbox
-        spec("gruvbox", "غروفبوكس (Gruvbox)", ThemeStyle.SOLID, 0xFF282828, 0xFF3C3836, 0xFFFABD2F, 0xFF83A598, 0xFFFE8019, 0xFFEBDBB2, 0xFFA89984, 0xFF504945),
-        // 17 — Monokai
-        spec("monokai", "مونوكاي (Monokai)", ThemeStyle.SOLID, 0xFF272822, 0xFF33342C, 0xFFA6E22E, 0xFF66D9EF, 0xFFF92672, 0xFFF8F8F2, 0xFF9E9D8C, 0xFF49483E),
-        // 18 — Solarized
-        spec("solarized", "سولارايزد (Solarized)", ThemeStyle.SOLID, 0xFF002B36, 0xFF073642, 0xFF268BD2, 0xFF2AA198, 0xFFB58900, 0xFFEEE8D5, 0xFF93A1A1, 0xFF586E75),
-        // 19 — One Dark
-        spec("one-dark", "ون دارك (One Dark)", ThemeStyle.SOLID, 0xFF282C34, 0xFF31353F, 0xFF61AFEF, 0xFF98C379, 0xFFE5C07B, 0xFFABB2BF, 0xFF5C6370, 0xFF3E4451),
-        // 20 — Material You
-        spec("material-you", "ماتيريال يو (Material You)", ThemeStyle.MESH, 0xFF141218, 0xFF1D1B20, 0xFFD0BCFF, 0xFFCCC2DC, 0xFFEFB8C8, 0xFFE6E1E5, 0xFF938F99, 0xFF49454F, extras = listOf(0xFFD0BCFF, 0xFFEFB8C8)),
-        // 21 — Baghdad
-        spec("baghdad", "بغداد", ThemeStyle.MESH, 0xFF1B3A2F, 0xFF224A3C, 0xFFD4A574, 0xFFC08A2E, 0xFFE9C46A, 0xFFF2E8CF, 0xFFB8C4B8, 0xFF2E5545, extras = listOf(0xFFD4A574, 0xFF1B3A2F, 0xFFE9C46A)),
-        // 22 — Desert
-        spec("desert", "صحراء", ThemeStyle.GRADIENT, 0xFF3D2817, 0xFF4C3420, 0xFFE8B86D, 0xFFD9A05B, 0xFFF0D9A8, 0xFFF7EDE2, 0xFFC4A484, 0xFF5E4229, extras = listOf(0xFFE8B86D, 0xFF3D2817)),
-        // 23 — Tigris
-        spec("tigris", "دجلة", ThemeStyle.GRADIENT, 0xFF0C4A6E, 0xFF0F5A82, 0xFF0D9488, 0xFF14B8A6, 0xFF7DD3FC, 0xFFE0F2FE, 0xFF8FB8CC, 0xFF155E75, extras = listOf(0xFF0D9488, 0xFF0C4A6E)),
-        // 24 — Euphrates
-        spec("euphrates", "الفرات", ThemeStyle.AURORA, 0xFF064E3B, 0xFF0A5C46, 0xFF059669, 0xFF10B981, 0xFF6EE7B7, 0xFFECFDF5, 0xFF8CB8A8, 0xFF0F5F4A, extras = listOf(0xFF059669, 0xFF064E3B, 0xFF6EE7B7)),
-        // 25 — Paper Light
-        spec(
-            "paper-light",
-            "ورقي فاتح (Paper Light)",
-            ThemeStyle.SOLID,
-            0xFFF5F5DC,
-            0xFFFFFDF2,
-            0xFF1A1A1A,
-            0xFF4A4A4A,
-            0xFF8A6D3B,
-            dark = false,
-        ),
-        // — ثيمات الإصدار 1 المحفوظة (للتوافق مع تفضيلات قائمة) —
-        spec("mahdi-dark", "مهدي الداكن", ThemeStyle.SOLID, 0xFF0F0D09, 0xFF17130C, 0xFFE3B341, 0xFFC08A2E, 0xFF9C7A46),
-        spec("mahdi-light", "مهدي الفاتح", ThemeStyle.SOLID, 0xFFFAF5EA, 0xFFFFFCF5, 0xFF8A5A00, 0xFF6B4E2E, 0xFF3F6C5B, dark = false),
-        spec("arabic-night", "ليل عربي", ThemeStyle.NEON, 0xFF080B16, 0xFF0F1424, 0xFFD4AF37, 0xFF2AA198, 0xFFB084CC, extras = listOf(0xFFD4AF37, 0xFF2AA198)),
+/** الثيم الفاتح: أسطح بيضاء هادئة وأزرق واضح عالي التباين. */
+val MahdiLight =
+    spec(
+        "mahdi-light",
+        "الفاتح · Light",
+        ThemeStyle.SOLID,
+        0xFFF6F7FB,
+        0xFFFFFFFF,
+        0xFF2563EB,
+        0xFF1D4ED8,
+        0xFF0EA5E9,
+        dark = false,
     )
+
+/** الثيم الداكن: خلفية ليلية عميقة (هو الافتراضي) بأزرق سماوي وبنفسجي هادئ. */
+val MahdiDark =
+    spec(
+        "mahdi-dark",
+        "الداكن · Dark",
+        ThemeStyle.SOLID,
+        0xFF0E1116,
+        0xFF151A21,
+        0xFF64B5F6,
+        0xFF38BDF8,
+        0xFFA78BFA,
+    )
+
+/** الثيم المظلم: رمادي فحمي منخفض التباين مريح للعين في الإضاءة الخافتة. */
+val MahdiDim =
+    spec(
+        "mahdi-dim",
+        "المظلم · Dim",
+        ThemeStyle.SOLID,
+        0xFF1B1D21,
+        0xFF23262B,
+        0xFF9DB2C6,
+        0xFF7C8FA3,
+        0xFFE0A458,
+    )
+
+/** الثيم السمائي: تدرّجات السماء الزرقاء مع لمسات فيروزية. */
+val MahdiSky =
+    spec(
+        "mahdi-sky",
+        "السمائي · Sky",
+        ThemeStyle.GRADIENT,
+        0xFF0A1B2E,
+        0xFF0F2438,
+        0xFF38BDF8,
+        0xFF60A5FA,
+        0xFFE0F2FE,
+        extras = listOf(0xFF38BDF8, 0xFF0A1B2E, 0xFF7DD3FC),
+    )
+
+val themeCatalog: List<ThemeSpec> = listOf(MahdiLight, MahdiDark, MahdiDim, MahdiSky)
 
 /** يقرأ ألوان ثيم قائم ليبني عليها شاشة التخصيص. */
 fun ThemeHolder.toMahdiColors(): MahdiColors {
@@ -423,7 +390,7 @@ fun ThemeHolder.toMahdiColors(): MahdiColors {
 }
 
 /** الثيم الافتراضي جاهزًا للاستخدام. */
-val defaultTheme: ThemeHolder = MahdiKiyani.toThemeHolder()
+val defaultTheme: ThemeHolder = MahdiDark.toThemeHolder()
 
 /** نمط الثيم (صلب/زجاجي/نيون…) بحسب معرّفه في كتالوج 2.0، أو `null` للثيمات الموروثة والمخصّصة. */
 fun themeStyleOf(id: String): ThemeStyle? = themeCatalog.firstOrNull { it.id == id }?.style

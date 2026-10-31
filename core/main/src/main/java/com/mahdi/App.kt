@@ -96,6 +96,8 @@ open class App : Application() {
         val currentLocale = Locale.forLanguageTag(Settings.current_lang)
         val appLocale = LocaleListCompat.create(currentLocale)
         AppCompatDelegate.setApplicationLocales(appLocale)
+        // نصوص خارج Compose (النوافذ المنبثقة، الرسائل السريعة) تتبع اللغة المختارة أيضًا
+        Res.updateLocale(currentLocale)
 
         GlobalScope.launch(Dispatchers.IO) {
             launch(Dispatchers.IO) {

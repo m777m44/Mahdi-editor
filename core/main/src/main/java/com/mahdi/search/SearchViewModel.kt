@@ -17,6 +17,8 @@ import com.mahdi.search.index.IndexDatabase
 import com.mahdi.search.index.ProjectIndexer
 import com.mahdi.search.utils.GlobExcluder
 import com.mahdi.search.utils.SearchUtils
+import com.mahdi.resources.getFilledString
+import com.mahdi.resources.strings
 import com.mahdi.settings.Preference
 import com.mahdi.settings.Settings
 import com.mahdi.settings.editor.LineEnding
@@ -506,7 +508,7 @@ class SearchViewModel : ViewModel() {
                 onIndexingStateChanged = { isIndexing -> _isIndexing.update { it + (projectRoot to isIndexing) } },
                 onError = { errorMessage ->
                     logError("Indexer error: $errorMessage")
-                    toast("Indexer error: $errorMessage")
+                    toast(strings.indexer_error.getFilledString(errorMessage))
                 },
                 viewModelScope = viewModelScope,
                 excluder = excluder,

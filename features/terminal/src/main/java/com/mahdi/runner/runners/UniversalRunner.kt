@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.os.Environment
-import com.mahdi.DefaultScope
 import com.mahdi.exec.TerminalCommand
 import com.mahdi.exec.launchTerminal
 import com.mahdi.file.FileObject
@@ -21,7 +20,6 @@ import com.mahdi.terminal.setupAssetFile
 import com.mahdi.utils.dialogRes
 import java.io.File
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 object UniversalRunner : FileRunner() {
@@ -57,13 +55,8 @@ object UniversalRunner : FileRunner() {
         if (isOnExternalStorage(path)) {
             // ملفات /sdcard للقراءة فقط على أندرويد الحديث (Media is read-only)،
             // لذلك ننسخ السكربت إلى المجلد الرئيسي للطرفية ونشغّله من هناك.
-            dialogRes(
-                title = strings.attention.getString(),
-                msg = strings.sdcard_filetype.getString(),
-                okRes = strings.continue_action,
-                onCancel = {},
-                onOk = { DefaultScope.launch { launchFromSandboxHome(activity, fileObject) } },
-            )
+            // التشغيل يبدأ فورًا بلا أي رسالة موافقة: زرّ ▶️ يشغّل السكربت مباشرة.
+            launchFromSandboxHome(activity, fileObject)
             return
         }
 

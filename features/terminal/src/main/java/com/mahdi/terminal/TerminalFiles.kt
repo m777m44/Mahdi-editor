@@ -33,15 +33,21 @@ fun setupTerminalFiles() {
     val internalFiles = listOf("init", "sandbox", "setup", "utils", "auto_deps", "mahdi_dl")
     internalFiles.forEach { setupAssetFile(it) }
 
+    // مثبّت حزم بايثون الذكي (يعرض نسبة تقدّم حقيقية في التطبيق)
+    setupPythonFile("mahdi_pip")
+
     application!!.assets.list("terminal/lsp")?.forEach { setupLspFile(it.removeSuffix(".sh")) }
 }
 
 fun setupLspFile(fileName: String) = setupAssetFile("lsp/$fileName")
 
-fun setupAssetFile(fileName: String) {
+/** ينسخ ملف بايثون من الأصول إلى مجلد أوامر الطرفية (مثل `mahdi_pip.py`). */
+fun setupPythonFile(fileName: String) = setupAssetFile(fileName, "$fileName.py")
+
+fun setupAssetFile(fileName: String, assetPath: String = "$fileName.sh") {
     val assetText =
         runCatching {
-            application!!.assets.open("terminal/$fileName.sh").bufferedReader().use { it.readText() }
+            application!!.assets.open("terminal/$assetPath").bufferedReader().use { it.readText() }
         }.getOrNull() ?: return
 
     with(localBinDir().child(fileName)) {
