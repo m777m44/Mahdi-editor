@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     env:
       KEYSTORE_B64: ${{ secrets.KEYSTORE }}
       PROPS_B64: ${{ secrets.PROP }}
