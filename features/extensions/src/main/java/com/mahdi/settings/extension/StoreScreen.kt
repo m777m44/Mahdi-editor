@@ -343,6 +343,11 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
 
         when (selectedCategory) {
             StoreCategory.EXTENSIONS -> {
+                item {
+                    BundledPackagesSection(
+                        onBrowseServers = { selectedCategory = StoreCategory.SERVERS }
+                    )
+                }
                 packageList(
                     packages = extensions,
                     isIndexing = isIndexing,

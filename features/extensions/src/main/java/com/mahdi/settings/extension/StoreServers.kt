@@ -35,6 +35,11 @@ import com.mahdi.lsp.LspRegistry
 import com.mahdi.resources.drawables
 import com.mahdi.resources.strings
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TextButton
 
 /**
  * تبويب «خوادم ومشغّلات» داخل متجر الإضافات (2.6.0).
@@ -248,5 +253,46 @@ fun ServersAndRunnersSection(
                 }
             },
         )
+    }
+}
+
+/**
+ * بطاقة «مدمج في التطبيق» أعلى تبويب الإضافات — تُبرز ما يأتي مع Mahdi-Editor
+ * وتنقل المستخدم إلى تبويب الخوادم والمشغّلات بلمسة.
+ */
+@Composable
+fun BundledPackagesSection(onBrowseServers: () -> Unit, modifier: Modifier = Modifier) {
+    val builtIn by LspRegistry.builtInServers.collectAsStateWithLifecycle()
+    val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+
+    Card(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+            ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = if (isArabic) "مدمج في التطبيق" else "Bundled with the app",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text =
+                    if (isArabic) {
+                        "${builtIn.size} خادم لغة · ${LanguageRegistry.all.size} لغة قابلة للتشغيل · 4 ثيمات"
+                    } else {
+                        "${builtIn.size} language servers · ${LanguageRegistry.all.size} runnable languages · 4 themes"
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+            )
+            TextButton(onClick = onBrowseServers) {
+                Text(if (isArabic) "استعراض الخوادم والمشغّلات" else "Browse servers & runners")
+            }
+        }
     }
 }
