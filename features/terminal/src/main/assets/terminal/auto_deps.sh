@@ -210,7 +210,7 @@ mahdi_pip_run() {
     mahdi_prog 40 "تثبيت المكتبة" "$name"
   fi
   python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-    --root-user-action ignore --quiet --no-input --retries 5 --timeout 30 "$@" || return 1
+    --quiet --no-input --retries 5 --timeout 30 "$@" || return 1
   declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم التثبيت" "$name"
   return 0
 }

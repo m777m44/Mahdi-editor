@@ -203,6 +203,28 @@ def remember_installed(items):
         pass
 
 
+_ROOT_FLAG = None
+
+
+def root_flag():
+    """‏pip الأقدم من 22.1 لا يعرف --root-user-action، فنفحص الإصدار مرة واحدة."""
+    global _ROOT_FLAG
+    if _ROOT_FLAG is None:
+        _ROOT_FLAG = []
+        try:
+            out = subprocess.run(
+                [sys.executable, "-m", "pip", "--version"],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=20,
+            ).stdout.decode("utf-8", "ignore")
+            version = out.split(" ")[1] if " " in out else ""
+            parts = version.split(".")
+            if len(parts) >= 2 and (int(parts[0]), int(parts[1])) >= (22, 1):
+                _ROOT_FLAG = ["--root-user-action", "ignore"]
+        except Exception:
+            pass
+    return _ROOT_FLAG
+
+
 def pip_cmd(*args):
     return [sys.executable, "-m", "pip", "--disable-pip-version-check", "--no-input"] + list(args)
 
@@ -241,7 +263,7 @@ def install_from_dir(directory, items):
     cmd = pip_cmd(
         "install", "--upgrade", "--no-deps", "--find-links", directory,
         "--prefer-binary", "--retries", "3", "--timeout", "30",
-        "--root-user-action", "ignore", "--quiet", *specs,
+        "--quiet", *root_flag(), *specs,
     )
     try:
         proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -277,8 +299,8 @@ def try_offline(targets, label):
         return False
     cmd = pip_cmd(
         "install", "--upgrade", "--no-index", "--find-links", CACHE_DIR,
-        "--disable-pip-version-check", "--root-user-action", "ignore",
-        "--retries", "1", "--timeout", "10", "--quiet", *targets,
+        "--disable-pip-version-check",
+        "--retries", "1", "--timeout", "10", "--quiet", *root_flag(), *targets,
     )
     try:
         proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
