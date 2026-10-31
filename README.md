@@ -46,7 +46,10 @@ Mahdi-Editor محرر أكواد مفتوح المصدر لنظام أندروي
 
 ## التحميل
 
-- [أحدث إصدار](https://github.com/m777m44/Mahdi-editor/releases/latest)
+**[⬇️ تنزيل أحدث إصدار من التطبيق (APK)](https://github.com/m777m44/Mahdi-editor/releases/latest/download/Mahdi-Editor.apk)**
+
+هذا الرابط **دائم ولا يتغيّر**: يفتح دائمًا ملف الـAPK لأحدث إصدار منشور، أي أنك بعد كل تحديث
+تحصل على النسخة الجديدة بفتح الرابط نفسه دون البحث عن إصدار بعينه.
 
 > التطبيق يحتاج أندرويد 8.0 (API 26) أو أحدث.
 
@@ -129,6 +132,7 @@ keytool -genkey -v -keystore mahdi-editor.jks -keyalg RSA -keysize 2048 -validit
 - المستودع: <https://github.com/m777m44/Mahdi-editor>
 - قناة Telegram: <https://t.me/HEROES2002>
 - الإصدارات: <https://github.com/m777m44/Mahdi-editor/releases>
+- رابط التنزيل الدائم (أحدث APK دائمًا): <https://github.com/m777m44/Mahdi-editor/releases/latest/download/Mahdi-Editor.apk>
 
 ---
 
