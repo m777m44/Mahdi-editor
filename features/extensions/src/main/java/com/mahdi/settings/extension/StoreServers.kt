@@ -1,24 +1,38 @@
 package com.mahdi.settings.extension
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -29,23 +43,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.TerminalLauncher
 import com.mahdi.components.SettingsItem
 import com.mahdi.icons.MahdiIcon
+import com.mahdi.lang.LanguageInstallStore
 import com.mahdi.lang.LanguageRegistry
 import com.mahdi.lang.LanguageToolchain
 import com.mahdi.lsp.LspRegistry
 import com.mahdi.resources.drawables
 import com.mahdi.resources.strings
+import com.mahdi.theme.SkyAccent
+import com.mahdi.theme.SkyBadge
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.TextButton
 
 /**
- * تبويب «خوادم ومشغّلات» داخل متجر الإضافات (2.6.0).
+ * تبويب «خوادم ومشغّلات» داخل متجر الإضافات (2.6.x / 2.7.0).
  *
- * يعرض — داخل التطبيق نفسه — كل خوادم اللغة المدمجة مع زرّ تثبيت/إزالة حقيقي
- * (يُشغّل سكربت التثبيت في الطرفية)، وكل لغات المحرّر مع زرّ تثبيت المفسّر.
+ * - خوادم اللغة المدمجة مع تثبيت/إزالة حقيقي.
+ * - كل لغات المحرّر مع زرّ تثبيت المفسّر داخل طرفية Ubuntu.
+ * - **حالة التثبيت محفوظة**: بعد نجاح التثبيت تظهر شارة «مثبت» سمائية وتبقى بعد إعادة التشغيل،
+ *   لأن السكربت يكتب ملفّ علامة داخل `/home/.mahdi/installed` ويقرأه التطبيق مباشرة.
  */
 @Composable
 fun ServersAndRunnersSection(
@@ -57,9 +72,15 @@ fun ServersAndRunnersSection(
     val scope = rememberCoroutineScope()
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
 
+    val installedLanguages by LanguageInstallStore.installed.collectAsStateWithLifecycle()
+    val pendingInstalls = remember { mutableStateMapOf<String, Boolean>() }
+
     val builtIn by LspRegistry.builtInServers.collectAsStateWithLifecycle()
     val extensionServers by LspRegistry.extensionServers.collectAsStateWithLifecycle()
     val externalServers by LspRegistry.externalServers.collectAsStateWithLifecycle()
+
+    // فحص المخزون عند فتح الشاشة (يقرأ ملفّات العلامة من القرص)
+    LaunchedEffect(Unit) { LanguageInstallStore.refresh() }
 
     val servers =
         remember(builtIn, extensionServers, externalServers, query) {
@@ -73,42 +94,38 @@ fun ServersAndRunnersSection(
                 }
         }
 
-    val installed = remember { mutableStateMapOf<String, Boolean>() }
-    val installing = remember { mutableStateMapOf<String, Boolean>() }
+    val installedServers = remember { mutableStateMapOf<String, Boolean>() }
 
     LaunchedEffect(servers) {
         servers.forEach { server ->
-            installed[server.id] = runCatching { server.isInstalled(context) }.getOrDefault(false)
+            installedServers[server.id] = runCatching { server.isInstalled(context) }.getOrDefault(false)
         }
     }
+
+    // ————— بطاقة المخزون —————
+    InventoryCard(
+        installedCount = installedLanguages.size,
+        totalLanguages = LanguageRegistry.all.size,
+        serverCount = servers.size,
+        modifier = modifier,
+    )
 
     Text(
         text = stringResource(strings.servers_hint),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     )
 
     // ————— خوادم اللغات —————
-    Text(
-        text = stringResource(strings.lsp_servers),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
-    )
+    SectionHeader(stringResource(strings.lsp_servers))
 
     if (servers.isEmpty()) {
-        Text(
-            text = if (isArabic) "لا توجد خوادم لغة مضافة بعد." else "No language servers yet.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+        EmptyLine(if (isArabic) "لا توجد خوادم لغة مضافة بعد." else "No language servers yet.")
     }
 
     servers.forEach { server ->
-        val isInstalled = installed[server.id] == true
-        val isBusy = installing[server.id] == true
+        val isInstalled = installedServers[server.id] == true
 
         SettingsItem(
             label = server.serverName,
@@ -145,20 +162,14 @@ fun ServersAndRunnersSection(
                 Row(
                     modifier = Modifier.padding(end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    if (isBusy) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else if (isInstalled) {
-                        Text(
-                            text = stringResource(strings.installed_state),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                    if (isInstalled) {
+                        SkyBadge(stringResource(strings.installed_state))
                         IconButton(
                             onClick = {
-                                activity?.let { act -> server.uninstall(act) }
-                                installed[server.id] = false
+                                activity?.let { act -> runCatching { server.uninstall(act) } }
+                                installedServers[server.id] = false
                             }
                         ) {
                             Icon(
@@ -171,11 +182,9 @@ fun ServersAndRunnersSection(
                         IconButton(
                             onClick = {
                                 val act = activity ?: return@IconButton
-                                installing[server.id] = true
                                 scope.launch {
                                     runCatching { server.install(act) }
-                                    runCatching { installed[server.id] = server.isInstalled(context) }
-                                    installing[server.id] = false
+                                    runCatching { installedServers[server.id] = server.isInstalled(context) }
                                 }
                             }
                         ) {
@@ -192,12 +201,7 @@ fun ServersAndRunnersSection(
     }
 
     // ————— المشغّلات واللغات —————
-    Text(
-        text = stringResource(strings.language_runners),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
+    SectionHeader(stringResource(strings.language_runners))
 
     val languages =
         remember(query) {
@@ -209,8 +213,25 @@ fun ServersAndRunnersSection(
             }
         }
 
+    // مُراقِب التثبيت: يفحص ملفّ العلامة كل ثانيتين حتى يظهر، ثم يثبّت الشارة السمائية
+    LaunchedEffect(pendingInstalls.keys.toList()) {
+        if (pendingInstalls.isEmpty()) return@LaunchedEffect
+        repeat(150) {
+            LanguageInstallStore.refresh()
+            val done = pendingInstalls.keys.filter { LanguageInstallStore.isInstalled(it) }
+            if (done.isNotEmpty()) {
+                done.forEach { pendingInstalls.remove(it) }
+            }
+            if (pendingInstalls.isEmpty()) return@LaunchedEffect
+            delay(2000)
+        }
+    }
+
     languages.forEach { lang ->
         val hasPackages = LanguageToolchain.packagesFor(lang.id).isNotBlank()
+        val installed = lang.id in installedLanguages
+        val pending = pendingInstalls[lang.id] == true
+
         SettingsItem(
             label = if (isArabic) lang.nameAr else lang.nameEn,
             description = lang.extensions.take(5).joinToString(" ") { ".$it" },
@@ -219,40 +240,154 @@ fun ServersAndRunnersSection(
                 Icon(
                     painter = painterResource(drawables.run),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint =
+                        if (installed) SkyAccent else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 16.dp, end = 4.dp).size(20.dp),
                 )
             },
             endWidget = {
-                if (hasPackages) {
-                    IconButton(
-                        onClick = {
-                            val act = activity ?: return@IconButton
-                            val command = LanguageToolchain.installCommandFor(lang.id) ?: return@IconButton
-                            TerminalLauncher.launch(
-                                activity = act,
-                                exe = "/bin/bash",
-                                args = arrayOf("-lc", command),
-                                id = "install-${lang.id}",
+                Row(
+                    modifier = Modifier.padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    when {
+                        // ✅ مثبت — شارة سمائية تبقى بعد إعادة التشغيل
+                        installed -> {
+                            SkyBadge(stringResource(strings.installed_state))
+                            IconButton(onClick = { LanguageInstallStore.unmark(lang.id) }) {
+                                Icon(
+                                    painter = painterResource(drawables.close),
+                                    contentDescription = stringResource(strings.uninstall_action),
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                        // ⏳ قيد التثبيت
+                        pending -> {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text(
+                                text = stringResource(strings.installing_state),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                    ) {
-                        Icon(
-                            painter = painterResource(drawables.download),
-                            contentDescription = stringResource(strings.install_interpreter),
-                            modifier = Modifier.padding(end = 4.dp).size(20.dp),
-                        )
+                        // ⬇️ يمكن تثبيته
+                        hasPackages -> {
+                            IconButton(
+                                onClick = {
+                                    val act = activity ?: return@IconButton
+                                    pendingInstalls[lang.id] = true
+                                    TerminalLauncher.launch(
+                                        activity = act,
+                                        exe = "/bin/bash",
+                                        args = arrayOf("-lc", LanguageInstallStore.installCommand(lang.id)),
+                                        id = "install-${lang.id}",
+                                    )
+                                }
+                            ) {
+                                Icon(
+                                    painter = painterResource(drawables.download),
+                                    contentDescription = stringResource(strings.install_interpreter),
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        // ⚡ جاهزة بلا تثبيت
+                        else -> SkyBadge(stringResource(strings.ready_state))
                     }
-                } else {
-                    Text(
-                        text = stringResource(strings.ready_state),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 16.dp),
-                    )
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun EmptyLine(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
+/** بطاقة «المخزون»: كم لغة مثبَّتة من الإجمالي، وشريط تقدّم أنيق. */
+@Composable
+fun InventoryCard(
+    installedCount: Int,
+    totalLanguages: Int,
+    serverCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+    val progress = if (totalLanguages == 0) 0f else installedCount.toFloat() / totalLanguages
+
+    Card(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SkyAccent.copy(alpha = 0.10f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "📦", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(strings.install_inventory),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.weight(1f))
+                SkyBadge(
+                    text = "$installedCount / $totalLanguages",
+                    showDot = false,
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(SkyAccent.copy(alpha = 0.18f))
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(SkyAccent)
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text =
+                    if (isArabic) {
+                        "$serverCount خادم لغة مدمج · كل اللغات تُشغَّل مباشرة بعد التثبيت"
+                    } else {
+                        "$serverCount bundled language servers · every language runs right after install"
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -263,7 +398,9 @@ fun ServersAndRunnersSection(
 @Composable
 fun BundledPackagesSection(onBrowseServers: () -> Unit, modifier: Modifier = Modifier) {
     val builtIn by LspRegistry.builtInServers.collectAsStateWithLifecycle()
+    val installedLanguages by LanguageInstallStore.installed.collectAsStateWithLifecycle()
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+    var expanded by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -283,15 +420,43 @@ fun BundledPackagesSection(onBrowseServers: () -> Unit, modifier: Modifier = Mod
             Text(
                 text =
                     if (isArabic) {
-                        "${builtIn.size} خادم لغة · ${LanguageRegistry.all.size} لغة قابلة للتشغيل · 4 ثيمات"
+                        "${builtIn.size} خادم لغة · ${LanguageRegistry.all.size} لغة قابلة للتشغيل · 4 ثيمات أساسية"
                     } else {
-                        "${builtIn.size} language servers · ${LanguageRegistry.all.size} runnable languages · 4 themes"
+                        "${builtIn.size} language servers · ${LanguageRegistry.all.size} runnable languages · 4 base themes"
                     },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
             )
-            TextButton(onClick = onBrowseServers) {
-                Text(if (isArabic) "استعراض الخوادم والمشغّلات" else "Browse servers & runners")
+
+            if (expanded) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text =
+                        if (isArabic) {
+                            "المخزون: ${installedLanguages.size} لغة مثبَّتة داخل التطبيق. " +
+                                "التثبيت يتم داخل طرفية Ubuntu ويبقى محفوظًا بعد إغلاق التطبيق."
+                        } else {
+                            "Inventory: ${installedLanguages.size} languages installed inside the app. " +
+                                "Installs run inside the Ubuntu terminal and persist across restarts."
+                        },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
+                )
+            }
+
+            Row {
+                TextButton(onClick = onBrowseServers) {
+                    Text(if (isArabic) "استعراض الخوادم والمشغّلات" else "Browse servers & runners")
+                }
+                TextButton(onClick = { expanded = !expanded }) {
+                    Text(
+                        if (expanded) {
+                            if (isArabic) "إخفاء التفاصيل" else "Hide details"
+                        } else {
+                            if (isArabic) "التفاصيل" else "Details"
+                        }
+                    )
+                }
             }
         }
     }

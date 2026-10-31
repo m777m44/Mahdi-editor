@@ -1075,4 +1075,8 @@
     <string name="terminal_tool_zoom_out">تصغير</string>
     <string name="open_store">تصفح الإضافات</string>
     <string name="ready_state">جاهز</string>
+    <string name="installing_state">قيد التثبيت…</string>
+    <string name="install_inventory">المخزون</string>
+    <string name="featured_themes">ثيمات مميزة</string>
+    <string name="applied_state">مطبّق</string>
 </resources>

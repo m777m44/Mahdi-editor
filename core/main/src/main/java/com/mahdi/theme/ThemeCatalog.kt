@@ -254,7 +254,7 @@ private const val DEF_WARNING = 0xFFF59E0B
  * تعريف مختصر: تُشتق الخانات غير المذكورة من `background` و`primary`.
  * النص يصبح أبيضَ مائلًا للون الأساسي، والثانوي نصٌّ باهت، والحدود خليطًا مُعتِمًا.
  */
-private fun spec(
+internal fun spec(
     id: String,
     name: String,
     style: ThemeStyle,

@@ -103,6 +103,9 @@ open class App : Application() {
         // تحفيز: قراءة سلسلة الأيام والهدف اليومي عند الإقلاع
         runCatching { Motivation.refresh() }
 
+        // المخزون: قراءة اللغات المثبَّتة فعليًا داخل الـ sandbox (2.7.0)
+        runCatching { com.mahdi.lang.LanguageInstallStore.refresh() }
+
         GlobalScope.launch(Dispatchers.IO) {
             launch(Dispatchers.IO) {
                 iconPackManager.indexLocalPacks()

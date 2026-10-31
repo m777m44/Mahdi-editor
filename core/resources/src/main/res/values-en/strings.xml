@@ -1052,4 +1052,8 @@ Thank you for using Mahdi-Editor.</string>
     <string name="terminal_tool_zoom_out">Zoom out</string>
     <string name="open_store">Browse extensions</string>
     <string name="ready_state">Ready</string>
+    <string name="installing_state">Installing…</string>
+    <string name="install_inventory">Inventory</string>
+    <string name="featured_themes">Featured themes</string>
+    <string name="applied_state">Applied</string>
 </resources>
