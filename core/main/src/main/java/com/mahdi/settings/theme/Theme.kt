@@ -1,0 +1,289 @@
+package com.mahdi.settings.theme
+
+import android.content.Context
+import android.os.Build
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import com.mahdi.App.Companion.iconPackManager
+import com.mahdi.App.Companion.themeManager
+import com.mahdi.DefaultScope
+import com.mahdi.activities.settings.SettingsRoutes
+import com.mahdi.app.AppFlavour
+import com.mahdi.components.BottomSheetContent
+import com.mahdi.components.SettingsItem
+import com.mahdi.components.compose.preferences.base.PreferenceGroup
+import com.mahdi.components.compose.preferences.base.PreferenceLayout
+import com.mahdi.components.compose.preferences.base.PreferenceTemplate
+import com.mahdi.events.AppEvent
+import com.mahdi.events.Events
+import com.mahdi.feature.FeatureRegistry
+import com.mahdi.icons.pack.currentIconPack
+import com.mahdi.resources.drawables
+import com.mahdi.resources.strings
+import com.mahdi.settings.Settings
+import com.mahdi.settings.editor.refreshEditors
+import com.mahdi.theme.THEME_MODE_AUTO_TIME
+import com.mahdi.theme.supportsDynamicTheming
+import kotlinx.coroutines.launch
+
+@Composable
+fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
+    val showDayNightBottomSheet = remember { mutableStateOf(false) }
+    val monetState = remember { mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Settings.monet) }
+    val amoledState = remember { mutableStateOf(Settings.amoled) }
+    val loadedThemes = themeManager.loadedThemesState.value
+    val localIconPacks by iconPackManager.localIconPacks.collectAsStateWithLifecycle()
+
+    PreferenceLayout(label = stringResource(strings.themes)) {
+        PreferenceGroup(heading = stringResource(strings.theme_settings)) {
+            SettingsItem(
+                label = stringResource(id = strings.theme_mode),
+                description = stringResource(id = strings.theme_mode_desc),
+                showSwitch = false,
+                default = false,
+                sideEffect = { showDayNightBottomSheet.value = true },
+            )
+
+            SettingsItem(
+                label = stringResource(id = strings.oled),
+                description = stringResource(id = strings.oled_desc),
+                default = Settings.amoled,
+                state = amoledState,
+                sideEffect = {
+                    Settings.amoled = it
+                    refreshEditors()
+                },
+            )
+
+            SettingsItem(
+                label = stringResource(id = strings.monet),
+                description = stringResource(id = strings.monet_desc),
+                default = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Settings.monet,
+                isEnabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+                state = monetState,
+                sideEffect = {
+                    Settings.monet = it
+                    themeManager.ensureThemeMode()
+                    refreshEditors()
+                },
+            )
+        }
+
+        PreferenceGroup(heading = stringResource(strings.themes)) {
+            loadedThemes.forEach { theme ->
+                SettingsItem(
+                    isEnabled = !Settings.monet,
+                    label = theme.name,
+                    description = null,
+                    showSwitch = false,
+                    default = false,
+                    startWidget = {
+                        RadioButton(
+                            modifier = Modifier.padding(start = 16.dp),
+                            enabled = !Settings.monet,
+                            selected = themeManager.currentTheme.id == theme.id,
+                            onClick = null,
+                        )
+                    },
+                    sideEffect = {
+                        val oldTheme = themeManager.currentTheme
+                        Settings.theme = theme.id
+                        themeManager.ensureThemeMode(theme)
+                        refreshEditors()
+                        DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(theme, oldTheme)) }
+                    },
+                )
+            }
+
+            // The store exists only when this build bundles extensions and the user has not disabled them.
+            if (AppFlavour.current.bundlesExtensions && FeatureRegistry.isEnabled("enable_extension")) {
+                SettingsItem(
+                    label = stringResource(strings.browse_themes),
+                    description = null,
+                    showSwitch = false,
+                    default = false,
+                    startWidget = {
+                        Icon(
+                            modifier = Modifier.padding(start = 16.dp),
+                            painter = painterResource(drawables.arrow_outward),
+                            contentDescription = null,
+                        )
+                    },
+                    sideEffect = { navController.navigate("${SettingsRoutes.Extensions.route}?category=themes") },
+                )
+            }
+        }
+
+        PreferenceGroup(heading = stringResource(strings.icon_packs)) {
+            SettingsItem(
+                label = "Simple Icons (${stringResource(strings.default_option)})",
+                description = null,
+                showSwitch = false,
+                default = false,
+                startWidget = {
+                    RadioButton(
+                        modifier = Modifier.padding(start = 16.dp),
+                        selected = currentIconPack.value == null,
+                        onClick = null,
+                    )
+                },
+                sideEffect = {
+                    val oldIconPack = currentIconPack.value
+                    currentIconPack.value = null
+                    Settings.icon_pack = ""
+
+                    DefaultScope.launch { Events.publish(AppEvent.IconPackChanged(null, oldIconPack)) }
+                },
+            )
+
+            localIconPacks.forEach { (id, iconPack) ->
+                val iconPackManifest = iconPack.manifest
+
+                SettingsItem(
+                    label = iconPackManifest.name,
+                    description = null,
+                    showSwitch = false,
+                    default = false,
+                    startWidget = {
+                        RadioButton(
+                            modifier = Modifier.padding(start = 16.dp),
+                            selected = currentIconPack.value?.manifest?.id == id,
+                            onClick = null,
+                        )
+                    },
+                    sideEffect = {
+                        val oldIconPack = currentIconPack.value
+                        currentIconPack.value = iconPack
+                        Settings.icon_pack = id
+
+                        DefaultScope.launch { Events.publish(AppEvent.IconPackChanged(iconPack, oldIconPack)) }
+                    },
+                )
+            }
+
+            // The store exists only when this build bundles extensions and the user has not disabled them.
+            if (AppFlavour.current.bundlesExtensions && FeatureRegistry.isEnabled("enable_extension")) {
+                SettingsItem(
+                    label = stringResource(strings.browse_icon_packs),
+                    description = null,
+                    showSwitch = false,
+                    default = false,
+                    startWidget = {
+                        Icon(
+                            modifier = Modifier.padding(start = 16.dp),
+                            painter = painterResource(drawables.arrow_outward),
+                            contentDescription = null,
+                        )
+                    },
+                    sideEffect = { navController.navigate("${SettingsRoutes.Extensions.route}?category=icon_packs") },
+                )
+            }
+        }
+
+        if (showDayNightBottomSheet.value) {
+            DayNightDialog(showBottomSheet = showDayNightBottomSheet, context = LocalContext.current)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DayNightDialog(showBottomSheet: MutableState<Boolean>, context: Context) {
+    val bottomSheetState = rememberModalBottomSheetState()
+    val coroutineScope = rememberCoroutineScope()
+    var selectedMode by remember { mutableIntStateOf(Settings.theme_mode) }
+
+    val modes =
+        listOf(
+            AppCompatDelegate.MODE_NIGHT_NO,
+            AppCompatDelegate.MODE_NIGHT_YES,
+            AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
+            THEME_MODE_AUTO_TIME,
+        )
+    val modeLabels =
+        listOf(
+            context.getString(strings.light_mode),
+            context.getString(strings.dark_mode),
+            context.getString(strings.auto_mode),
+            context.getString(strings.auto_time_mode),
+        )
+
+    val theme = themeManager.currentTheme
+    val isLightSupported = theme.isLightSupported
+    val isDarkSupported = theme.isDarkSupported
+
+    if (showBottomSheet.value) {
+        ModalBottomSheet(onDismissRequest = { showBottomSheet.value = false }, sheetState = bottomSheetState) {
+            BottomSheetContent(
+                title = { Text(text = stringResource(id = strings.theme_mode)) },
+                buttons = {
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                bottomSheetState.hide()
+                                showBottomSheet.value = false
+                            }
+                        }
+                    ) {
+                        Text(text = stringResource(id = strings.cancel))
+                    }
+                },
+            ) {
+                LazyColumn {
+                    itemsIndexed(modes) { index, mode ->
+                        val isEnabled =
+                            when {
+                                Settings.monet && supportsDynamicTheming() -> true
+                                mode == AppCompatDelegate.MODE_NIGHT_NO -> isLightSupported
+                                mode == AppCompatDelegate.MODE_NIGHT_YES -> isDarkSupported
+                                else -> true
+                            }
+
+                        PreferenceTemplate(
+                            title = { Text(text = modeLabels[index]) },
+                            modifier =
+                                Modifier.clickable(enabled = isEnabled) {
+                                    selectedMode = mode
+                                    Settings.theme_mode = selectedMode
+                                    themeManager.ensureThemeMode(theme)
+                                    coroutineScope.launch {
+                                        bottomSheetState.hide()
+                                        showBottomSheet.value = false
+                                    }
+                                },
+                            enabled = isEnabled,
+                            startWidget = {
+                                RadioButton(selected = selectedMode == mode, onClick = null, enabled = isEnabled)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

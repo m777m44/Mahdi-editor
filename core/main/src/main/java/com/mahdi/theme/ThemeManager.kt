@@ -1,0 +1,636 @@
+package com.mahdi.theme
+
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.material3.ColorScheme
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.graphics.toColorInt
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.mahdi.DefaultScope
+import com.mahdi.activities.settings.SettingsActivity
+import com.mahdi.common.MahdiPackage
+import com.mahdi.events.AppEvent
+import com.mahdi.events.Events
+import com.mahdi.extension.manager.StoreManager
+import com.mahdi.extension.model.PackageAuthor
+import com.mahdi.extension.model.PackageCache
+import com.mahdi.extension.model.ReviewStats
+import com.mahdi.file.FileOperations
+import com.mahdi.file.FileWrapper
+import com.mahdi.file.child
+import com.mahdi.file.themeDir
+import com.mahdi.resources.getFilledString
+import com.mahdi.resources.getString
+import com.mahdi.resources.strings
+import com.mahdi.settings.Settings
+import com.mahdi.settings.editor.refreshEditors
+import com.mahdi.utils.application
+import com.mahdi.utils.dialogRes
+import com.mahdi.utils.errorDialog
+import com.mahdi.utils.logError
+import com.mahdi.utils.toast
+import java.io.File
+import java.io.FileInputStream
+import java.io.ObjectInputStream
+import java.util.Properties
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.MissingFieldException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement as KJsonElement
+
+@Serializable
+data class ThemeEntry(
+    val id: String,
+    val manifest: ThemeManifest,
+    val size: Long? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val rating: ReviewStats,
+)
+
+@Serializable
+private data class LegacyManifest(
+    val id: String,
+    val name: String,
+    val author: PackageAuthor = PackageAuthor.UNKNOWN,
+    val version: String = "1.0.0",
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val repository: String = "",
+    val license: String? = null,
+    val minAppVersion: Int? = null,
+    val inheritBase: Boolean = true,
+    val light: ThemePaletteNew? = null,
+    val dark: ThemePaletteNew? = null,
+)
+
+class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
+    private val mutex = Mutex()
+    private val json = Json {
+        ignoreUnknownKeys = true
+        allowTrailingComma = true
+    }
+
+    private val _loadedThemesState = mutableStateOf(builtInThemes)
+    val loadedThemesState: State<List<ThemeHolder>> = _loadedThemesState
+    private val _localThemes = MutableStateFlow<Map<String, LocalTheme>>(emptyMap())
+    val localThemes: StateFlow<Map<String, LocalTheme>> = _localThemes.asStateFlow()
+    private val _storeThemes = MutableStateFlow<Map<String, StoreTheme>>(emptyMap())
+    val storeThemes: StateFlow<Map<String, StoreTheme>> = _storeThemes.asStateFlow()
+
+    val currentTheme by derivedStateOf { loadedThemesState.value.find { it.id == Settings.theme } ?: blueberry }
+
+    private val _activeThemeReady = mutableStateOf(false)
+    val activeThemeReady: Boolean
+        get() = _activeThemeReady.value
+
+    /**
+     * Loads the active theme without loading other custom themes. This is a stripped down version of [indexLocalThemes]
+     * for the splashscreen.
+     *
+     * @see indexLocalThemes
+     */
+    suspend fun loadActiveTheme() {
+        val id = Settings.theme
+
+        val holder =
+            if (builtInThemes.any { it.id == id }) {
+                null
+            } else {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val dir = themeDir().child(id)
+                        val manifest = json.decodeFromString<ThemeManifest>(dir.resolve("manifest.json").readText())
+                        val themeFile =
+                            dir.resolve("theme.json")
+                                .takeIf { it.exists() }
+                                ?.let { json.decodeFromString<ThemeFile>(it.readText()) }
+                        manifest.build(themeFile)
+                    }
+                        .onFailure { logError(it, "Failed to load active theme") }
+                        .getOrNull()
+                }
+            }
+
+        withContext(Dispatchers.Main.immediate) {
+            if (holder != null && _loadedThemesState.value.none { it.id == holder.id }) {
+                _loadedThemesState.value += holder
+            }
+            ensureThemeMode()
+            _activeThemeReady.value = true
+        }
+    }
+
+    private fun setLoadedThemes(themes: List<ThemeHolder>) {
+        _loadedThemesState.value = themes
+        ensureThemeMode()
+    }
+
+    fun calculateEffectiveNightMode(theme: ThemeHolder = currentTheme): Int {
+        val requested = resolveThemeMode(Settings.theme_mode)
+        if (Settings.monet && supportsDynamicTheming()) return requested
+
+        return when {
+            !theme.isLightSupported -> AppCompatDelegate.MODE_NIGHT_YES
+            !theme.isDarkSupported -> AppCompatDelegate.MODE_NIGHT_NO
+            else -> requested
+        }
+    }
+
+    fun ensureThemeMode(theme: ThemeHolder = currentTheme) {
+        val targetMode = calculateEffectiveNightMode(theme)
+        launch(Dispatchers.Main.immediate) {
+            if (AppCompatDelegate.getDefaultNightMode() != targetMode) {
+                AppCompatDelegate.setDefaultNightMode(targetMode)
+            }
+        }
+    }
+
+    fun isInstalled(id: String) = localThemes.value.containsKey(id)
+
+    fun getTheme(id: String): ThemePackage? {
+        val local = localThemes.value[id]
+        val store = storeThemes.value[id]
+
+        return when {
+            (local != null && store != null) -> UpdatableTheme(local, store)
+            local != null -> local
+            store != null -> store
+            else -> null
+        }
+    }
+
+    fun getSyncedThemes(): List<ThemePackage> {
+        val allIds = localThemes.value.keys + storeThemes.value.keys
+        return allIds.mapNotNull { getTheme(it) }
+    }
+
+    suspend fun uninstallTheme(id: String) {
+        withContext(Dispatchers.IO) {
+            themeDir().child(id).deleteRecursively()
+            withContext(Dispatchers.Main) { removeLocalTheme(id) }
+        }
+    }
+
+    fun removeLocalTheme(id: String) {
+        if (Settings.theme == id) {
+            val oldTheme = currentTheme
+            Settings.theme = blueberry.id
+            refreshEditors()
+            DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(currentTheme, oldTheme)) }
+        }
+        _localThemes.update { it - id }
+        setLoadedThemes(_loadedThemesState.value.filterNot { it.id == id })
+    }
+
+    private suspend fun calcSize(dir: File): Long {
+        return FileOperations.calculateContent(FileWrapper(dir)).totalSize
+    }
+
+    private fun resolveCache(dir: File): PackageCache {
+        val cacheFile = dir.resolve("cache.json")
+
+        if (!cacheFile.exists() || !cacheFile.isFile) {
+            return PackageCache()
+        }
+
+        return runCatching {
+            json.decodeFromString<PackageCache>(cacheFile.readText())
+        }
+            .getOrElse { PackageCache() }
+    }
+
+    private fun writeCache(dir: File, cache: PackageCache) {
+        val cacheFile = dir.resolve("cache.json")
+        cacheFile.writeText(json.encodeToString(cache))
+    }
+
+    suspend fun invalidateSize(pkg: ThemePackage) {
+        if (pkg is StoreTheme) return
+
+        withContext(Dispatchers.IO) {
+            val dir = themeDir().resolve(pkg.id)
+            val cache = resolveCache(dir)
+            val newSize = calcSize(dir)
+            writeCache(dir, cache.copy(size = newSize))
+
+            withContext(Dispatchers.Main) { localThemes.value[pkg.id]?.size = newSize }
+        }
+    }
+
+    suspend fun installTheme(file: File) {
+        withContext(Dispatchers.IO) {
+            val tempDir = File(application!!.cacheDir, "theme_temp_${System.currentTimeMillis()}")
+            tempDir.mkdirs()
+
+            try {
+                MahdiPackage.extract(file, tempDir)
+
+                val manifestFile = File(tempDir, "manifest.json")
+                val themeFile = File(tempDir, "theme.json")
+
+                if (!manifestFile.exists() || !themeFile.exists()) {
+                    withContext(Dispatchers.Main) { toast("Neither manifest.json nor theme.json found") }
+                    return@withContext
+                }
+
+                val manifest = validateManifestJson(manifestFile.readText()) ?: return@withContext
+                validateThemeFile(themeFile.readText()) ?: return@withContext
+
+                installThemeFromData(manifest, tempDir)
+            } catch (e: Exception) {
+                errorDialog(e)
+            } finally {
+                tempDir.deleteRecursively()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    internal fun validateManifestJson(text: String): ThemeManifest? {
+        return runCatching {
+            json.decodeFromString<ThemeManifest>(text)
+        }
+            .getOrElse { e ->
+                if (e is MissingFieldException) {
+                    val fields = e.missingFields.joinToString("\n") { "• $it" }
+                    dialogRes(
+                        SettingsActivity.instance,
+                        strings.theme_install_failed.getString(),
+                        strings.manifest_missing_fields.getFilledString(fields),
+                        cancelable = false,
+                    )
+                    return null
+                }
+                dialogRes(
+                    SettingsActivity.instance,
+                    strings.theme_install_failed.getString(),
+                    e.localizedMessage ?: strings.unknown_err.getString(),
+                    cancelable = false,
+                )
+                return null
+            }
+    }
+
+    internal fun validateThemeFile(text: String): ThemeFile? {
+        return runCatching {
+            json.decodeFromString<ThemeFile>(text)
+        }
+            .getOrElse { e ->
+                dialogRes(
+                    SettingsActivity.instance,
+                    strings.theme_install_failed.getString(),
+                    e.localizedMessage ?: strings.unknown_err.getString(),
+                    cancelable = false,
+                )
+                return null
+            }
+    }
+
+    private suspend fun installThemeFromData(manifest: ThemeManifest, sourceDir: File?) =
+        withContext(Dispatchers.IO) {
+            val packageName = application!!.packageName
+            val packageManager = application!!.packageManager
+            val currentVersionCode = PackageInfoCompat.getLongVersionCode(packageManager.getPackageInfo(packageName, 0))
+
+            if (manifest.minAppVersion != null && manifest.minAppVersion.toLong() > currentVersionCode) {
+                dialogRes(
+                    activity = SettingsActivity.instance,
+                    title = strings.warning.getString(),
+                    msg = strings.incompatible_theme_warning.getString(),
+                    cancelRes = strings.cancel,
+                    okRes = strings.continue_action,
+                    onOk = {
+                        launch(Dispatchers.IO) {
+                            finishThemeInstall(manifest, sourceDir)
+                            indexLocalThemes()
+                        }
+                    },
+                )
+                return@withContext
+            }
+
+            finishThemeInstall(manifest, sourceDir)
+            indexLocalThemes()
+        }
+
+    private suspend fun finishThemeInstall(manifest: ThemeManifest, sourceDir: File?) {
+        val installDir = themeDir().child(manifest.id).also { if (!it.exists()) it.mkdirs() }
+
+        var oldCreatedAt: Long? = null
+        if (installDir.exists()) {
+            oldCreatedAt = resolveCache(installDir).createdAt
+        }
+
+        val manifestFile = installDir.resolve("manifest.json")
+        manifestFile.writeText(json.encodeToString<ThemeManifest>(manifest))
+
+        sourceDir?.listFiles()?.forEach { file ->
+            if (file.name != "manifest.json") {
+                file.copyRecursively(installDir.resolve(file.name), overwrite = true)
+            }
+        }
+
+        val size = calcSize(installDir)
+        val newCache =
+            PackageCache(
+                createdAt = oldCreatedAt ?: System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                size = size,
+            )
+        writeCache(installDir, newCache)
+    }
+
+    suspend fun indexStoreThemes() =
+        withContext(Dispatchers.IO) {
+            val themesList = runCatching { StoreManager.fetchThemes() }.getOrNull() ?: return@withContext
+            val newThemes = themesList.associateBy({ it.id }, { StoreTheme(it) })
+            withContext(Dispatchers.Main) { _storeThemes.value = newThemes }
+        }
+
+    suspend fun indexLocalThemes() = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            val themeDir = themeDir()
+            if (!themeDir.exists()) return@withContext
+
+            migrateOldThemes(themeDir)
+
+            val newLocalThemes = mutableMapOf<String, LocalTheme>()
+            val newLoadedThemes = mutableListOf<ThemeHolder>()
+            themeDir.listFiles()?.forEach { dir ->
+                if (dir.isDirectory) {
+                    runCatching {
+                        val manifestFile = dir.resolve("manifest.json")
+                        if (manifestFile.exists()) {
+                            val manifest = json.decodeFromString<ThemeManifest>(manifestFile.readText())
+                            val themeFile =
+                                dir.resolve("theme.json")
+                                    .takeIf { it.exists() }
+                                    ?.let { json.decodeFromString<ThemeFile>(it.readText()) }
+                            newLoadedThemes.add(manifest.build(themeFile))
+
+                            val cache = resolveCache(dir)
+                            val size = cache.size ?: calcSize(dir).also { writeCache(dir, cache.copy(size = it)) }
+
+                            val theme =
+                                LocalTheme(
+                                    manifest = manifest,
+                                    installPath = dir.absolutePath,
+                                    createdAt = cache.createdAt,
+                                    updatedAt = cache.updatedAt,
+                                    initSize = size,
+                                )
+
+                            newLocalThemes[manifest.id] = theme
+                        }
+                    }
+                        .onFailure { logError(it, "Failed to index local themes") }
+                }
+            }
+            withContext(Dispatchers.Main) {
+                _localThemes.value = newLocalThemes
+                setLoadedThemes(builtInThemes + newLoadedThemes)
+            }
+        }
+    }
+
+    @Deprecated("Migration from old theme format for backwards compatibility")
+    private suspend fun migrateOldThemes(themeDir: File) {
+        val listFiles = themeDir.listFiles()
+        var migratedCount = 0
+        listFiles?.forEach { file ->
+            if (file.isFile) {
+                runCatching {
+                    if (migratedCount == 0) {
+                        withContext(Dispatchers.Main) { toast(strings.migrating_themes.getString()) }
+                    }
+                    ObjectInputStream(FileInputStream(file)).use { input ->
+                        val oldConfig = input.readObject()
+                        if (oldConfig is ThemeConfig) {
+                            installMigratedTheme(
+                                manifest =
+                                    ThemeManifest(
+                                        id = oldConfig.id ?: file.nameWithoutExtension,
+                                        name = oldConfig.name ?: file.nameWithoutExtension,
+                                        minAppVersion = oldConfig.minAppVersion,
+                                        inheritBase = oldConfig.inheritBase ?: true,
+                                    ),
+                                themeFile =
+                                    ThemeFile(
+                                        light = oldConfig.light?.let { ThemePaletteNew.fromLegacyPalette(it) },
+                                        dark = oldConfig.dark?.let { ThemePaletteNew.fromLegacyPalette(it) },
+                                    ),
+                            )
+                            migratedCount++
+                        }
+                        file.delete()
+                    }
+                }
+                    .onFailure { file.delete() }
+            } else if (file.isDirectory) {
+                runCatching {
+                    val manifestFile = file.resolve("manifest.json")
+                    val themeFile = file.resolve("theme.json")
+                    if (manifestFile.exists() && !themeFile.exists()) {
+                        val legacy = json.decodeFromString<LegacyManifest>(manifestFile.readText())
+                        if (legacy.light != null || legacy.dark != null) {
+                            val manifest =
+                                ThemeManifest(
+                                    id = legacy.id,
+                                    name = legacy.name,
+                                    author = legacy.author,
+                                    version = legacy.version,
+                                    description = legacy.description,
+                                    tags = legacy.tags,
+                                    repository = legacy.repository,
+                                    license = legacy.license,
+                                    minAppVersion = legacy.minAppVersion,
+                                    inheritBase = legacy.inheritBase,
+                                )
+                            themeFile.writeText(
+                                json.encodeToString(ThemeFile(light = legacy.light, dark = legacy.dark))
+                            )
+                            manifestFile.writeText(json.encodeToString(manifest))
+                            migratedCount++
+                        }
+                    }
+                }
+            }
+        }
+
+        if (migratedCount > 0) {
+            withContext(Dispatchers.Main) { toast(strings.theme_migrated.getFilledString(migratedCount)) }
+        }
+    }
+
+    private suspend fun installMigratedTheme(manifest: ThemeManifest, themeFile: ThemeFile) {
+        val installDir = themeDir().child(manifest.id).also { if (!it.exists()) it.mkdirs() }
+
+        val oldCreatedAt = resolveCache(installDir).createdAt
+        installDir.resolve("manifest.json").writeText(json.encodeToString<ThemeManifest>(manifest))
+        installDir.resolve("theme.json").writeText(json.encodeToString<ThemeFile>(themeFile))
+
+        val size = calcSize(installDir)
+        writeCache(
+            installDir,
+            PackageCache(
+                createdAt = oldCreatedAt ?: System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                size = size,
+            ),
+        )
+    }
+
+    private fun String.toColor(): Color {
+        return try {
+            Color(this.toColorInt())
+        } catch (_: Exception) {
+            toast("Invalid color: $this")
+            Color.Unspecified
+        }
+    }
+
+    fun ThemeManifest.build(themeFile: ThemeFile?): ThemeHolder {
+        fun Map<String, String>.toProperties(): Properties {
+            val props = Properties()
+            for ((k, v) in this) props[k] = v
+            return props
+        }
+
+        val light = themeFile?.light
+        val dark = themeFile?.dark
+
+        val lightTokenColors = light?.tokenColors.toTokenColorArray()
+        val darkTokenColors = dark?.tokenColors.toTokenColorArray()
+
+        return ThemeHolder(
+            id = id,
+            name = name,
+            inheritBase = inheritBase,
+            lightScheme = light?.build(isDarkTheme = false) ?: blueberry.lightScheme,
+            darkScheme = dark?.build(isDarkTheme = true) ?: blueberry.darkScheme,
+            lightTerminalColors = light?.terminalColors?.toProperties() ?: Properties(),
+            darkTerminalColors = dark?.terminalColors?.toProperties() ?: Properties(),
+            lightEditorColors = mapEditorColorScheme(light?.editorColors),
+            darkEditorColors = mapEditorColorScheme(dark?.editorColors),
+            lightTokenColors = lightTokenColors,
+            darkTokenColors = darkTokenColors,
+            isLightSupported = light != null,
+            isDarkSupported = dark != null,
+        )
+    }
+
+    private fun KJsonElement?.toTokenColorArray(): JsonArray {
+        if (this == null) return JsonArray()
+
+        val gsonElement = JsonParser.parseString(this.toString())
+        if (gsonElement.isJsonArray) return gsonElement.asJsonArray
+
+        if (gsonElement.isJsonObject) {
+            val convertedArray = JsonArray()
+            for ((scope, colorHex) in gsonElement.asJsonObject.entrySet()) {
+                val item =
+                    JsonObject().apply {
+                        addProperty("scope", scope)
+                        val settings = JsonObject()
+                        settings.addProperty("foreground", colorHex.asString)
+                        add("settings", settings)
+                    }
+                convertedArray.add(item)
+            }
+            return convertedArray
+        }
+
+        return JsonArray()
+    }
+
+    fun ThemePaletteNew.build(isDarkTheme: Boolean): ColorScheme {
+        val fallback = if (isDarkTheme) blueberry.darkScheme else blueberry.lightScheme
+        val base = baseColors ?: return fallback
+        return fallback.copy(
+            primary = base.primary?.toColor() ?: fallback.primary,
+            onPrimary = base.onPrimary?.toColor() ?: fallback.onPrimary,
+            primaryContainer = base.primaryContainer?.toColor() ?: fallback.primaryContainer,
+            onPrimaryContainer = base.onPrimaryContainer?.toColor() ?: fallback.onPrimaryContainer,
+            secondary = base.secondary?.toColor() ?: fallback.secondary,
+            onSecondary = base.onSecondary?.toColor() ?: fallback.onSecondary,
+            secondaryContainer = base.secondaryContainer?.toColor() ?: fallback.secondaryContainer,
+            onSecondaryContainer = base.onSecondaryContainer?.toColor() ?: fallback.onSecondaryContainer,
+            tertiary = base.tertiary?.toColor() ?: fallback.tertiary,
+            onTertiary = base.onTertiary?.toColor() ?: fallback.onTertiary,
+            tertiaryContainer = base.tertiaryContainer?.toColor() ?: fallback.tertiaryContainer,
+            onTertiaryContainer = base.onTertiaryContainer?.toColor() ?: fallback.onTertiaryContainer,
+            error = base.error?.toColor() ?: fallback.error,
+            onError = base.onError?.toColor() ?: fallback.onError,
+            errorContainer = base.errorContainer?.toColor() ?: fallback.errorContainer,
+            onErrorContainer = base.onErrorContainer?.toColor() ?: fallback.onErrorContainer,
+            background = base.background?.toColor() ?: fallback.background,
+            onBackground = base.onBackground?.toColor() ?: fallback.onBackground,
+            surface = base.surface?.toColor() ?: fallback.surface,
+            onSurface = base.onSurface?.toColor() ?: fallback.onSurface,
+            surfaceVariant = base.surfaceVariant?.toColor() ?: fallback.surfaceVariant,
+            onSurfaceVariant = base.onSurfaceVariant?.toColor() ?: fallback.onSurfaceVariant,
+            outline = base.outline?.toColor() ?: fallback.outline,
+            outlineVariant = base.outlineVariant?.toColor() ?: fallback.outlineVariant,
+            scrim = base.scrim?.toColor() ?: fallback.scrim,
+            inverseSurface = base.inverseSurface?.toColor() ?: fallback.inverseSurface,
+            inverseOnSurface = base.inverseOnSurface?.toColor() ?: fallback.inverseOnSurface,
+            inversePrimary = base.inversePrimary?.toColor() ?: fallback.inversePrimary,
+            surfaceTint = base.surfaceTint?.toColor() ?: fallback.surfaceTint,
+            surfaceDim = base.surfaceDim?.toColor() ?: fallback.surfaceDim,
+            surfaceBright = base.surfaceBright?.toColor() ?: fallback.surfaceBright,
+            surfaceContainerLowest = base.surfaceContainerLowest?.toColor() ?: fallback.surfaceContainerLowest,
+            surfaceContainerLow = base.surfaceContainerLow?.toColor() ?: fallback.surfaceContainerLow,
+            surfaceContainer = base.surfaceContainer?.toColor() ?: fallback.surfaceContainer,
+            surfaceContainerHigh = base.surfaceContainerHigh?.toColor() ?: fallback.surfaceContainerHigh,
+            surfaceContainerHighest = base.surfaceContainerHighest?.toColor() ?: fallback.surfaceContainerHighest,
+        )
+    }
+}
+
+/**
+ * وضع الثيم التلقائي حسب الوقت: يتحوّل التطبيق إلى الوضع الداكن مساءً وإلى الفاتح نهارًا دون الحاجة إلى متابعة
+ * إعدادات النظام.
+ *
+ * Extra theme mode added by Mahdi-Editor: switches to dark in the evening and back to light in the morning.
+ */
+const val THEME_MODE_AUTO_TIME = 100
+
+/** أول ساعة يُعتبر فيها الوقت ليلًا (24 ساعة). */
+const val NIGHT_START_HOUR = 19
+
+/** أول ساعة يُعتبر فيها الوقت نهارًا (24 ساعة). */
+const val DAY_START_HOUR = 6
+
+/** هل الوقت الحالي ليل حسب إعدادات الوضع التلقائي؟ */
+fun isNightTimeNow(): Boolean {
+    val hour = java.time.LocalTime.now().hour
+    return hour >= NIGHT_START_HOUR || hour < DAY_START_HOUR
+}
+
+/** يحوّل [THEME_MODE_AUTO_TIME] إلى وضع ليلي/نهاري فعلي حسب الساعة الحالية. */
+fun resolveThemeMode(mode: Int): Int {
+    if (mode != THEME_MODE_AUTO_TIME) return mode
+    return if (isNightTimeNow()) {
+        AppCompatDelegate.MODE_NIGHT_YES
+    } else {
+        AppCompatDelegate.MODE_NIGHT_NO
+    }
+}

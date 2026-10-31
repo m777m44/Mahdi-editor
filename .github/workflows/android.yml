@@ -1,0 +1,103 @@
+name: Mahdi-Editor CI
+
+# بناء حزمة APK تلقائيًا عند كل دفعة إلى main، أو يدويًا من تبويب Actions.
+# Builds the app on every push to main and on manual dispatch.
+
+on:
+  push:
+    branches:
+      - main
+    # الوسوم تُطلق بناء الإصدار ونشره (راجع خطوة «Publish release»)
+    tags:
+      - "v*"
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  # طلبات الدمج تُبنى أيضًا، حتى يُتحقّق من نجاح التجميع قبل الدمج في main.
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      use_cache:
+        description: "استخدام ذاكرة Gradle المؤقتة / Use the Gradle cache"
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      KEYSTORE_B64: ${{ secrets.KEYSTORE }}
+      PROPS_B64: ${{ secrets.PROP }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Cache Gradle
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.use_cache != 'false' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Decode signing material (optional)
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > /tmp/mahdi.keystore
+          echo "$PROPS_B64" | base64 -d > /tmp/signing.properties
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Set short commit hash
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: |
+          ./gradlew assembleCommunityRelease --no-daemon --stacktrace
+          mkdir -p out
+          cp app/build/outputs/apk/community/release/*.apk "out/Mahdi-Editor-${SHORT_SHA}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mahdi-Editor-${{ env.SHORT_SHA }}
+          path: out/*.apk
+          retention-days: 30
+
+      - name: Publish release (tags only)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          generate_release_notes: true
+
+      - name: Delete signing material
+        if: always()
+        run: rm -f /tmp/mahdi.keystore /tmp/signing.properties

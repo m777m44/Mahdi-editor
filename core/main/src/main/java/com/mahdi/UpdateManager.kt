@@ -1,0 +1,271 @@
+package com.mahdi
+
+import androidx.core.content.pm.PackageInfoCompat
+import com.mahdi.commands.KeybindingsManager
+import com.mahdi.file.child
+import com.mahdi.file.localBinDir
+import com.mahdi.file.localDir
+import com.mahdi.file.sandboxDir
+import com.mahdi.file.sandboxHomeDir
+import com.mahdi.file.toFileWrapper
+import com.mahdi.lsp.LspPersistence
+import com.mahdi.settings.Preference
+import com.mahdi.settings.Settings
+import com.mahdi.settings.editor.DEFAULT_EXTRA_KEYS_SYMBOLS
+import com.mahdi.utils.application
+import com.mahdi.utils.hasHardwareKeyboard
+import com.mahdi.editor.BuildConfig
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+object UpdateManager {
+    private fun deleteCommonFiles() =
+        with(application!!) {
+            codeCacheDir.apply {
+                if (exists()) {
+                    deleteRecursively()
+                }
+            }
+
+            localBinDir().apply {
+                if (exists()) {
+                    deleteRecursively()
+                }
+            }
+        }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    fun inspect() =
+        with(application!!) {
+            val lastVersionCode = Settings.last_version_code
+            val currentVersionCode = PackageInfoCompat.getLongVersionCode(packageManager.getPackageInfo(packageName, 0))
+
+            if (lastVersionCode != currentVersionCode) {
+                // App is updated -> Migrate existing files
+                if (lastVersionCode <= 40L) {
+                    Preference.clearData()
+                }
+
+                if (lastVersionCode <= 66L) {
+                    Settings.line_spacing = 1f
+                }
+
+                if (lastVersionCode <= 68L) {
+                    val rootfs =
+                        sandboxDir().listFiles()?.filter {
+                            it.absolutePath != sandboxHomeDir().absolutePath &&
+                                it.absolutePath != sandboxDir().child("tmp").absolutePath
+                        } ?: emptyList()
+
+                    if (rootfs.isNotEmpty()) {
+                        localDir().child(".terminal_setup_ok_DO_NOT_REMOVE").createNewFile()
+                    }
+                }
+
+                if (lastVersionCode <= 69L) {
+                    sandboxDir().child(".cache/.packages_ensured").apply {
+                        if (exists()) {
+                            delete()
+                        }
+                    }
+                }
+
+                if (lastVersionCode <= 73) {
+                    runCatching {
+                        val filesToCopy = application!!.cacheDir.listFiles { it.isFile && it.extension.isEmpty() }
+                        filesToCopy?.forEach {
+                            it.copyTo(
+                                application!!.filesDir.child(it.name),
+                                overwrite = true,
+                            )
+                        }
+                    }
+                }
+
+                if (lastVersionCode <= 76) {
+                    runCatching {
+                        val filesToCopy = application!!.filesDir.listFiles { it.isFile && it.extension.isEmpty() }
+                        filesToCopy?.forEach { it.delete() }
+                    }
+                }
+
+                if (lastVersionCode <= 80) {
+                    val oldReadOnly = Preference.getBoolean("readOnly", false)
+                    Preference.removeKey("readOnly")
+                    if (oldReadOnly) {
+                        Preference.setBoolean("read_only_default", true)
+                    }
+
+                    val oldShownDisclaimer = Preference.getBoolean("shownDisclaimer", false)
+                    Preference.removeKey("shownDisclaimer")
+                    if (oldShownDisclaimer) {
+                        Preference.setBoolean("shown_disclaimer", true)
+                    }
+
+                    val oldOled = Preference.getBoolean("oled", false)
+                    Preference.removeKey("oled")
+                    if (oldOled) {
+                        Preference.setBoolean("amoled", true)
+                    }
+
+                    val oldPinLine = Preference.getBoolean("pinline", false)
+                    Preference.removeKey("pinline")
+                    if (oldPinLine) {
+                        Preference.setBoolean("pin_line_number", true)
+                    }
+
+                    val oldWWTxt = Preference.getBoolean("ww_txt", true)
+                    Preference.removeKey("ww_txt")
+                    if (!oldWWTxt) {
+                        Preference.setBoolean("word_wrap_text", false)
+                    }
+
+                    val oldWordWrap = Preference.getBoolean("wordwrap", false)
+                    Preference.removeKey("wordwrap")
+                    if (oldWordWrap) {
+                        Preference.setBoolean("word_wrap", true)
+                    }
+
+                    val default = hasHardwareKeyboard(application!!).not()
+                    val oldArrowKeys = Preference.getBoolean("arrow_keys", default)
+                    Preference.removeKey("arrow_keys")
+                    if (oldArrowKeys != default) {
+                        Preference.setBoolean("show_extra_keys", oldArrowKeys)
+                    }
+
+                    val oldStrictMode = Preference.getBoolean("strictMode", BuildConfig.DEBUG)
+                    Preference.removeKey("strictMode")
+                    if (oldStrictMode != BuildConfig.DEBUG) {
+                        Preference.setBoolean("strict_mode", oldStrictMode)
+                    }
+
+                    val oldTerminalVirusNotice = Preference.getBoolean("terminal-virus-notice", false)
+                    Preference.removeKey("terminal-virus-notice")
+                    if (oldTerminalVirusNotice) {
+                        Preference.setBoolean("terminal_virus_notice", true)
+                    }
+
+                    val oldTextMateSuggestion = Preference.getBoolean("textMateSuggestion", true)
+                    Preference.removeKey("textMateSuggestion")
+                    if (!oldTextMateSuggestion) {
+                        Preference.setBoolean("textmate_suggestions", true)
+                    }
+
+                    val oldDesktopMode = Preference.getBoolean("desktopMode", false)
+                    Preference.removeKey("desktopMode")
+                    if (oldDesktopMode) {
+                        Preference.setBoolean("desktop_mode", true)
+                    }
+
+                    val oldTabSize = Preference.getInt("tabsize", 4)
+                    Preference.removeKey("tabsize")
+                    if (oldTabSize != 4) {
+                        Preference.setInt("tab_size", oldTabSize)
+                    }
+
+                    val oldTextSize = Preference.getInt("textsize", 14)
+                    Preference.removeKey("textsize")
+                    if (oldTextSize != 14) {
+                        Preference.setInt("text_size", oldTextSize)
+                    }
+
+                    val defaultLang = application!!.resources.configuration.locales[0].language
+                    val oldCurrentLang = Preference.getString("currentLang", defaultLang)
+                    Preference.removeKey("currentLang")
+                    if (oldCurrentLang != defaultLang) {
+                        Preference.setString("current_lang", oldCurrentLang)
+                    }
+
+                    val oldExtraKeys = Preference.getString("extra_keys", DEFAULT_EXTRA_KEYS_SYMBOLS)
+                    Preference.removeKey("extra_keys")
+                    if (oldExtraKeys != DEFAULT_EXTRA_KEYS_SYMBOLS) {
+                        Preference.setString("extra_keys_symbols", oldExtraKeys)
+                    }
+                }
+
+                if (lastVersionCode <= 81) {
+                    GlobalScope.launch {
+                        runCatching {
+                            application!!.filesDir.child("projects").toFileWrapper().renameTo("drawerTabs")
+                            application!!.filesDir.child("currentTab").toFileWrapper().renameTo("currentDrawerTab")
+                            application!!
+                                .filesDir
+                                .child("expanded_filetree_nodes")
+                                .toFileWrapper()
+                                .renameTo("expandedFileTree")
+                        }
+                    }
+                }
+
+                if (lastVersionCode <= 85) {
+                    LspPersistence.migrate()
+                }
+
+                if (lastVersionCode <= 94L) {
+                    runCatching {
+                        val legacySeccomp = Preference.getBoolean("seccomp", false)
+
+                        val newValue =
+                            if (legacySeccomp) {
+                                "yes"
+                            } else {
+                                "unspecified"
+                            }
+
+                        Preference.setString("seccomp_mode", newValue)
+                        Preference.removeKey("seccomp")
+                    }
+                }
+
+                if (lastVersionCode <= 99) {
+                    runCatching {
+                        KeybindingsManager.migrate()
+                        KeybindingsManager.loadKeybindings()
+                    }
+                }
+
+                // See https://github.com/m777m44/Mahdi-editor/issues/1607
+                if (lastVersionCode <= 104) {
+                    runCatching {
+                        val file = localDir().child("runners.json")
+
+                        if (file.exists()) {
+                            val text = file.readText()
+                            val json: List<JsonObject> = Json.decodeFromString(text)
+
+                            val updatedJson = json.map { obj ->
+                                if ("name" in obj) {
+                                    buildJsonObject {
+                                        obj.forEach { (key, value) -> put(key, value) }
+                                        put("label", obj["name"]!!)
+                                    }
+                                } else {
+                                    obj
+                                }
+                            }
+
+                            file.writeText(Json.encodeToString(updatedJson))
+                        }
+                    }
+                }
+
+                deleteCommonFiles()
+            }
+
+            if (lastVersionCode <= 111) {
+                runCatching {
+                    val oldTextMateSuggestion = Preference.getBoolean("textmate_suggestions", true)
+                    Preference.removeKey("textmate_suggestions")
+                    if (!oldTextMateSuggestion) {
+                        Preference.setBoolean("suggest_keywords", true)
+                    }
+                }
+            }
+
+            Settings.last_version_code = currentVersionCode
+        }
+}

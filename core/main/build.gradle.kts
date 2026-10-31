@@ -1,0 +1,218 @@
+import groovy.json.JsonOutput
+
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.ksp)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ktfmt)
+}
+
+val isGitRepo = generateSequence(rootProject.projectDir) { it.parentFile }.any { File(it, ".git").exists() }
+
+val gitCommitHash: Provider<String> =
+    if (isGitRepo) {
+        providers
+            .exec {
+                commandLine("git", "rev-parse", "--short=8", "HEAD")
+                isIgnoreExitValue = true
+            }
+            .standardOutput
+            .asText
+            .map { it.trim().ifEmpty { "unknown" } }
+    } else {
+        providers.provider { "unknown" }
+    }
+
+val fullGitCommitHash: Provider<String> =
+    if (isGitRepo) {
+        providers
+            .exec {
+                commandLine("git", "rev-parse", "HEAD")
+                isIgnoreExitValue = true
+            }
+            .standardOutput
+            .asText
+            .map { it.trim().ifEmpty { "unknown" } }
+    } else {
+        providers.provider { "unknown" }
+    }
+
+val gitCommitDate: Provider<String> =
+    if (isGitRepo) {
+        providers
+            .exec {
+                commandLine("git", "show", "-s", "--format=%cI", "HEAD")
+                isIgnoreExitValue = true
+            }
+            .standardOutput
+            .asText
+            .map { it.trim().ifEmpty { "unknown" } }
+    } else {
+        providers.provider { "unknown" }
+    }
+
+android {
+    namespace = "com.mahdi.editor"
+    compileSdk = 37
+
+    defaultConfig {
+        minSdk = 26
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    buildFeatures {
+        buildConfig = true
+        viewBinding = true
+        compose = true
+    }
+
+    buildTypes {
+        release {
+            buildConfigField("String", "GIT_COMMIT_HASH", "\"${fullGitCommitHash.get()}\"")
+            buildConfigField("String", "GIT_SHORT_COMMIT_HASH", "\"${gitCommitHash.get()}\"")
+            buildConfigField("String", "GIT_COMMIT_DATE", "\"${gitCommitDate.get()}\"")
+
+            isMinifyEnabled = false
+            isShrinkResources = false
+
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+
+        debug {
+            buildConfigField("String", "GIT_COMMIT_HASH", "\"${fullGitCommitHash.get()}\"")
+            buildConfigField("String", "GIT_SHORT_COMMIT_HASH", "\"${gitCommitHash.get()}\"")
+            buildConfigField("String", "GIT_COMMIT_DATE", "\"${gitCommitDate.get()}\"")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+    kotlin { jvmToolchain(21) }
+}
+
+val runPrecompileScript by
+    tasks.registering(GenerateSupportedLocales::class) {
+        group = "build setup"
+        description = "Update supported_locales.json in assets"
+
+        resDir.set(layout.projectDirectory.dir("../resources/src/main/res"))
+
+        outputFile.set(layout.projectDirectory.file("src/main/assets/supported_locales.json"))
+    }
+
+tasks.named("preBuild") { dependsOn(runPrecompileScript) }
+
+dependencies {
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.lifecycle.viewmodel)
+    implementation(libs.androidx.lifecycle.runtime)
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.navigation.fragment)
+    implementation(libs.androidx.navigation.ui)
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui.ktx)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.core.splashscreen)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.utilcode)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
+    implementation(libs.gson)
+    implementation(libs.commons.net)
+    implementation(libs.okhttp)
+    implementation(libs.material.motion.compose)
+    implementation(libs.nanohttpd)
+    implementation(libs.photoview)
+    implementation(libs.glide)
+    implementation(libs.anrwatchdog)
+    implementation(libs.lsp4j)
+    implementation(libs.kotlin.reflect)
+    implementation(libs.androidx.documentfile)
+    implementation(libs.compose.dnd)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidsvg.aar)
+    implementation(libs.ec4j.core)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.semver)
+    debugImplementation(libs.leakcanary)
+    implementation(libs.junit)
+
+    // Markdown rendering (Compose). This is a Kotlin Multiplatform library, but it publishes
+    // Android AAR variants that Gradle resolves automatically for this Android-only project.
+    // `api` is used because com.mahdi.markdown.MarkdownText exposes library types (ImageTransformer)
+    // in its public signature, so feature modules need them on their compile classpath.
+    api(libs.markdown.renderer)
+    api(libs.markdown.renderer.m3)
+    api(libs.markdown.renderer.code)
+    api(libs.markdown.renderer.coil2)
+
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+
+    implementation(libs.kotlinx.coroutines)
+
+    // Modules
+    implementation(project(":core:resources"))
+    implementation(project(":core:components"))
+
+    // Required for ANSI to AnnotatedString parsing
+    implementation(project(":terminal-emulator"))
+
+    implementation(libs.sorax.editor)
+    implementation(libs.sorax.editor.lsp)
+    implementation(libs.sorax.language.textmate)
+
+    // api is used so ai feature can access ktor
+    // api(libs.ktor.server.netty)
+    // api(libs.ktor.client.okhttp)
+}
+
+abstract class GenerateSupportedLocales : DefaultTask() {
+    @get:InputDirectory abstract val resDir: DirectoryProperty
+
+    @get:OutputFile abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val locales = mutableListOf<String>()
+
+        resDir
+            .get()
+            .asFile
+            .listFiles { file -> file.isDirectory && file.name.startsWith("values") }
+            ?.forEach { dir ->
+                val folderName = dir.name
+                val locale =
+                    when {
+                        // التطبيق عربي بالكامل: مجلد الموارد الافتراضي عربي أيضًا
+                        folderName == "values" -> "ar"
+                        folderName.startsWith("values-") -> folderName.removePrefix("values-").replace("-r", "-")
+
+                        else -> null
+                    }
+                locale?.let { locales.add(it) }
+            }
+
+        val sortedLocales = locales.distinct().sorted()
+
+        val outFile = outputFile.get().asFile
+        outFile.parentFile.mkdirs()
+        outFile.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(sortedLocales)))
+
+        logger.lifecycle("✅ Generated ${outFile.path}")
+    }
+}
