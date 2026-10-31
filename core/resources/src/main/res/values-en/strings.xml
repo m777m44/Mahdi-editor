@@ -1035,10 +1035,10 @@ Thank you for using Mahdi-Editor.</string>
     <string name="theme_suggestions">Theme suggestions</string>
     <string name="run_direct">Run</string>
     <string name="browse_extensions_desc">Language servers, runners, themes and icon packs — one tap away</string>
-    <string name="servers_runners">Servers & runners</string>
+    <string name="servers_runners">Servers &amp; runners</string>
     <string name="search_servers">Search servers and runners</string>
     <string name="lsp_servers">Language servers (LSP)</string>
-    <string name="language_runners">Runners & languages</string>
+    <string name="language_runners">Runners &amp; languages</string>
     <string name="install_action">Install</string>
     <string name="uninstall_action">Remove</string>
     <string name="installed_state">Installed</string>
