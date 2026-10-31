@@ -78,13 +78,45 @@ jobs:
 
       - name: Build release APK
         run: |
-          ./gradlew assembleCommunityRelease --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew assembleCommunityRelease --no-daemon --stacktrace 2>&1 | tee /tmp/gradle.log
           mkdir -p out
           # اسم الملف ثابت دائمًا: عليه يعتمد رابط «أحدث إصدار» في README
           cp app/build/outputs/apk/community/release/*.apk "out/Mahdi-Editor.apk"
           # نسخة إضافية باسم الإصدار، للرجوع إليها لاحقًا
           cp "out/Mahdi-Editor.apk" "out/Mahdi-Editor-v${APP_VERSION}.apk"
           ls -lh out
+
+      # عند فشل التجميع في طلب دمج: انشر أسطر الخطأ كتعليق على الطلب،
+      # حتى يراها من لا يملك صلاحية الوصول إلى سجلات Actions.
+      - name: Report build errors on PR
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import re, os
+          log_path = '/tmp/gradle.log'
+          text = ''
+          if os.path.exists(log_path):
+              text = open(log_path, encoding='utf-8', errors='ignore').read()
+          lines = text.splitlines()
+          picked = []
+          for i, line in enumerate(lines):
+              if re.search(r'(^e: |^w: .*error|error:|FAILURE:|What went wrong|Caused by:|> Task .* FAILED)', line):
+                  picked.append(line.strip())
+          # أبقِ 120 سطرًا كحد أقصى مع إزالة التكرار
+          seen, uniq = set(), []
+          for l in picked:
+              if l and l not in seen:
+                  seen.add(l)
+                  uniq.append(l)
+          body = '\n'.join(uniq[:120]) or 'لم تُستخرج أسطر خطأ؛ راجع سجل التشغيل.'
+          md = "### ❌ فشل التجميع\n\n```\n" + body[:60000] + "\n```\n"
+          open('/tmp/errors.md', 'w', encoding='utf-8').write(md)
+          print(md[:4000])
+          PY
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/errors.md || true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
