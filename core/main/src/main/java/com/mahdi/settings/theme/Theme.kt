@@ -7,8 +7,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -47,8 +50,11 @@ import com.mahdi.resources.drawables
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.settings.editor.refreshEditors
+import com.mahdi.theme.CustomThemes
+import com.mahdi.theme.DEFAULT_THEME_ID
 import com.mahdi.theme.THEME_MODE_AUTO_TIME
 import com.mahdi.theme.supportsDynamicTheming
+import com.mahdi.theme.themeStyleOf
 import kotlinx.coroutines.launch
 
 @Composable
@@ -111,10 +117,32 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
 
         PreferenceGroup(heading = stringResource(strings.themes)) {
             loadedThemes.forEach { theme ->
+                // ثيمات المستخدم المخصّصة وحدها تُحذف بزرّ الحذف
+                val deleteAction: (@Composable () -> Unit)? =
+                    if (CustomThemes.isCustom(theme.id)) {
+                        {
+                            IconButton(
+                                onClick = {
+                                    CustomThemes.delete(theme.id)
+                                    themeManager.removeCustomTheme(theme.id)
+                                    if (Settings.theme == theme.id) {
+                                        Settings.theme = DEFAULT_THEME_ID
+                                        themeManager.ensureThemeMode()
+                                        refreshEditors()
+                                    }
+                                }
+                            ) {
+                                Icon(imageVector = Icons.Outlined.Delete, contentDescription = stringResource(strings.delete))
+                            }
+                        }
+                    } else {
+                        null
+                    }
+
                 SettingsItem(
                     isEnabled = !Settings.monet,
                     label = theme.name,
-                    description = null,
+                    description = themeStyleOf(theme.id)?.label,
                     showSwitch = false,
                     default = false,
                     startWidget = {
@@ -125,6 +153,7 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
                             onClick = null,
                         )
                     },
+                    endWidget = deleteAction,
                     sideEffect = {
                         val oldTheme = themeManager.currentTheme
                         Settings.theme = theme.id

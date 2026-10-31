@@ -425,5 +425,8 @@ fun ThemeHolder.toMahdiColors(): MahdiColors {
 /** الثيم الافتراضي جاهزًا للاستخدام. */
 val defaultTheme: ThemeHolder = MahdiKiyani.toThemeHolder()
 
+/** نمط الثيم (صلب/زجاجي/نيون…) بحسب معرّفه في كتالوج 2.0، أو `null` للثيمات الموروثة والمخصّصة. */
+fun themeStyleOf(id: String): ThemeStyle? = themeCatalog.firstOrNull { it.id == id }?.style
+
 /** كل الثيمات جاهزة، بالترتيب المعروض في الشاشة. */
 val catalogThemes: List<ThemeHolder> = themeCatalog.map { it.toThemeHolder() }
