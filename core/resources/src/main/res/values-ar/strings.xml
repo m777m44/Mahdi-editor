@@ -1062,4 +1062,22 @@
     <string name="languages_supported_stats">التلوين النحوي: %1$d لغة — التشغيل المباشر: %2$d لغة</string>
     <string name="theme_suggestions">اقتراحات ثيمات</string>
     <string name="run_direct">تشغيل مباشر</string>
+    <string name="browse_extensions_desc">خوادم لغات ومشغّلات وثيمات وحزم أيقونات — بضغطة واحدة</string>
+    <string name="servers_runners">خوادم ومشغّلات</string>
+    <string name="search_servers">ابحث في الخوادم والمشغّلات</string>
+    <string name="lsp_servers">خوادم اللغات (LSP)</string>
+    <string name="language_runners">المشغّلات واللغات</string>
+    <string name="install_action">تثبيت</string>
+    <string name="uninstall_action">إزالة</string>
+    <string name="installed_state">مثبّت</string>
+    <string name="install_interpreter">تثبيت المفسّر</string>
+    <string name="servers_hint">ثبّت خادم اللغة لتحصل على إكمال تلقائي وأخطاء فورية، وثبّت المفسّر لتشغيل أي ملف مباشرة.</string>
+    <string name="terminal_tools">أدوات سريعة</string>
+    <string name="terminal_tool_clear">مسح</string>
+    <string name="terminal_tool_interrupt">إيقاف</string>
+    <string name="terminal_tool_paste">لصق</string>
+    <string name="terminal_tool_zoom_in">تكبير</string>
+    <string name="terminal_tool_zoom_out">تصغير</string>
+    <string name="open_store">تصفح الإضافات</string>
+    <string name="ready_state">جاهز</string>
 </resources>

@@ -12,7 +12,7 @@
 
 1. ابنِ المشروع واختبر تعديلك (انظر [BUILDING.md](BUILDING.md)).
 2. تأكد من أن `./gradlew assembleCommunityDebug` ينجح دون أخطاء.
-3. اقرأ [REBRAND.md](REBRAND.md) لتفهم اختلاف هذه النسخة عن المشروع الأصلي.
+3. اقرأ [REBRAND.md](REBRAND.md) لتفهم هوية المشروع ومعماره.
 
 ## تنسيق الشيفرة
 

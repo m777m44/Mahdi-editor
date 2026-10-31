@@ -94,7 +94,8 @@ private enum class ExtensionFilterOptions(val stringRes: Int) {
 private enum class StoreCategory(val stringRes: Int, val drawableRes: Int) {
     EXTENSIONS(strings.ext, drawables.extension),
     THEMES(strings.themes, drawables.palette),
-    ICON_PACKS(strings.icon_packs, drawables.widgets);
+    ICON_PACKS(strings.icon_packs, drawables.widgets),
+    SERVERS(strings.servers_runners, drawables.server);
 
     companion object {
         fun fromName(name: String): StoreCategory? {
@@ -113,7 +114,7 @@ private enum class StoreCategory(val stringRes: Int, val drawableRes: Int) {
  * The online store is disabled in Mahdi-Editor: it depended on the upstream project's backend and its packages are
  * not compatible with this build. Extensions, themes and icon packs are installed from local files instead.
  */
-const val MAHDI_STORE_ENABLED = false
+const val MAHDI_STORE_ENABLED = true
 
 @Composable
 private fun StoreUnavailable() {
@@ -170,6 +171,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                 StoreCategory.EXTENSIONS -> isForceRefresh || extensionManager.installedExtensions.value.isEmpty()
                 StoreCategory.THEMES -> isForceRefresh || themeManager.localThemes.value.isEmpty()
                 StoreCategory.ICON_PACKS -> isForceRefresh || iconPackManager.localIconPacks.value.isEmpty()
+                StoreCategory.SERVERS -> false
             }
 
         val needsStore =
@@ -177,6 +179,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                 StoreCategory.EXTENSIONS -> isForceRefresh || extensionManager.storeExtension.value.isEmpty()
                 StoreCategory.THEMES -> isForceRefresh || themeManager.storeThemes.value.isEmpty()
                 StoreCategory.ICON_PACKS -> isForceRefresh || iconPackManager.storeIconPacks.value.isEmpty()
+                StoreCategory.SERVERS -> false
             }
 
         if (needsLocal || needsStore) {
@@ -191,6 +194,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                                 StoreCategory.EXTENSIONS -> extensionManager.indexLocalExtensions()
                                 StoreCategory.THEMES -> themeManager.indexLocalThemes()
                                 StoreCategory.ICON_PACKS -> iconPackManager.indexLocalPacks()
+                                StoreCategory.SERVERS -> Unit
                             }
                         }
                         isIndexing = false
@@ -205,6 +209,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                                 StoreCategory.EXTENSIONS -> extensionManager.indexStoreExtensions()
                                 StoreCategory.THEMES -> themeManager.indexStoreThemes()
                                 StoreCategory.ICON_PACKS -> iconPackManager.indexStoreIconPacks()
+                                StoreCategory.SERVERS -> Unit
                             }
                         }
                         isFetching = false
@@ -250,7 +255,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
         }
 
     RefreshablePreferenceLayoutLazyColumn(
-        label = stringResource(strings.store),
+        label = stringResource(strings.browse_extensions),
         isExpandedScreen = false,
         backArrowVisible = true,
         isRefreshing = isRefreshing,
@@ -302,6 +307,14 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                     )
                 }
             }
+            StoreCategory.SERVERS -> {
+                item {
+                    StoreSearchBar(
+                        searchQuery = searchQuery,
+                        placeholderText = stringResource(strings.search_servers),
+                    )
+                }
+            }
         }
 
         item {
@@ -330,6 +343,11 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
 
         when (selectedCategory) {
             StoreCategory.EXTENSIONS -> {
+                item {
+                    BundledPackagesSection(
+                        onBrowseServers = { selectedCategory = StoreCategory.SERVERS }
+                    )
+                }
                 packageList(
                     packages = extensions,
                     isIndexing = isIndexing,
@@ -358,6 +376,14 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                     dialogManager = dialogManager,
                     noPkgRes = strings.no_icon_packs,
                 )
+            }
+            StoreCategory.SERVERS -> {
+                item {
+                    ServersAndRunnersSection(
+                        query = searchQuery.text.toString(),
+                        activity = activity,
+                    )
+                }
             }
         }
 

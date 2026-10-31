@@ -9,6 +9,8 @@ import com.mahdi.App.Companion.themeManager
 import com.mahdi.activities.main.MainActivity
 import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.common.MahdiPackage
+import com.mahdi.commands.CommandProvider
+import com.mahdi.commands.global.StoreCommand
 import com.mahdi.components.DialogProvider
 import com.mahdi.components.DialogRegistry
 import com.mahdi.extension.ActivityProvider
@@ -115,8 +117,16 @@ class ExtensionFeature : Feature {
             extensionManager.indexStoreExtensions()
         }
 
-        // ملاحظة 2.5.0: أُزيل زر «المتجر» من الإعدادات بطلب من صاحب التطبيق.
-        // تبقى مسارات التمديدات نفسها مسجّلة (تُفتح من الأوامر) لكن دون عنصر ظاهر للمستخدم.
+        // 2.6.0: عاد «تصفح الإضافات» بصيغة Mahdi-Editor — إضافات وثيمات وحزم أيقونات
+        // وخوادم لغات ومشغّلات، كلها في شاشة واحدة.
+        settingsCategory =
+            SettingsCategory(
+                    label = strings.browse_extensions.getString(),
+                    description = strings.browse_extensions_desc.getString(),
+                    icon = Icon.ResourceIcon(drawables.store),
+                    route = SettingsRoutes.Extensions.route,
+                )
+                .also { SettingsRegistry.registerCategory(it) }
 
         // Register settings routes
         routes.add(
@@ -169,6 +179,9 @@ class ExtensionFeature : Feature {
         )
 
         routes.forEach { SettingsRegistry.registerRoute(it) }
+
+        // أمر عام: «تصفح الإضافات» من لوحة الأوامر ومن الشاشة الرئيسية
+        runCatching { CommandProvider.registerCommand(StoreCommand()) }
     }
 
     override fun dispose(application: Application) {
@@ -179,6 +192,7 @@ class ExtensionFeature : Feature {
         intentHandler?.let { IntentHandleRegistry.unregister(it) }
         dialogProvider?.let { DialogRegistry.unregister(it) }
         settingsCategory?.let { SettingsRegistry.unregisterCategory(it) }
+        runCatching { CommandProvider.commandList.value.filterIsInstance<StoreCommand>().forEach { CommandProvider.unregisterCommand(it) } }
         routes.forEach { SettingsRegistry.unregisterRoute(it) }
         routes.clear()
     }

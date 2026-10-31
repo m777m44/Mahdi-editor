@@ -4,48 +4,27 @@
 
 - **الاسم:** Mahdi-Editor
 - **معرّف التطبيق:** `com.mahdi.editor`
-- **المطوّر المسؤول عن هذه النسخة:** Mahdi (مستودع: <https://github.com/m777m44/Mahdi-editor>)
+- **المطوّر:** MAHDI-Editor-Code
+- **المستودع:** <https://github.com/m777m44/Mahdi-editor>
 - **القناة:** <https://t.me/HEROES2002>
-- **الترخيص:** GNU General Public License v3.0 (انظر [LICENSE](LICENSE))
-- **سنة التعديلات:** 2026
+- **الترخيص:** MIT — انظر [LICENSE](LICENSE)
+- **حقوق النشر:** `Mahdi-Editor-Code © 2026 — جميع الحقوق محفوظة`
 
-## تنبيه بأن البرنامج معدّل
+## رخصة المشروع
 
-<!-- GPLv3 §5(a): prominent notices stating that the software is modified and giving a relevant date. -->
+يُقدَّم هذا المشروع «كما هو» بموجب رخصة MIT. يمكنك استخدامه وتعديله وإعادة توزيعه مع الحفاظ على
+إشعار حقوق النشر أعلاه.
 
-هذا البرنامج **نسخة معدّلة** من برنامج حر مفتوح المصدر حُرِّر في سنة **2026** على يد Mahdi، ولا
-يُعدّ الإصدار الرسمي للمشروع الأصلي، ولا تُنسب هذه التعديلات إلى مؤلفيه الأصليين.
+## المكوّنات الخارجية المضمّنة
 
-This program is a **modified version** of free software, changed by Mahdi in **2026**. It is not the
-official release of the upstream project and the modifications are not attributed to the original
-authors.
+هذه المكوّنات مكتبات طرف ثالث تُضمَّن داخل التطبيق، وتخضع لرخصها الأصلية (لا علاقة لها برخصة
+المشروع أعلاه). أسماؤها وروابطها موجودة داخل مجلداتها ومصادرها:
 
-## حقوق النشر الأصلية
-
-شيفرة الأساس أُخذت من مشروع محرر نصوص مفتوح المصدر صدر بموجب GNU GPL v3.0، وبيانات حقوق النشر
-الأصلية محفوظة في ملف [LICENSE](LICENSE) كما يقتضي الترخيص. المصادر المضمّنة:
-
-| المكوّن | المؤلف / المصدر | الترخيص |
-|---|---|---|
-| محرّك التحرير (مجلد `soraX/`) | Rosemoe — <https://github.com/Rosemoe/sora-editor> | GNU LGPL v2.1 (انظر `soraX/LICENSE`) |
-| محاكي الطرفية (`terminal-emulator/`, `terminal-view/`) | مشروع Termux — <https://github.com/termux/termux-app> | Apache License 2.0 (وفق ترويسات الملفات) |
-| مكتبة `termux-shared` (`core/termux-shared/`) | مشروع Termux | MIT، مع استثناء GPLv3 لبعض الملفات — انظر `core/termux-shared/LICENSE.md` |
-| PRoot (`features/terminal/proot/`) | مشروع PRoot (fork الخاص بـ Termux) | GNU GPL v2 |
-| قواعد TextMate (`core/main/src/main/assets/textmate/`) | مستودعات TextMate وMicrosoft ومساهمون | MIT / Apache 2.0 حسب القاعدة |
-| خطوط FiraCode وOutfit وRoboto | مؤلفو الخطوط | SIL OFL 1.1 / Apache 2.0 |
-
-## التغييرات الرئيسية
-
-قائمة تفصيلية بكل تغيير (إعادة التسمية، المعرّف الجديد، التعريب، الثيمات، المزايا) موجودة في
-[docs/REBRAND.md](docs/REBRAND.md).
-
-## المصادر المقابلة
-
-وفقًا لرخصة GPLv3، الشيفرة المصدرية الكاملة لهذا الإصدار متاحة في:
-<https://github.com/m777m44/Mahdi-editor>
-
-## ملاحظة حول مورد خارجي واحد
-
-تُنزَّل صورة نظام Ubuntu الخاصة بالطرفية (`features/terminal/src/main/java/com/mahdi/terminal/Constants.kt`)
-من مستودع إصدارات خارجي. ليس هذا إشارة إلى المطوّر الأصلي في واجهة المستخدم، بل مصدر بيانات عام
-لصورة Ubuntu. لإعادة استضافتها على مستودعك، عدّل الثابت `ROOTFS_BASE` في الملف المذكور.
+| المكوّن | الترخيص |
+|---|---|
+| محرّك التحرير (`soraX/`) | LGPL-2.1 — انظر `soraX/LICENSE` |
+| محاكي الطرفية (`terminal-emulator/`, `terminal-view/`) | Apache-2.0 حسب ترويسات الملفات |
+| مكتبة `termux-shared` (`core/termux-shared/`) | MIT مع استثناءات — انظر `core/termux-shared/LICENSE.md` |
+| PRoot (`features/terminal/proot/`) | GPL-2.0 |
+| قواعد TextMate (`core/main/src/main/assets/textmate/`) | MIT / Apache-2.0 حسب كل قاعدة |
+| الخطوط | SIL OFL 1.1 / Apache-2.0 |

@@ -57,6 +57,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -100,6 +101,11 @@ import com.termux.view.TerminalView
 import java.lang.ref.WeakReference
 import java.util.Properties
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AssistChip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 
 var terminalView = WeakReference<TerminalView?>(null)
 var virtualKeysView = WeakReference<VirtualKeysView?>(null)
@@ -164,6 +170,9 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                 ) { paddingValues ->
                     Column(modifier = Modifier.padding(paddingValues)) {
                         TerminalView(isDarkMode, currentTheme, surfaceColor, onSurfaceColor, terminalActivity)
+
+                        // شريط الأدوات السريع (2.6.0): أوامر جاهزة بلمسة واحدة
+                        TerminalQuickBar()
 
                         val pagerState = rememberPagerState(pageCount = { 2 })
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().height(75.dp)) { page ->
@@ -553,4 +562,56 @@ private fun TerminalView.applyTerminalColors(onSurfaceColor: Int, surfaceColor: 
     }
 
     invalidate()
+}
+
+/**
+ * شريط أدوات احترافي فوق لوحة المفاتيح: أوامر الطرفية الشائعة بلمسة واحدة،
+ * مع لصق من الحافظة وتكبير/تصغير فوري للخط.
+ */
+@Composable
+private fun TerminalQuickBar(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+
+    fun send(text: String) {
+        terminalView.get()?.currentSession?.write(text)
+    }
+
+    fun zoom(delta: Int) {
+        val newSize = (Settings.terminal_font_size + delta).coerceIn(8, 32)
+        Settings.terminal_font_size = newSize
+        terminalView.get()?.setTextSize(dpToPx(newSize.toFloat(), context))
+    }
+
+    val items: List<Pair<String, () -> Unit>> =
+        listOf(
+            "Ctrl+C" to { send("\u0003") },
+            "Ctrl+D" to { send("\u0004") },
+            stringResource(strings.terminal_tool_clear) to { send("\u000c") },
+            "Tab" to { send("\t") },
+            "Esc" to { send("\u001b") },
+            "↑" to { send("\u001b[A") },
+            "↓" to { send("\u001b[B") },
+            "←" to { send("\u001b[D") },
+            "→" to { send("\u001b[C") },
+            stringResource(strings.terminal_tool_paste) to {
+                clipboard.getText()?.text?.let { text -> if (text.isNotEmpty()) send(text) }
+            },
+            stringResource(strings.terminal_tool_zoom_in) to { zoom(+1) },
+            stringResource(strings.terminal_tool_zoom_out) to { zoom(-1) },
+        )
+
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items.forEach { (label, action) ->
+            AssistChip(onClick = { action() }, label = { Text(label, style = MaterialTheme.typography.labelSmall) })
+        }
+    }
 }
