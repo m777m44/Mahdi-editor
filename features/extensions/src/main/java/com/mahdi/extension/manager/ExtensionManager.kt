@@ -1,0 +1,342 @@
+package com.mahdi.extension.manager
+
+import android.app.Application
+import android.content.Context
+import androidx.core.content.edit
+import androidx.core.content.pm.PackageInfoCompat
+import com.mahdi.DefaultScope
+import com.mahdi.common.MahdiPackage
+import com.mahdi.events.Events
+import com.mahdi.extension.Extension
+import com.mahdi.extension.ExtensionAPI
+import com.mahdi.extension.ExtensionError
+import com.mahdi.extension.ExtensionEvent
+import com.mahdi.extension.InstallResult
+import com.mahdi.extension.LocalExtension
+import com.mahdi.extension.StoreExtension
+import com.mahdi.extension.UpdatableExtension
+import com.mahdi.extension.model.ExtensionId
+import com.mahdi.extension.model.ExtensionManifest
+import com.mahdi.extension.model.PackageCache
+import com.mahdi.file.FileOperations
+import com.mahdi.file.FileWrapper
+import com.mahdi.resources.getString
+import com.mahdi.resources.strings
+import com.mahdi.utils.errorDialog
+import com.mahdi.utils.logError
+import com.mahdi.utils.logInfo
+import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+
+private val Context.localDir: File
+    get() = filesDir.parentFile!!.resolve("local").apply { if (!exists()) mkdirs() }
+
+val Context.extensionDir: File
+    get() = localDir.resolve("extensions").apply { if (!exists()) mkdirs() }
+
+internal fun Context.compiledDexDir() = extensionDir.resolve("oat")
+
+data class LoadedExtension(val api: ExtensionAPI, val scope: CoroutineScope)
+
+open class ExtensionManager(private val context: Application) : CoroutineScope by CoroutineScope(Dispatchers.IO) {
+    private val mutex = Mutex()
+    private val _installedExtensions = MutableStateFlow<Map<ExtensionId, LocalExtension>>(emptyMap())
+    val installedExtensions: StateFlow<Map<ExtensionId, LocalExtension>> = _installedExtensions.asStateFlow()
+    private val _storeExtension = MutableStateFlow<Map<ExtensionId, StoreExtension>>(emptyMap())
+    val storeExtension: StateFlow<Map<ExtensionId, StoreExtension>> = _storeExtension.asStateFlow()
+    private val json = Json {
+        ignoreUnknownKeys = true
+        allowTrailingComma = true
+    }
+
+    private val _loadedExtensions = MutableStateFlow<Map<LocalExtension, LoadedExtension?>>(emptyMap())
+    val loadedExtensions: StateFlow<Map<LocalExtension, LoadedExtension?>> = _loadedExtensions.asStateFlow()
+
+    private val disabledPrefs by lazy { context.getSharedPreferences("disabled_extensions", Context.MODE_PRIVATE) }
+
+    fun isExtensionCrashed(extension: Extension): Boolean {
+        return disabledPrefs.getBoolean(extension.id, false)
+    }
+
+    fun setExtensionCrashed(extension: Extension, disabled: Boolean) {
+        disabledPrefs.edit { putBoolean(extension.id, disabled) }
+        if (disabled) {
+            launch { Events.publish(ExtensionEvent.Crashed(extension)) }
+        }
+    }
+
+    fun isInstalled(extensionId: ExtensionId) = installedExtensions.value.containsKey(extensionId)
+
+    fun getExtension(extensionId: ExtensionId): Extension? {
+        val local = installedExtensions.value[extensionId]
+        val store = storeExtension.value[extensionId]
+
+        return when {
+            local != null && store != null -> UpdatableExtension(local, store)
+            local != null -> local
+            store != null -> store
+            else -> null
+        }
+    }
+
+    fun getSyncedExtensions(): List<Extension> {
+        val allIds = installedExtensions.value.keys + storeExtension.value.keys
+        return allIds.mapNotNull { id -> getExtension(id) }
+    }
+
+    fun getLocalExtensions(): List<Extension> {
+        return getSyncedExtensions().filterIsInstance<LocalExtension>()
+    }
+
+    fun getStoreExtensions(): List<Extension> {
+        return getSyncedExtensions().filter { it is StoreExtension || it is UpdatableExtension }
+    }
+
+    fun clearLoadedExtensions() {
+        _loadedExtensions.value = emptyMap()
+    }
+
+    fun registerLoadedExtension(extension: LocalExtension, loaded: LoadedExtension) {
+        _loadedExtensions.update { it + (extension to loaded) }
+    }
+
+    private suspend fun calcSize(dir: File): Long {
+        return FileOperations.calculateContent(FileWrapper(dir)).totalSize
+    }
+
+    private fun resolveCache(dir: File): PackageCache {
+        val cacheFile = dir.resolve("cache.json")
+
+        if (!cacheFile.exists() || !cacheFile.isFile) {
+            return PackageCache()
+        }
+
+        return runCatching {
+            json.decodeFromString<PackageCache>(cacheFile.readText())
+        }
+            .getOrElse { PackageCache() }
+    }
+
+    private fun writeCache(dir: File, cache: PackageCache) {
+        val cacheFile = dir.resolve("cache.json")
+        cacheFile.writeText(json.encodeToString(cache))
+    }
+
+    suspend fun invalidateSize(extension: Extension) {
+        if (extension is StoreExtension) return
+
+        withContext(Dispatchers.IO) {
+            val dir = context.extensionDir.resolve(extension.id)
+            val cache = resolveCache(dir)
+            val newSize = calcSize(dir)
+            writeCache(dir, cache.copy(size = newSize))
+
+            withContext(Dispatchers.Main) { installedExtensions.value[extension.id]?.size = newSize }
+        }
+    }
+
+    suspend fun indexLocalExtensions() = mutex.withLock {
+        logInfo("Indexing local extensions...")
+        val newExtensions =
+            withContext(Dispatchers.IO) {
+                val map = mutableMapOf<ExtensionId, LocalExtension>()
+                val extensionFolders = context.extensionDir.listFiles()?.filter { it.isDirectory }
+                extensionFolders?.forEach { dir ->
+                    val extensionJson = dir.resolve("manifest.json")
+
+                    if (extensionJson.exists()) {
+                        runCatching {
+                            val extensionManifest = json.decodeFromString<ExtensionManifest>(extensionJson.readText())
+                            val extensionCache = resolveCache(dir)
+                            val size =
+                                extensionCache.size
+                                    ?: calcSize(dir).also { writeCache(dir, extensionCache.copy(size = it)) }
+                            val extension =
+                                LocalExtension(
+                                    manifest = extensionManifest,
+                                    installPath = dir.absolutePath,
+                                    initSize = size,
+                                    createdAt = extensionCache.createdAt,
+                                    updatedAt = extensionCache.updatedAt,
+                                )
+                            map[extensionManifest.id] = extension
+                        }
+                            .onFailure { logError(it) }
+                    }
+                }
+                map
+            }
+        withContext(Dispatchers.Main) {
+            _installedExtensions.update { current ->
+                val retained = current.filterKeys { it in newExtensions }
+                retained + newExtensions
+            }
+        }
+    }
+
+    suspend fun indexStoreExtensions() =
+        withContext(Dispatchers.IO) {
+            val extensions =
+                runCatching {
+                    StoreManager.fetchExtensions()
+                }
+                    .getOrNull() ?: return@withContext
+            val newExtensions = extensions.associate { it.id to StoreExtension(it) }
+            withContext(Dispatchers.Main) {
+                _storeExtension.update { current ->
+                    val retained = current.filterKeys { it in newExtensions }
+                    retained + newExtensions
+                }
+            }
+        }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    internal fun validateExtensionDir(dir: File): Result<ExtensionManifest> {
+        val extensionJson = dir.resolve("manifest.json")
+        if (!extensionJson.exists()) {
+            return Result.failure(Exception("Missing manifest.json"))
+        }
+        val extensionManifest = runCatching {
+            json.decodeFromString<ExtensionManifest>(extensionJson.readText())
+        }
+            .getOrElse { e ->
+                return Result.failure(e)
+            }
+
+        val hasApk = dir.listFiles()?.any { it.extension == "apk" } == true
+        if (!hasApk) {
+            return Result.failure(Exception("Missing APK file"))
+        }
+
+        return Result.success(extensionManifest)
+    }
+
+    suspend fun installExtensionFromZip(mahdiFile: File): InstallResult =
+        withContext(Dispatchers.IO) {
+            logInfo("Installing extension from zip: ${mahdiFile.name}")
+            // Extract to temp dir first
+            val tempDir = File(context.cacheDir, "ext_temp_${System.currentTimeMillis()}")
+            tempDir.mkdirs()
+
+            try {
+                MahdiPackage.extract(mahdiFile, tempDir)
+                installExtensionFromDir(tempDir)
+            } catch (e: Exception) {
+                logError(e)
+                errorDialog(e)
+                InstallResult.ValidationFailed(e)
+            } finally {
+                tempDir.deleteRecursively()
+            }
+        }
+
+    suspend fun installExtensionFromDir(dir: File): InstallResult =
+        withContext(Dispatchers.IO) {
+            val validation = validateExtensionDir(dir)
+            if (validation.isFailure) {
+                return@withContext InstallResult.ValidationFailed(validation.exceptionOrNull())
+            }
+
+            val extensionInfo = validation.getOrThrow()
+            val targetDir = context.extensionDir.resolve(extensionInfo.id)
+
+            var performedUpdate = false
+            var oldCreatedAt: Long? = null
+            if (targetDir.exists()) {
+                oldCreatedAt = resolveCache(targetDir).createdAt
+                uninstallExtension(extensionInfo.id, update = true)
+                performedUpdate = true
+            }
+
+            val pm = context.packageManager
+            val mahdiVersionCode = PackageInfoCompat.getLongVersionCode(pm.getPackageInfo(context.packageName, 0))
+
+            val minAppVersion = extensionInfo.minAppVersion
+            if (minAppVersion != null && mahdiVersionCode < minAppVersion) {
+                return@withContext InstallResult.Error(ExtensionError.OUTDATED_CLIENT)
+            }
+
+            dir.copyRecursively(targetDir, overwrite = true)
+
+            val size = calcSize(targetDir)
+            val newExtensionCache =
+                PackageCache(
+                        createdAt = oldCreatedAt ?: System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis(),
+                        size = size,
+                    )
+                    .also { writeCache(targetDir, it) }
+
+            val extension =
+                LocalExtension(
+                    manifest = extensionInfo,
+                    installPath = targetDir.absolutePath,
+                    initSize = size,
+                    createdAt = newExtensionCache.createdAt,
+                    updatedAt = newExtensionCache.updatedAt,
+                )
+            _installedExtensions.update { it + (extensionInfo.id to extension) }
+
+            Events.publish(ExtensionEvent.Installed(extension))
+
+            InstallResult.Success(extension, performedUpdate)
+        }
+
+    suspend fun uninstallExtension(extensionId: ExtensionId, update: Boolean = false) =
+        withContext(Dispatchers.IO) {
+            logInfo("Uninstalling extension: $extensionId (update=$update)")
+            try {
+                val extension =
+                    installedExtensions.value[extensionId]
+                        ?: return@withContext Result.failure(Exception("Extension not found"))
+
+                val loadedExtension = loadedExtensions.value[extension]
+                runCatching {
+                    loadedExtension?.api?.onDispose()
+                    if (update) {
+                        loadedExtension?.api?.beforeUpdate()
+                    } else {
+                        loadedExtension?.api?.onUninstalled()
+                    }
+                }
+                    .onFailure { errorDialog(title = strings.ext_cleanup_failed.getString(), throwable = it) }
+                loadedExtensions.value[extension]?.scope?.cancel()
+
+                val extensionDir = File(extension.installPath)
+                if (!extensionDir.exists()) {
+                    return@withContext Result.failure(Exception("Extension directory not found"))
+                }
+
+                extensionDir.deleteRecursively()
+                _installedExtensions.update { it - extensionId }
+
+                DefaultScope.launch { Events.publish(ExtensionEvent.Uninstalled(extension, update)) }
+
+                context.compiledDexDir().deleteWithPackageName(extension.manifest.id)
+                disabledPrefs.edit { remove(extensionId) }
+
+                Result.success(Unit)
+            } catch (err: Exception) {
+                Result.failure(Exception("Failed to uninstall extension: ${err.message}", err))
+            }
+        }
+
+    private fun File.deleteWithPackageName(pkgName: String) {
+        if (isDirectory) {
+            listFiles()?.forEach { it.deleteWithPackageName(pkgName) }
+            delete()
+        } else if (name.startsWith(pkgName)) delete()
+    }
+}

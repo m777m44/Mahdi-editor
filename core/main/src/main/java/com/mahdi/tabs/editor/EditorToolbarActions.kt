@@ -1,0 +1,165 @@
+package com.mahdi.tabs.editor
+
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import com.mahdi.activities.main.MainViewModel
+import com.mahdi.commands.ActionContext
+import com.mahdi.commands.Command
+import com.mahdi.commands.KeybindingsManager
+import com.mahdi.commands.ToggleableCommand
+import com.mahdi.commands.ToolbarConfiguration
+import com.mahdi.components.MahdiDropdownMenuItem
+import com.mahdi.components.compose.utils.holdable
+import com.mahdi.icons.Icon
+import com.mahdi.icons.MahdiIcon
+import com.mahdi.resources.strings
+import com.mahdi.theme.Typography
+import kotlin.math.min
+
+@Composable
+fun EditorToolbarActions(modifier: Modifier = Modifier, viewModel: MainViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+    val activity = LocalActivity.current
+
+    val allActions by remember { derivedStateOf { ToolbarConfiguration.editorCommands } }
+
+    BoxWithConstraints(modifier = modifier) {
+        val itemWidth = 64.dp
+        val availableWidth = maxWidth - 48.dp
+        val maxVisibleCount = (availableWidth / itemWidth).toInt().coerceAtLeast(0)
+
+        // Filter visible actions first
+        val visibleActions = allActions.filter { it.isSupported() }
+
+        // Calculate actual number of actions to show in toolbar
+        var actualVisibleCount = min(visibleActions.size, maxVisibleCount)
+
+        // Make sure that the dropdown menu never contains only one entry
+        if (visibleActions.size - actualVisibleCount == 1) {
+            actualVisibleCount += 1
+        }
+
+        val toolbarActions = visibleActions.take(actualVisibleCount)
+        val dropdownActions = visibleActions.drop(actualVisibleCount)
+
+        Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            toolbarActions.forEach { command -> ToolbarAction(command) }
+
+            if (dropdownActions.isNotEmpty()) {
+                Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
+                    IconButton(onClick = { expanded = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Outlined.MoreVert, stringResource(strings.more))
+                    }
+
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        dropdownActions.forEach { command ->
+                            val keyCombination = KeybindingsManager.getKeyCombinationForCommand(command)
+                            val displayKeyCombination = keyCombination?.getDisplayName()
+
+                            MahdiDropdownMenuItem(
+                                enabled = command.isEnabled(),
+                                text = {
+                                    Text(
+                                        text = command.getLabel(),
+                                        color =
+                                            if (command is ToggleableCommand && command.isOn()) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                Color.Unspecified
+                                            },
+                                    )
+                                },
+                                onClick = {
+                                    command.perform(ActionContext(activity!!))
+                                    expanded = false
+                                },
+                                leadingIcon = {
+                                    MahdiIcon(
+                                        command.getIcon(),
+                                        contentDescription = command.getLabel(),
+                                        tint =
+                                            if (command is ToggleableCommand && command.isOn()) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else LocalContentColor.current,
+                                    )
+                                },
+                                trailingIcon =
+                                    displayKeyCombination?.let {
+                                        {
+                                            Text(
+                                                modifier = Modifier.padding(start = 4.dp),
+                                                text = it,
+                                                maxLines = 1,
+                                                fontFamily = FontFamily.Monospace,
+                                                style = Typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ToolbarAction(command: Command) {
+    val activity = LocalActivity.current
+
+    IconButton(
+        onClick = { /* Handled by holdable modifier */ },
+        modifier =
+            Modifier.size(48.dp)
+                .holdable(
+                    enabled = command.isEnabled(),
+                    repeatOnHold = command.repeatOnHold,
+                    onLongClick = { activity?.let { command.onLongClick(ActionContext(it)) } ?: false },
+                    onClick = { activity?.let { command.perform(ActionContext(it)) } },
+                ),
+        enabled = command.isEnabled(),
+        colors =
+            IconButtonDefaults.iconButtonColors().let {
+                if (command is ToggleableCommand && command.isOn())
+                    it.copy(
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        disabledContentColor = MaterialTheme.colorScheme.primary,
+                    )
+                else it
+            },
+    ) {
+        MahdiIcon(
+            icon = if (command.preferText) Icon.TextIcon(command.getLabel()) else command.getIcon(),
+            contentDescription = command.getLabel(),
+        )
+    }
+}

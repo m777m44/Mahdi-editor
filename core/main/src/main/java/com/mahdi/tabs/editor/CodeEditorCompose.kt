@@ -1,0 +1,462 @@
+package com.mahdi.tabs.editor
+
+import android.app.Activity
+import android.content.Intent
+import android.view.KeyEvent
+import android.view.View
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.net.toUri
+import com.mahdi.activities.main.MainActivity
+import com.mahdi.activities.main.MainViewModel
+import com.mahdi.activities.main.ui.fileTreeViewModel
+import com.mahdi.activities.main.ui.snackbarHostStateRef
+import com.mahdi.color.ColorFormat
+import com.mahdi.color.parseUnknownColor
+import com.mahdi.commands.KeybindingsManager
+import com.mahdi.editor.Editor
+import com.mahdi.editor.FormatterSource
+import com.mahdi.editor.Formatters
+import com.mahdi.editor.LanguageManager
+import com.mahdi.editor.TextActionItem
+import com.mahdi.editor.intelligent.IntelligentFeature
+import com.mahdi.feature.FeatureRegistry
+import com.mahdi.file.FileObject
+import com.mahdi.file.FileTypeManager
+import com.mahdi.file.FileWrapper
+import com.mahdi.lsp.LspConnectionConfig
+import com.mahdi.lsp.LspConnector
+import com.mahdi.lsp.LspRegistry
+import com.mahdi.lsp.LspServer
+import com.mahdi.lsp.createLspTextActions
+import com.mahdi.resources.drawables
+import com.mahdi.resources.getDrawable
+import com.mahdi.resources.getFilledString
+import com.mahdi.resources.getString
+import com.mahdi.resources.strings
+import com.mahdi.settings.Preference
+import com.mahdi.settings.Settings
+import com.mahdi.theme.GitColorScheme
+import com.mahdi.utils.logError
+import com.mahdi.utils.logInfo
+import com.mahdi.utils.logWarn
+import com.mahdi.utils.toast
+import io.github.rosemoe.sora.event.ContentChangeEvent
+import io.github.rosemoe.sora.event.EditorFormatEvent
+import io.github.rosemoe.sora.event.EditorKeyEvent
+import io.github.rosemoe.sora.event.InlayHintClickEvent
+import io.github.rosemoe.sora.event.KeyBindingEvent
+import io.github.rosemoe.sora.event.LayoutStateChangeEvent
+import io.github.rosemoe.sora.event.PublishDiagnosticsEvent
+import io.github.rosemoe.sora.lang.format.FormatterProvider
+import io.github.rosemoe.sora.lang.styling.inlayHint.ColorInlayHint
+import io.github.rosemoe.sora.text.CharPosition
+import io.github.rosemoe.sora.text.TextRange
+import java.lang.ref.WeakReference
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+
+@OptIn(DelicateCoroutinesApi::class, ExperimentalLayoutApi::class)
+@Composable
+fun EditorTab.CodeEditor(
+    modifier: Modifier = Modifier,
+    intelligentFeatures: List<IntelligentFeature>,
+    onTextChange: () -> Unit,
+) {
+    val selectionColors = LocalTextSelectionColors.current
+    val scope = rememberCoroutineScope()
+    val isDarkMode = isSystemInDarkTheme()
+    val colorScheme = MaterialTheme.colorScheme
+    val gitColorScheme = GitColorScheme.create()
+
+    Column(modifier = modifier) {
+        AndroidView(
+            modifier = Modifier.weight(1f),
+            onRelease = { it.release() },
+            update = { logInfo("Editor view update") },
+            factory = { ctx ->
+                Editor(ctx).apply {
+                    logInfo("New Editor instance")
+                    ownerTab = this@CodeEditor
+
+                    editable = editorState.editable
+                    val isTxtFile = file?.getName()?.endsWith(".txt") ?: (fallbackExtension == "txt")
+                    if (Settings.word_wrap_text && isTxtFile) {
+                        setWordwrap(true, true, true)
+                    }
+                    id = View.generateViewId()
+                    layoutParams = ConstraintLayout.LayoutParams(ConstraintLayout.LayoutParams.MATCH_PARENT, 0)
+
+                    setThemeColors(
+                        isDarkMode = isDarkMode,
+                        selectionColors = selectionColors,
+                        colorScheme = colorScheme,
+                        gitColorScheme = gitColorScheme,
+                    )
+
+                    editorState.editor = WeakReference(this)
+
+                    registerMahdiFormatter(this@CodeEditor)
+                    registerMahdiActions(scope, viewModel, this@CodeEditor)
+                    registerMahdiEvents(this@CodeEditor, intelligentFeatures, file, onTextChange)
+
+                    scope.launch(Dispatchers.IO) {
+                        editorState.contentLoaded.await()
+                        editorState.updateLock.withLock {
+                            withContext(Dispatchers.Main) {
+                                val content = editorState.content
+                                setText(content)
+
+                                // Save newly created Content instance from setText(...)
+                                if (content == null) {
+                                    editorState.content = text
+                                }
+
+                                editorState.contentRendered.complete(Unit)
+                            }
+                        }
+                    }
+                }
+            },
+        )
+
+        if (Settings.show_extra_keys) {
+            HorizontalDivider()
+        }
+    }
+}
+
+fun Editor.registerMahdiFormatter(editorTab: EditorTab) {
+    val scope = editorTab.editorState.textmateScope
+    val inferredExtension = FileTypeManager.fromScope(scope).extensions.firstOrNull()
+    val fileExtension = editorTab.file?.getExtension()
+    val extension = fileExtension ?: inferredExtension
+
+    extension?.let {
+        val formatter = Formatters.getPreferredSourceForNonLspFile(it)
+        formatterProvider = FormatterProvider { editor ->
+            runCatching {
+                formatter?.provider?.getFormatter(editorTab, editor, editorTab.file)
+            }
+                .onFailure { e -> logError(e, "Error getting formatter") }
+                .getOrNull()
+        }
+    }
+}
+
+fun Editor.registerMahdiActions(scope: CoroutineScope, viewModel: MainViewModel, editorTab: EditorTab) {
+    registerTextAction(
+        TextActionItem(
+            strings.open.getString(context),
+            drawables.open_in_new.getDrawable(context)!!,
+            shouldShow = { isUrlSelected() },
+            onClick = {
+                val text = getSelectedText() ?: return@TextActionItem
+                val intent = Intent(Intent.ACTION_VIEW, text.toUri())
+                context.startActivity(intent)
+            },
+        )
+    )
+    val lspActions = createLspTextActions(scope, context, viewModel, editorTab)
+    lspActions.forEach { registerTextAction(it) }
+}
+
+fun Editor.registerMahdiEvents(
+    editorTab: EditorTab,
+    intelligentFeatures: List<IntelligentFeature>,
+    file: FileObject?,
+    onTextChange: () -> Unit,
+) {
+    subscribeAlways(InlayHintClickEvent::class.java) { event ->
+        val hint = event.inlayHint as? ColorInlayHint ?: return@subscribeAlways
+        val range =
+            hint.colorRange
+                ?: run {
+                    toast(strings.invalid_color)
+                    return@subscribeAlways
+                }
+
+        val editor = event.editor
+        val text = editor.text
+
+        val start = CharPosition(range.start.line, range.start.column)
+        val end = CharPosition(range.end.line, range.end.column)
+
+        val indexedRange = TextRange(start, end)
+
+        val colorText = text.subContent(start.line, start.column, end.line, end.column).toString()
+
+        val colorValue = hint.color.resolve(colorScheme).let(::Color)
+        val parsed = colorText.parseUnknownColor() ?: (colorValue to ColorFormat.HEX)
+
+        editorTab.editorState.apply {
+            showColorPicker = parsed
+            colorPickerRange = indexedRange
+        }
+    }
+
+    if (file != null) {
+        subscribeAlways(PublishDiagnosticsEvent::class.java) { event ->
+            val viewModel = fileTreeViewModel.get()
+            val diagnostics = event.newDiagnosticsEvent
+
+            val highestSeverity = diagnostics.maxOfOrNull { it.severity.toInt() }
+
+            if (highestSeverity != null) {
+                viewModel?.diagnoseNode(file, highestSeverity)
+            } else {
+                viewModel?.undiagnoseNode(file)
+            }
+        }
+    }
+
+    subscribeAlways(ContentChangeEvent::class.java) {
+        intelligentFeatures.forEach { feature ->
+            when (it.action) {
+                ContentChangeEvent.ACTION_INSERT -> feature.handleInsert(this)
+                ContentChangeEvent.ACTION_DELETE -> feature.handleDelete(this)
+            }
+        }
+
+        if (it.changedText.length == 1) {
+            val character = it.changedText.first()
+            intelligentFeatures.forEach { feature ->
+                if (feature.triggerCharacters.contains(character)) {
+                    when (it.action) {
+                        ContentChangeEvent.ACTION_INSERT -> feature.handleInsertChar(character, this)
+                        ContentChangeEvent.ACTION_DELETE -> feature.handleDeleteChar(character, this)
+                    }
+                }
+            }
+        }
+
+        if (!editorTab.editorState.updateLock.isLocked) {
+            editorTab.editorState.updateUndoRedo()
+            onTextChange.invoke()
+        }
+    }
+
+    subscribeAlways(LayoutStateChangeEvent::class.java) { event ->
+        if (event.isLayoutBusy) {
+            editorTab.registerTask(EditorTab.LAYOUT_BUSY_TASK_ID)
+        } else {
+            editorTab.unregisterTask(EditorTab.LAYOUT_BUSY_TASK_ID)
+        }
+    }
+
+    subscribeAlways(EditorFormatEvent::class.java) {
+        editorTab.editorState.formatDeferred?.complete(it.isSuccess)
+        editorTab.editorState.formatDeferred = null
+    }
+
+    subscribeAlways(EditorKeyEvent::class.java) { event ->
+        intelligentFeatures.forEach { it.handleKeyEvent(event, this) }
+    }
+
+    // Intercept the default handling of some keybinds because
+    // they should be handled by Mahdi-Editor's key binding system instead
+    // (for custom keybinds support)
+    subscribeAlways(KeyBindingEvent::class.java) { event ->
+        intelligentFeatures.forEach { it.handleKeyBindingEvent(event, this) }
+        if (event.isIntercepted) return@subscribeAlways
+
+        val keyCode = event.keyCode
+        val shouldBeIntercepted =
+            event.isCtrlPressed &&
+                (keyCode == KeyEvent.KEYCODE_A ||
+                    keyCode == KeyEvent.KEYCODE_C ||
+                    keyCode == KeyEvent.KEYCODE_X ||
+                    keyCode == KeyEvent.KEYCODE_V ||
+                    keyCode == KeyEvent.KEYCODE_U ||
+                    keyCode == KeyEvent.KEYCODE_R ||
+                    keyCode == KeyEvent.KEYCODE_D ||
+                    keyCode == KeyEvent.KEYCODE_W ||
+                    keyCode == KeyEvent.KEYCODE_Y ||
+                    keyCode == KeyEvent.KEYCODE_Z ||
+                    keyCode == KeyEvent.KEYCODE_J)
+        if (shouldBeIntercepted) event.markAsConsumed()
+
+        val wasHandled = KeybindingsManager.handleEditorEvent(event, MainActivity.instance!!)
+        if (wasHandled) event.markAsConsumed()
+    }
+}
+
+fun EditorTab.applyHighlightingAndConnectLSP() {
+    val editor = editorState.editor.get() ?: return
+
+    scope.launch(Dispatchers.IO) {
+        editorState.textmateScope?.let { editor.configureLanguage(it) }
+
+        val editorConfigProps = editorState.editorConfigLoaded?.await()
+        editorConfigProps?.let { withContext(Dispatchers.Main) { editor.applySettings(it) } }
+
+        file?.let { editor.connectLsp(this@applyHighlightingAndConnectLSP, it, this) }
+    }
+}
+
+private suspend fun Editor.connectLsp(
+    tab: EditorTab,
+    file: FileObject,
+    scope: CoroutineScope,
+) {
+    val activity = context as? Activity ?: return
+
+    val extension = file.getExtensionServers(activity, scope)
+    val external = file.getExternalServers()
+    var servers =
+        (extension + external).ifEmpty {
+            return
+        }
+
+    if (!FeatureRegistry.isEnabled("feature_terminal")) {
+        servers = servers.filter { it.getConnectionConfig() !is LspConnectionConfig.Process }
+    }
+
+    // Language servers fail with content URIs
+    if (file !is FileWrapper) {
+        servers = servers.filter { Preference.getBoolean("lsp_${it.id}_run_external", false) }
+    }
+
+    if (servers.isEmpty()) {
+        logWarn("No suitable servers available for ${file.getName()}. Skipping language server connection.")
+        return
+    }
+
+    // Create another language, as created identifiers cannot be modified retroactively
+    val wrapperLanguage =
+        tab.editorState.textmateScope
+            ?.let { LanguageManager.createLanguage(textmateScope = it, createIdentifiers = false) }
+            ?.apply {
+                getTextMateLanguage()?.let {
+                    useTab(it.useTab())
+                    tabSize = it.tabSize
+                }
+            }
+
+    val projectFile =
+        tab.projectRoot
+            ?: run {
+                logWarn("File ${file.getName()} has no suitable project root. Skipping language server connection.")
+                return
+            }
+
+    tab.lspConnector =
+        LspConnector(
+            projectFile = projectFile,
+            fileObject = file,
+            codeEditor = this,
+            editorTab = tab,
+            servers = servers,
+        )
+
+    logInfo("Trying to connect language servers...")
+    tab.lspConnector?.connect(wrapperLanguage)
+    logInfo("isConnected : ${tab.lspConnector?.isConnected() ?: false}")
+
+    val formatter = Formatters.getPreferredSourceForFile(file.getExtension())
+    val supportsFormatting = tab.lspConnector?.isFormattingSupported() ?: false
+
+    if (formatter is FormatterSource.LSP && supportsFormatting) {
+        formatterProvider = null
+    }
+}
+
+private fun LspServer.promptLspInstall(activity: Activity, scope: CoroutineScope) {
+    scope.launch {
+        val snackbarHost = snackbarHostStateRef.get() ?: return@launch
+        val result =
+            snackbarHost.showSnackbar(
+                message = strings.ask_lsp_install.getFilledString(languageName, activity),
+                actionLabel = strings.install.getString(),
+                withDismissAction = true,
+                duration = SnackbarDuration.Short,
+            )
+        if (result == SnackbarResult.ActionPerformed) {
+            Preference.removeKey("lsp_install_reject_count_${id}")
+            install(activity)
+        } else if (result == SnackbarResult.Dismissed) {
+            val rejectCount = Preference.getInt("lsp_install_reject_count_${id}", 0)
+            Preference.setInt("lsp_install_reject_count_${id}", rejectCount + 1)
+        }
+    }
+}
+
+private fun LspServer.promptLspUpdate(activity: Activity, scope: CoroutineScope) {
+    scope.launch {
+        val snackbarHost = snackbarHostStateRef.get() ?: return@launch
+        val result =
+            snackbarHost.showSnackbar(
+                message = strings.ask_lsp_update.getFilledString(languageName, activity),
+                actionLabel = strings.update.getString(),
+                duration = SnackbarDuration.Long,
+            )
+        if (result == SnackbarResult.ActionPerformed) {
+            update(activity)
+        }
+    }
+}
+
+private suspend fun FileObject.getExtensionServers(
+    activity: Activity,
+    scope: CoroutineScope,
+): List<LspServer> {
+    val servers =
+        (LspRegistry.extensionServers.value + LspRegistry.builtInServers.value).filter { server ->
+            server.isSupported(this)
+        }
+    return servers.filterActiveLspServers(activity, scope)
+}
+
+private suspend fun List<LspServer>.filterActiveLspServers(
+    activity: Activity,
+    scope: CoroutineScope,
+): MutableList<LspServer> {
+    val matchedServers = mutableListOf<LspServer>()
+
+    this.forEach { server ->
+        if (!Preference.getBoolean("lsp_${server.id}", true)) {
+            return@forEach
+        }
+
+        if (!server.isInstalled(activity)) {
+            logInfo("Server ${server.id} is not installed")
+            if (Preference.getInt("lsp_install_reject_count_${server.id}", 0) >= 3) {
+                return@forEach
+            }
+            server.promptLspInstall(activity, scope)
+            return@forEach
+        }
+
+        scope.launch(Dispatchers.IO) {
+            if (server.isUpdatable(activity)) {
+                logInfo("Server ${server.id} has updates available")
+                server.promptLspUpdate(activity, scope)
+            }
+        }
+
+        matchedServers.add(server)
+        return@forEach
+    }
+
+    return matchedServers
+}
+
+private fun FileObject.getExternalServers(): List<LspServer> {
+    return LspRegistry.externalServers.value.filter { server -> server.isSupported(this) }
+}

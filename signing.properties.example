@@ -1,0 +1,10 @@
+# انسخ هذا الملف إلى signing.properties ثم عدّل القيم.
+# Copy this file to signing.properties and fill in your own values.
+#
+# لا ترفع signing.properties أو ملف المفتاح إلى Git أبدًا.
+# Never commit signing.properties or your keystore.
+
+storeFile=/absolute/path/to/mahdi-editor.jks
+storePassword=CHANGE_ME
+keyAlias=mahdi
+keyPassword=CHANGE_ME

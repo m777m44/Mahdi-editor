@@ -1,0 +1,23 @@
+package com.mahdi.activities.main.navigation
+
+import com.mahdi.extension.api.DynamicRoute
+import com.mahdi.extension.api.MahdiExtensionPoint
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+object MainRouteRegistry {
+    private val _routes = MutableStateFlow<List<DynamicRoute>>(emptyList())
+    val routes: StateFlow<List<DynamicRoute>> = _routes.asStateFlow()
+
+    @MahdiExtensionPoint
+    fun registerRoute(route: DynamicRoute) {
+        _routes.update { it + route }
+    }
+
+    @MahdiExtensionPoint
+    fun unregisterRoute(route: DynamicRoute) {
+        _routes.update { it - route }
+    }
+}
