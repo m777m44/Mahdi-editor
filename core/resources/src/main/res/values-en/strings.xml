@@ -1050,4 +1050,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="applied_state">Applied</string>
     <string name="package_studio">Package studio</string>
     <string name="package_studio_desc">Theme, icon pack and extension templates, pack validation and theme import</string>
+    <string name="guide_title">Mahdi-Editor guide</string>
+    <string name="guide_desc">Complete docs: editor, terminal, Git, themes, packages, servers, languages</string>
 </resources>
