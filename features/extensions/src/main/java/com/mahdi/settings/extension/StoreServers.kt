@@ -45,6 +45,7 @@ import com.mahdi.TerminalLauncher
 import com.mahdi.components.SettingsItem
 import com.mahdi.icons.MahdiIcon
 import com.mahdi.lang.LanguageInstallStore
+import com.mahdi.runtime.InstallState
 import com.mahdi.runtime.RuntimeCatalog
 import com.mahdi.runtime.RuntimeInstaller
 import com.mahdi.lang.LanguageRegistry
@@ -207,6 +208,28 @@ fun ServersAndRunnersSection(
     // ————— المشغّلات واللغات —————
     SectionHeader(stringResource(strings.language_runners))
 
+    // حالة بيئات التشغيل الحقيقية (من القرص) — JavaScript وTypeScript تتبعان Node،
+    // وJava وKotlin تتبعان JDK، وC/C++ تتبعان GCC… فلا يدور مؤشّر بلا نهاية.
+    val runtimeStates by RuntimeInstaller.status.collectAsStateWithLifecycle()
+
+    // قراءة أولية من القرص عند فتح الشاشة
+    LaunchedEffect(Unit) {
+        runCatching { RuntimeInstaller.refresh() }
+    }
+
+    // تحديث دوري هادئ ما دام تثبيت جارٍ (يعمل أيضًا بعد إعادة فتح التطبيق وسط التثبيت)
+    LaunchedEffect(Unit) {
+        while (true) {
+            val busy =
+                RuntimeInstaller.status.value.values.any { status ->
+                    val state = status.state
+                    state is InstallState.Downloading || state is InstallState.Extracting || state is InstallState.Queued
+                }
+            if (busy) runCatching { RuntimeInstaller.refresh() }
+            delay(1500)
+        }
+    }
+
     val languages =
         remember(query) {
             LanguageRegistry.all.filter { lang ->
@@ -217,35 +240,88 @@ fun ServersAndRunnersSection(
             }
         }
 
-    // مُراقِب التثبيت: يفحص ملفّ العلامة كل ثانيتين حتى يظهر، ثم يثبّت الشارة السمائية
+    // لغة بلا بيئة تشغيل (HTML/CSS…) تُثبَّت بعلامة على القرص — لها مهلة صريحة بدل الدوران الأبدي
+    val pendingSince = remember { mutableStateMapOf<String, Long>() }
+    val failedInstalls = remember { mutableStateMapOf<String, String>() }
+
     LaunchedEffect(pendingInstalls.keys.toList()) {
         if (pendingInstalls.isEmpty()) return@LaunchedEffect
-        repeat(150) {
+        // 3.1.0: مهلة 120 ثانية — بعدها تظهر «فشل» مع زرّ إعادة بدل مؤشّر لا يتوقّف أبدًا
+        while (pendingInstalls.isNotEmpty()) {
             LanguageInstallStore.refresh()
-            val done = pendingInstalls.keys.filter { LanguageInstallStore.isInstalled(it) }
-            if (done.isNotEmpty()) {
-                done.forEach { pendingInstalls.remove(it) }
+            runCatching { RuntimeInstaller.refresh() }
+            val now = System.currentTimeMillis()
+            pendingInstalls.keys.toList().forEach { id ->
+                if (pendingSince[id] == null) pendingSince[id] = now
+                val started = pendingSince[id] ?: now
+                when {
+                    LanguageInstallStore.isInstalled(id) -> {
+                        pendingSince.remove(id)
+                        failedInstalls.remove(id)
+                        pendingInstalls.remove(id)
+                    }
+
+                    now - started > 120_000L -> {
+                        pendingSince.remove(id)
+                        pendingInstalls.remove(id)
+                        failedInstalls[id] =
+                            if (isArabic) "انتهت المهلة" else "Timed out"
+                    }
+                }
             }
-            if (pendingInstalls.isEmpty()) return@LaunchedEffect
-            delay(2000)
+            delay(1000)
         }
     }
 
     languages.forEach { lang ->
-        val hasPackages = LanguageToolchain.packagesFor(lang.id).isNotBlank()
-        val installed = lang.id in installedLanguages
-        val pending = pendingInstalls[lang.id] == true
+        val spec = RuntimeCatalog.forLanguage(lang.id)
+        val runtimeStatus = spec?.let { runtimeStates[it.id] }
+        val runtimeState = runtimeStatus?.state
+        val runtimeReady = runtimeState is InstallState.Installed || runtimeState is InstallState.Bundled
+        val runtimeBusy = runtimeState is InstallState.Downloading || runtimeState is InstallState.Extracting || runtimeState is InstallState.Queued
+        val runtimeProgress = (runtimeState as? InstallState.Downloading)?.progress
+        val runtimeError = (runtimeState as? InstallState.Failed)?.error
+
+        val installed = lang.id in installedLanguages || runtimeReady
+        val pending = pendingInstalls[lang.id] == true || runtimeBusy
+        val failure = runtimeError ?: failedInstalls[lang.id]
+        val hasPackages = LanguageToolchain.packagesFor(lang.id).isNotBlank() || spec != null
+
+        fun startInstall(activity: android.app.Activity) {
+            failedInstalls.remove(lang.id)
+            if (spec != null) {
+                RuntimeInstaller.install(activity, spec)
+            } else {
+                pendingSince[lang.id] = System.currentTimeMillis()
+                pendingInstalls[lang.id] = true
+                TerminalLauncher.launch(
+                    activity = activity,
+                    exe = "/bin/bash",
+                    args = arrayOf("-lc", LanguageInstallStore.installCommand(lang.id)),
+                    id = "install-${lang.id}",
+                )
+            }
+        }
 
         SettingsItem(
             label = if (isArabic) lang.nameAr else lang.nameEn,
-            description = lang.extensions.take(5).joinToString(" ") { ".$it" },
+            // 3.1.0: الامتدادات في سطر واحد — كانت تلتفّ حرفًا حرفًا فتتراكب مع الصفوف المجاورة.
+            // ونُظهر بيئة التشغيل المطلوبة (Node للجافاسكربت، JDK لجافا…) ليعرف المستخدم ما يُثبَّت.
+            description =
+                buildString {
+                    append(lang.extensions.take(3).joinToString(" ") { ".$it" })
+                    if (spec != null) {
+                        append("  ·  ")
+                        append(if (isArabic) spec.nameAr else spec.nameEn)
+                    }
+                },
+            singleLineDescription = true,
             showSwitch = false,
             startWidget = {
                 Icon(
                     painter = painterResource(drawables.run),
                     contentDescription = null,
-                    tint =
-                        if (installed) SkyAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (installed) SkyAccent else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 16.dp, end = 4.dp).size(20.dp),
                 )
             },
@@ -259,43 +335,56 @@ fun ServersAndRunnersSection(
                         // ✅ مثبت — شارة سمائية تبقى بعد إعادة التشغيل
                         installed -> {
                             SkyBadge(stringResource(strings.installed_state))
-                            IconButton(onClick = { LanguageInstallStore.unmark(lang.id) }) {
-                                Icon(
-                                    painter = painterResource(drawables.close),
-                                    contentDescription = stringResource(strings.uninstall_action),
-                                    modifier = Modifier.size(18.dp),
-                                )
+                            if (spec == null) {
+                                IconButton(onClick = { LanguageInstallStore.unmark(lang.id) }) {
+                                    Icon(
+                                        painter = painterResource(drawables.close),
+                                        contentDescription = stringResource(strings.uninstall_action),
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
                             }
                         }
-                        // ⏳ قيد التثبيت
+
+                        // ⏳ قيد التثبيت — نسبة حقيقية إن توفّرت، بلا نصّ طويل يزاحم العنوان
                         pending -> {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             Text(
-                                text = stringResource(strings.installing_state),
+                                text =
+                                    if (runtimeProgress != null) {
+                                        "${runtimeProgress}%"
+                                    } else {
+                                        stringResource(strings.installing_state)
+                                    },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+
+                        // ✖ فشل — سبب مختصر + إعادة المحاولة
+                        !failure.isNullOrBlank() -> {
+                            Text(
+                                text = if (isArabic) "فشل" else "Failed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            IconButton(
+                                enabled = activity != null,
+                                onClick = { activity?.let { act -> startInstall(act) } },
+                            ) {
+                                Icon(
+                                    painter = painterResource(drawables.download),
+                                    contentDescription = if (isArabic) "إعادة المحاولة" else "Retry",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+
                         // ⬇️ يمكن تثبيته
                         hasPackages -> {
                             IconButton(
-                                onClick = {
-                                    val act = activity ?: return@IconButton
-                                    pendingInstalls[lang.id] = true
-                                    // 3.0.0: إن كانت للغة بيئة تشغيل معروفة نستخدم المثبّت
-                                    // الذي يكتب حالة حقيقية (نسبة/فشل/نسخة) بدل أمر خام.
-                                    val spec = RuntimeCatalog.byId(lang.id)
-                                    if (spec != null) {
-                                        RuntimeInstaller.install(act, spec)
-                                    } else {
-                                        TerminalLauncher.launch(
-                                            activity = act,
-                                            exe = "/bin/bash",
-                                            args = arrayOf("-lc", LanguageInstallStore.installCommand(lang.id)),
-                                            id = "install-${lang.id}",
-                                        )
-                                    }
-                                }
+                                enabled = activity != null,
+                                onClick = { activity?.let { act -> startInstall(act) } },
                             ) {
                                 Icon(
                                     painter = painterResource(drawables.download),
@@ -304,6 +393,7 @@ fun ServersAndRunnersSection(
                                 )
                             }
                         }
+
                         // ⚡ جاهزة بلا تثبيت
                         else -> SkyBadge(stringResource(strings.ready_state))
                     }

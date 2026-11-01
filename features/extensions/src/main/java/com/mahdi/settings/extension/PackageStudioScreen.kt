@@ -128,9 +128,7 @@ fun PackageStudioScreen(modifier: Modifier = Modifier) {
                 busy = false
                 if (holder != null) {
                     themeManager.addCustomTheme(holder)
-                    Settings.theme = holder.id
-                    themeManager.ensureThemeMode(holder)
-                    refreshEditors()
+                    themeManager.setTheme(holder.id, holder)
                     importedName = holder.name
                 }
             }

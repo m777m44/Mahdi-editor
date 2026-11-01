@@ -3,6 +3,13 @@ file="$1"
 
 source "$LOCAL/bin/utils"
 
+# 3.1.0: شعار MAHDI في بداية كل تشغيل سكربت — داخليًا كان أو خارجيًا،
+# حتى لو كان التشغيل غير تفاعلي (bash -lc …) كما طُلب.
+if [ -f "$LOCAL/bin/banner" ]; then
+  # shellcheck disable=SC1091
+  MAHDI_BANNER_FORCE=1 source "$LOCAL/bin/banner"
+fi
+
 # التعرّف التلقائي على مكتبات السكربت وتثبيتها قبل التشغيل (Python/Node/PHP)
 if [ -f "$LOCAL/bin/auto_deps" ]; then
   # shellcheck disable=SC1091

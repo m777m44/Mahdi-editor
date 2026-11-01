@@ -122,8 +122,14 @@ fi
 # shellcheck disable=SC2164
 cd "$WKDIR" || cd $HOME
 
-# 3.0.0: شعار MAHDI في الجلسات التفاعلية فقط (يُتجاهل عند تنفيذ أمر مباشر)
+# 3.0.0: شعار MAHDI في الجلسات التفاعلية (وعند كل تشغيل سكربت عبر universal_runner)
 if [ -f "$LOCAL/bin/banner" ]; then
     # shellcheck disable=SC1091
     source "$LOCAL/bin/banner"
+fi
+
+# 3.1.0: اختصارات التشغيل py · Py · pY · PY · js · ts · run (ملفات تنفيذية على PATH)
+if [ -f "$LOCAL/bin/aliases" ]; then
+    # shellcheck disable=SC1091
+    source "$LOCAL/bin/aliases"
 fi

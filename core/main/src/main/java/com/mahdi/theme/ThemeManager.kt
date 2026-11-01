@@ -95,7 +95,19 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val _storeThemes = MutableStateFlow<Map<String, StoreTheme>>(emptyMap())
     val storeThemes: StateFlow<Map<String, StoreTheme>> = _storeThemes.asStateFlow()
 
-    val currentTheme by derivedStateOf { loadedThemesState.value.find { it.id == Settings.theme } ?: defaultTheme }
+    /**
+     * معرّف الثيم النشط كحالة Compose (3.1.0).
+     *
+     * سابقًا كانت `currentTheme` تُشتق من `Settings.theme` وهي **ليست حالة قابلة للمراقبة**،
+     * فكان تغيير الثيم لا يُعيد رسم الواجهة إلا إذا تغيّرت قائمة الثيمات — أي أن الضغط على
+     * ثيم مثبَّت مسبقًا كان يبدو بلا أثر. الآن المعرّف نفسه حالة، فأي `setTheme` يُعيد الرسم.
+     */
+    private val _themeIdState = mutableStateOf(Settings.theme)
+
+    /** معرّف الثيم النشط. */
+    val activeThemeId: State<String> = _themeIdState
+
+    val currentTheme by derivedStateOf { loadedThemesState.value.find { it.id == _themeIdState.value } ?: defaultTheme }
 
     private val _activeThemeReady = mutableStateOf(false)
     val activeThemeReady: Boolean
@@ -109,6 +121,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
      */
     suspend fun loadActiveTheme() {
         val id = Settings.theme
+        _themeIdState.value = id
 
         val holder =
             if (builtInThemes.any { it.id == id } || CustomThemes.themes.any { it.id == id }) {
@@ -182,6 +195,33 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
         }
     }
 
+    /**
+     * يطبّق ثيمًا فورًا: يحفظ المعرّف، يحدّث حالة العرض، يضبط الوضع الليلي، ويُخبر المحرّرات.
+     *
+     * @param holder الثيم إن كان محمّلًا/مثبّتًا للتوّ (يُضاف إلى القائمة قبل التطبيق).
+     */
+    fun setTheme(id: String, holder: ThemeHolder? = null) {
+        val oldTheme =
+            runCatching { currentTheme }
+                .getOrElse { defaultTheme }
+        if (holder != null && _loadedThemesState.value.none { it.id == holder.id }) {
+            _loadedThemesState.value = _loadedThemesState.value + holder
+        }
+        Settings.theme = id
+        _themeIdState.value = id
+        val newTheme =
+            runCatching { currentTheme }
+                .getOrElse { defaultTheme }
+        ensureThemeMode(newTheme)
+        runCatching { refreshEditors() }
+        DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(newTheme, oldTheme)) }
+    }
+
+    /** يُزامن معرّف الثيم النشط مع المحفوظ (يُستدعى عند الإقلاع وبعد الاستيراد). */
+    fun syncActiveTheme() {
+        _themeIdState.value = Settings.theme
+    }
+
     fun isInstalled(id: String) = localThemes.value.containsKey(id)
 
     fun getTheme(id: String): ThemePackage? {
@@ -212,6 +252,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
         if (Settings.theme == id) {
             val oldTheme = currentTheme
             Settings.theme = DEFAULT_THEME_ID
+            _themeIdState.value = DEFAULT_THEME_ID
             refreshEditors()
             DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(currentTheme, oldTheme)) }
         }

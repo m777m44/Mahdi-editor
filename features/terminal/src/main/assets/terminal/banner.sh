@@ -1,20 +1,29 @@
 # shellcheck shell=bash
 # ——————————————————————————————————————————————————————————————————————————————
-# شعار Mahdi-Editor داخل الطرفية (3.0.0)
+# شعار Mahdi-Editor داخل الطرفية (3.0.0 / 3.1.0)
 #
-# يُطبع مرة واحدة عند فتح جلسة تفاعلية، ويمكن تعطيله:
-#   MAHDI_BANNER=0
+# - يظهر مرة واحدة عند فتح جلسة طرفية تفاعلية.
+# - ويظهر **عند كل تشغيل سكربت** (داخلي أو خارجي) عبر `MAHDI_BANNER_FORCE=1`
+#   الذي يضبطه `universal_runner` — كما طُلب: الشعار في بداية كل تشغيل.
+# - يمكن تعطيله كليًا: MAHDI_BANNER=0
 # ——————————————————————————————————————————————————————————————————————————————
 
-MAHDI_VERSION="${MAHDI_VERSION:-3.0.0}"
+MAHDI_VERSION="${MAHDI_VERSION:-3.1.0}"
 MAHDI_BANNER_ENABLED="${MAHDI_BANNER:-1}"
 
 mahdi_banner() {
   [ "$MAHDI_BANNER_ENABLED" = "0" ] && return 0
-  # لا شعار عند تنفيذ أمر مباشر (bash -lc …)
-  [ -n "${BASH_EXECUTION_STRING:-}" ] && return 0
-  # فقط في طرفية حقيقية
-  [ -t 1 ] || return 0
+
+  # الوضعان: إجباري (تشغيل سكربت) أو تفاعلي مرة واحدة لكل جلسة
+  if [ "${MAHDI_BANNER_FORCE:-0}" != "1" ]; then
+    # لا تكرار في نفس الجلسة التفاعلية
+    [ -n "${MAHDI_BANNER_SHOWN:-}" ] && return 0
+    # لا شعار تلقائي عند تنفيذ أمر مباشر
+    [ -n "${BASH_EXECUTION_STRING:-}" ] && return 0
+    # طرفية حقيقية فقط
+    [ -t 1 ] || return 0
+    export MAHDI_BANNER_SHOWN=1
+  fi
 
   local c='\033[36m' d='\033[2;36m' r='\033[0m' b='\033[1m'
 
@@ -30,7 +39,9 @@ mahdi_banner() {
   printf "${c}  ║${r}   ${d}Mahdi-Editor  ·  v${MAHDI_VERSION}${r}                  ${c}║${r}\n"
   printf "${c}  ╚═══════════════════════════════════════════════╝${r}\n"
   printf "${d}   محرر أكواد عربي احترافي — بلا إعلانات ولا تتبّع${r}\n"
-  printf "${d}   اكتب ${r}${b}help${r}${d} للمساعدة · ${r}${b}python --version${r}${d} للتحقّق من البيئة${r}\n\n"
+  printf "${d}   اختصارات التشغيل: ${r}${b}py${r}${d} ملف.py · ${r}${b}js${r}${d} ملف.js · ${r}${b}ts${r}${d} ملف.ts · ${r}${b}run${r}${d} أي ملف${r}\n"
+  printf "${d}   لأي حرف كبير أو صغير: ${r}${b}PY${r}${d} · ${r}${b}Py${r}${d} · ${r}${b}JS${r}${d}${d} — تعمل كلها بالطريقة نفسها${r}\n"
+  printf "${d}   للمساعدة: ${r}${b}py --help${r}${d} · ${r}${b}usage${r}${d} — للتحقّق من البيئة: ${r}${b}python --version${r}${d}${r}\n\n"
 }
 
 mahdi_banner

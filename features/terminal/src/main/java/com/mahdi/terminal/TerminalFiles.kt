@@ -30,7 +30,7 @@ fun setupTerminalFiles() {
     }
 
     // auto_deps: محرّك التعرّف التلقائي على مكتبات السكربتات وتثبيتها قبل التشغيل
-    val internalFiles = listOf("init", "sandbox", "setup", "utils", "auto_deps", "mahdi_dl", "progress", "install_runtime", "banner")
+    val internalFiles = listOf("init", "sandbox", "setup", "utils", "auto_deps", "mahdi_dl", "progress", "install_runtime", "banner", "aliases")
     internalFiles.forEach { setupAssetFile(it) }
 
     // 3.0.0: شريط التقدّم الأحادي السطر + مثبّت بيئات التشغيل + شعار MAHDI
