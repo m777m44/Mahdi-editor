@@ -1076,4 +1076,6 @@
     <string name="install_inventory">المخزون</string>
     <string name="featured_themes">ثيمات مميزة</string>
     <string name="applied_state">مطبّق</string>
+    <string name="package_studio">استوديو الحزم</string>
+    <string name="package_studio_desc">قوالب ثيمات وأيقونات وإضافات، فحص الحزم، واستيراد ثيمات المحرّرات</string>
 </resources>

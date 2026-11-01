@@ -32,9 +32,20 @@ fun FileObject.isZip(): Boolean {
     return isFile() && getExtension().equals("zip", ignoreCase = true)
 }
 
+/**
+ * ملفّ حزمة قابل للتثبيت (إضافة/ثيم/حزمة أيقونات).
+ *
+ * يقبل صيغة Mahdi-Editor (`.mahdi`) وأيضًا **الصيغ القياسية للشيفرة القابلة للتنزيل**
+ * (`.xed`, `.xedx`) لأن بنية الحزمة نفسها: `manifest.json` + محتوى — فيعمل أي ثيم
+ * أو إضافة صادرة بالصيغة القياسية داخل التطبيق مباشرة.
+ */
 fun FileObject.isMahdiPackage(): Boolean {
-    return isFile() && getExtension().equals("mahdi", ignoreCase = true)
+    if (!isFile()) return false
+    return getExtension().lowercase() in PACKAGE_EXTENSIONS
 }
+
+/** امتدادات الحزم المدعومة. */
+val PACKAGE_EXTENSIONS = setOf("mahdi", "xed", "xedx")
 
 class FileTreeViewModel : ViewModel() {
     // File option dialogs

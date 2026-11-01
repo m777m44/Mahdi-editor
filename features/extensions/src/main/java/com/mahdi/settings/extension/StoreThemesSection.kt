@@ -2,6 +2,7 @@ package com.mahdi.settings.extension
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,9 +46,9 @@ import com.mahdi.settings.Settings
 import com.mahdi.settings.editor.refreshEditors
 import com.mahdi.theme.SkyAccent
 import com.mahdi.theme.SkyBadge
+import com.mahdi.theme.ThemeHolder
 import com.mahdi.theme.FeaturedTheme
 import com.mahdi.theme.StoreThemeCatalog
-import com.mahdi.theme.toThemeHolder
 import com.mahdi.utils.toast
 
 /**
@@ -61,6 +62,7 @@ import com.mahdi.utils.toast
 fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+    val isDarkMode = isSystemInDarkTheme()
 
     var installedIds by remember {
         mutableStateOf(
@@ -79,20 +81,29 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
             }
         }
 
-    fun install(theme: FeaturedTheme) {
+    // ثيم ثنائي الوضع: لوحة فاتحة ولوحة داكنة حقيقيتان (2.8.0)
+    fun install(theme: FeaturedTheme): ThemeHolder? =
         runCatching {
-                CustomThemes.save(theme.spec)
-                themeManager.addCustomTheme(theme.spec.toThemeHolder())
+                val holder =
+                    CustomThemes.savePair(
+                        id = theme.id,
+                        name = "${theme.nameAr} · ${theme.nameEn}",
+                        light = theme.light,
+                        dark = theme.dark,
+                    )
+                themeManager.addCustomTheme(holder)
                 installedIds = installedIds + theme.id
+                holder
             }
             .onFailure { toast(strings.unknown_err) }
-    }
+            .getOrNull()
 
     fun apply(theme: FeaturedTheme) {
         runCatching {
-                if (theme.id !in installedIds) install(theme)
+                val holder = if (theme.id in installedIds) null else install(theme)
+                if (theme.id !in installedIds) return@runCatching
                 Settings.theme = theme.id
-                themeManager.ensureThemeMode(theme.spec.toThemeHolder())
+                themeManager.ensureThemeMode(holder ?: themeManager.currentTheme)
                 refreshEditors()
                 appliedId = theme.id
             }
@@ -110,10 +121,10 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.weight(1f))
-            Text(
-                text = "${themes.size}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // مبدّل المعاينة: كل ثيم يحمل لوحة فاتحة ولوحة داكنة
+            SkyBadge(
+                text = "${themes.size} · ${if (isDarkMode) "داكن" else "فاتح"}",
+                showDot = false,
             )
         }
 
@@ -122,7 +133,7 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(themes, key = { it.id }) { theme ->
-                val colors = theme.spec.colors
+                val colors = if (isDarkMode) theme.dark else theme.light
                 val isApplied = appliedId == theme.id
                 val isInstalled = theme.id in installedIds
 
@@ -243,9 +254,9 @@ fun ThemesHeaderCard(modifier: Modifier = Modifier) {
                 Text(
                     text =
                         if (isArabic) {
-                            "$installedStore ثيمًا مميزًا بضغطة واحدة — تُثبَّت في المخزون وتُطبَّق فورًا"
+                            "$installedStore ثيمًا مزدوج الوضع (فاتح + داكن) — بضغطة واحدة في المخزون وفورًا على الواجهة"
                         } else {
-                            "$installedStore featured themes, one tap — installed to inventory and applied instantly"
+                            "$installedStore dual-mode themes (light + dark) — one tap to install and apply"
                         },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

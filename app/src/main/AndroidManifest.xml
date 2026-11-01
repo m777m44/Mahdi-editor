@@ -92,6 +92,8 @@
                 <data android:host="*" />
                 <data android:mimeType="application/octet-stream" />
                 <data android:pathPattern=".*\\.mahdi" />
+                <data android:pathPattern=".*\\.xed" />
+                <data android:pathPattern=".*\\.xedx" />
             </intent-filter>
         </activity>
 
