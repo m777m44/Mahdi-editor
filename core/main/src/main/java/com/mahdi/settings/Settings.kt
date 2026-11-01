@@ -165,10 +165,11 @@ object Settings {
     // Int settings
     var tab_size by CachedPreference("tab_size", 4)
     var editor_text_size by CachedPreference("text_size", 14)
+    // 3.2.0: الوضع الداكن افتراضيًا ليتناسب مع الثيم الأساسي «السمائي»
     var theme_mode by
         CachedPreference(
             "default_night_mode",
-            AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
+            AppCompatDelegate.MODE_NIGHT_YES,
         )
     var terminal_font_size by CachedPreference("terminal_font_size", 12)
     var terminal_scrollback_buffer by CachedPreference("terminal_scrollback_buffer", 5000)

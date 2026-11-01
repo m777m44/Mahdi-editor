@@ -6,7 +6,6 @@ import android.view.MotionEvent
 import com.blankj.utilcode.util.ClipboardUtils
 import com.blankj.utilcode.util.KeyboardUtils
 import com.mahdi.activities.terminal.Terminal
-import com.mahdi.utils.dpToPx
 import com.mahdi.settings.Settings
 import com.mahdi.settings.terminal.TerminalCursorStyle
 import com.mahdi.terminal.virtualkeys.SpecialButton
@@ -82,65 +81,16 @@ class TerminalBackEnd : TerminalViewClient, TerminalSessionClient {
         e?.let { logError(it) }
     }
 
-    /** حجم الخط الحالي بالبكسل — مصدر الحقيقة أثناء الإيماءة. */
-    private var zoomPx = 0f
-
     /**
-     * آخر قيمة أعدناها إلى `TerminalView`؛ هي التي يُضرب فيها عامل الإيماءة التالي،
-     * فنحسب الخطوة الحقيقية = (القادم ÷ آخر قيمة).
-     */
-    private var lastReturned = 0f
-
-    /** آخر قيمة حفظناها في الإعدادات — لكشف أي تغيير خارجي (أزرار + و −). */
-    private var lastSavedDp = Int.MIN_VALUE
-
-    /** وقت آخر إعادة بناء للمُصيّر — إطار واحد على الأكثر لكل 16ms. */
-    private var lastRebuildAt = 0L
-
-    /**
-     * تكبير/تصغير بإصبعين — ناعم بلا اهتزاز (3.0.0).
+     * تكبير/تصغير بإصبعين — كما كان في الإصدار الأصلي (بلا تحويل أو حفظ إضافي).
      *
-     * المشكلة القديمة: كان كل حدث لمس يُقرأ كأنه «حجم خط» فيُقصّ إلى 11px، ثم يعيد بناء
-     * `TerminalRenderer` بالكامل — فتظهر قفزات وارتعاش. الحل:
-     * 1. نفهم ما يرسله العرض: حاصل ضرب عوامل الإيماءة × آخر قيمة أعدناها، فنستخرج الخطوة.
-     * 2. نضرب الحجم الحالي في الخطوة ونقصّه بين 8 و32dp (نفس حدود شريط الأدوات).
-     * 3. لا نعيد بناء المُصيّر إلا عند تغيّر البكسل فعلًا، وبمعدّل إطار واحد كل 16ms.
-     * 4. نحفظ الحجم بوحدات dp ليبقى بعد إعادة التشغيل، ونلتقط أي تغيير خارجي للخط.
+     * `TerminalView` يضرب عامل الإيماءة في آخر قيمة أعدناها، فنقصّها بين 11 و45
+     * ونمرّرها إلى `setTextSize` مباشرة.
      */
     override fun onScale(scale: Float): Float {
-        val view = terminalView.get() ?: return scale
-        val context = view.context
-        val density = context.resources.displayMetrics.density.coerceAtLeast(0.1f)
-        val settingsPx = dpToPx(Settings.terminal_font_size.toFloat(), context).toFloat()
-
-        // تغيير خارجي للحجم (شريط الأدوات) ← أعد الضبط من الإعدادات
-        if (zoomPx <= 0f || Settings.terminal_font_size != lastSavedDp) {
-            zoomPx = settingsPx.coerceAtLeast(1f)
-            lastSavedDp = Settings.terminal_font_size
-            lastReturned = zoomPx
-        }
-
-        val step = if (lastReturned > 0f) scale / lastReturned else 1f
-        if (step.isFinite() && step in 0.5f..2f) {
-            val minPx = dpToPx(8f, context).toFloat()
-            val maxPx = dpToPx(32f, context).toFloat()
-            val target = (zoomPx * step).coerceIn(minPx, maxPx)
-            val snapped = Math.round(target).toFloat()
-            val now = android.os.SystemClock.uptimeMillis()
-            if (snapped != zoomPx && now - lastRebuildAt >= 16L) {
-                zoomPx = snapped
-                lastRebuildAt = now
-                view.setTextSize(snapped.toInt())
-
-                val dp = Math.round(snapped / density).coerceIn(8, 32)
-                Settings.terminal_font_size = dp
-                lastSavedDp = dp
-            }
-        }
-
-        // ما نعيده يصبح أساس الضرب في الحدث التالي
-        lastReturned = zoomPx
-        return zoomPx
+        val fontScale = scale.coerceIn(11f, 45f)
+        terminalView.get()?.setTextSize(fontScale.toInt())
+        return fontScale
     }
 
     override fun onSingleTapUp(e: MotionEvent) {
