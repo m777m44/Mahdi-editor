@@ -9,25 +9,25 @@ package com.mahdi.runtime
  */
 sealed interface InstallState {
     /** غير مثبَّتة بعد. */
-    data object NotInstalled : InstallState()
+    data object NotInstalled : InstallState
 
     /** في قائمة الانتظار (قبل بدء الأمر). */
-    data object Queued : InstallState()
+    data object Queued : InstallState
 
     /** جارٍ التنزيل/التثبيت بنسبة من 0 إلى 100. */
-    data class Downloading(val progress: Int) : InstallState()
+    data class Downloading(val progress: Int) : InstallState
 
     /** جارٍ فك الضغط أو إعداد الأذونات. */
-    data object Extracting : InstallState()
+    data object Extracting : InstallState
 
     /** مثبَّتة ومتحقَّق منها فعليًا. */
-    data class Installed(val version: String? = null) : InstallState()
+    data class Installed(val version: String? = null) : InstallState
 
     /** مضمّنة داخل التطبيق أصلًا (لا تحتاج تثبيتًا). */
-    data object Bundled : InstallState()
+    data object Bundled : InstallState
 
     /** فشل التثبيت بسبب رسالة من الطرفية. */
-    data class Failed(val error: String) : InstallState()
+    data class Failed(val error: String) : InstallState
 }
 
 /** وصف بيئة تشغيل واحدة وحالتها الحالية. */

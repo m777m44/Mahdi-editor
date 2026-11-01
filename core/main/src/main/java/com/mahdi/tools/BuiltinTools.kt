@@ -488,11 +488,11 @@ object BuiltinTools {
             actions =
                 listOf(
                     action("escape", "تهريب Unicode", "Escape") {
-                        it.joinToString("") { c -> if (c.code < 128) c.toString() else "\\u%04x".format(Locale.ROOT, c.code) }
+                        it.map { c -> if (c.code < 128) c.toString() else "\\u%04x".format(Locale.ROOT, c.code) }.joinToString("")
                     },
                     action("unescape", "فك Unicode", "Unescape") { it.unicodeUnescape() },
                     action("codepoints", "نقاط الترميز", "Code points") {
-                        it.take(40).joinToString("\n") { c -> "%s U+%04X".format(Locale.ROOT, c, c.code) }
+                        it.take(40).map { c -> "%s U+%04X".format(Locale.ROOT, c, c.code) }.joinToString("\n")
                     },
                 ),
         )
