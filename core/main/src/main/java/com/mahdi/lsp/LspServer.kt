@@ -82,7 +82,7 @@ abstract class LspServer {
     }
 
     fun connectAllSuitableEditors(excludedEditors: List<EditorTab> = emptyList()) {
-        val viewModel = MainActivity.instance!!.viewModel
+        val viewModel = MainActivity.instance?.viewModelOrNull() ?: return
         val suitableTabs =
             viewModel.editorTabs.filterWithFiles { it, file ->
                 !excludedEditors.contains(it) && this@LspServer.supportedExtensions.contains(file.getExtension())

@@ -25,7 +25,7 @@ data class EditorTabState(
     override suspend fun toTab(): Tab? {
         if (fileObject != null && !fileObject.exists() && !fileObject.canRead()) return null
 
-        return MainActivity.instance?.viewModel?.run {
+        return MainActivity.instance?.viewModelOrNull()?.run {
             val editorTab =
                 editorManager.createEditorTab(
                     file = fileObject,
@@ -49,15 +49,18 @@ data class EditorTabState(
 
 data class FileTabState(val fileObject: FileObject, val projectRoot: FileObject?, val scopeRoot: FileObject?) :
     TabState {
-    override suspend fun toTab() =
-        TabRegistry.getTab(
+    override suspend fun toTab(): Tab? {
+        // 2.8.2: قد تصل الاستعادة قبل جاهزية الـViewModel — نتجاهل التبويب بدل الانهيار.
+        val viewModel = MainActivity.instance?.viewModelOrNull() ?: return null
+        return TabRegistry.getTab(
             file = fileObject,
             projectRoot = projectRoot,
             scopeRoot = scopeRoot,
-            viewModel = MainActivity.instance!!.viewModel,
+            viewModel = viewModel,
             readOnly = false,
             customTitle = null,
         )
+    }
 }
 
 /**

@@ -69,12 +69,28 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
+    /** هل جاهز الـViewModel للاستخدام؟ (يُقرأ من خيوط خلفية أثناء استعادة الجلسة) */
+    val isViewModelReady: Boolean
+        get() = ::viewModel.isInitialized
+
+    /**
+     * نسخة آمنة من [viewModel] بلا استثناء.
+     *
+     * تُستخدم في المسارات التي قد تعمل قبل اكتمال `onCreate` أو بعده مباشرة
+     * (استعادة الجلسات، فتح التبويبات، أوامر الإقلاع) بدل `lateinit` المباشر.
+     */
+    fun viewModelOrNull(): MainViewModel? = if (::viewModel.isInitialized) viewModel else null
+
     @OptIn(DelicateCoroutinesApi::class)
     override fun onPause() {
         isPaused = true
         GlobalScope.launch(Dispatchers.IO) {
-            SessionManager.saveSession(viewModel.tabs, viewModel.currentTabIndex)
-            DrawerPersistence.saveState(drawerViewModel)
+            if (isViewModelReady) {
+                runCatching { SessionManager.saveSession(viewModel.tabs, viewModel.currentTabIndex) }
+            }
+            if (::drawerViewModel.isInitialized) {
+                runCatching { DrawerPersistence.saveState(drawerViewModel) }
+            }
             foregroundListener.values.forEach { it.invoke(false) }
 
             LspRegistry.updateConfiguration(this@MainActivity)
@@ -144,10 +160,14 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(themeManager.calculateEffectiveNightMode())
         super.onCreate(savedInstanceState)
-        instance = this
 
+        // 2.8.2: لا نُعرّف النشاط قبل تهيئة الـViewModel.
+        // كان `instance = this` يُسجَّل قبل `viewModel = …`، فإذا قرأت خيطية خلفية
+        // `MainActivity.instance.viewModel` في تلك اللحظة (استعادة الجلسة عند الإقلاع)
+        // انهار التطبيق بـ UninitializedPropertyAccessException.
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
         drawerViewModel = ViewModelProvider(this)[DrawerViewModel::class.java]
+        instance = this
 
         val splash = installSplashScreen()
         splash.setKeepOnScreenCondition { !themeManager.activeThemeReady }

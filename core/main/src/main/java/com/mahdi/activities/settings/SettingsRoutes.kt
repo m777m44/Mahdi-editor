@@ -70,4 +70,6 @@ sealed class SettingsRoutes(val route: String) {
     data object PackageStudio : SettingsRoutes("package_studio")
 
     data object Guide : SettingsRoutes("guide")
+
+    data object BuiltinTool : SettingsRoutes("builtin_tool")
 }

@@ -230,7 +230,7 @@ data class LspServerInstance(
         val filteredEditors = editors.filter { server.supportedExtensions.contains(it.fileExt) }
         filteredEditors.forEach { editor ->
             val matchingEditorTab =
-                MainActivity.instance!!.viewModel.run {
+                MainActivity.instance?.viewModelOrNull()?.run {
                     tabs.filterIsInstance<EditorTab>().find { it.editorState.editor.get() == editor.editor }
                 } ?: return@forEach
             matchingEditorTab.applyHighlightingAndConnectLSP()

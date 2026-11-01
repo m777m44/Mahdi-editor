@@ -272,8 +272,15 @@ public final class TerminalRenderer {
         // مؤشّر الكتابة: شريط رفيع عند خانة المؤشّر (لا يغطّي النص العربي)
         if (cursorX >= 0 && cursorX <= columns) {
             mTextPaint.setColor(palette[TextStyle.COLOR_INDEX_CURSOR]);
-            final float cursorLeft = cursorX * mFontWidth;
             final float cursorWidth = Math.max(2f, mFontWidth / 5f);
+            final float effectiveWidth = available / (scale <= 0f ? 1f : scale);
+            // 2.8.2: في السطر العربي يكون النص مُحاذًى إلى اليمين، فخانة المؤشّر المنطقية
+            // تُعكس أفقيًا. بلا هذا العكس كان المؤشّر يُرسم في وسط الكلام بدل نهاية النص
+            // حيث يكتب المستخدم فعليًا.
+            float cursorLeft = rtlBase ? (effectiveWidth - cursorX * mFontWidth) : (cursorX * mFontWidth);
+            if (rtlBase) {
+                cursorLeft = Math.max(0f, Math.min(cursorLeft, effectiveWidth - cursorWidth));
+            }
             if (cursorShape == TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE) {
                 canvas.drawRect(cursorLeft, rectBottom - Math.max(2f, (rectBottom - rectTop) / 8f),
                         cursorLeft + mFontWidth, rectBottom, mTextPaint);
