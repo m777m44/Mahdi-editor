@@ -1073,4 +1073,6 @@
     <string name="applied_state">مطبّق</string>
     <string name="package_studio">استوديو الحزم</string>
     <string name="package_studio_desc">قوالب ثيمات وأيقونات وإضافات، فحص الحزم، واستيراد ثيمات المحرّرات</string>
+    <string name="guide_title">دليل Mahdi-Editor</string>
+    <string name="guide_desc">التوثيق الكامل: المحرّر، الطرفية، Git، الثيمات، الحزم، الخوادم، اللغات</string>
 </resources>

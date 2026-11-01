@@ -59,6 +59,13 @@ private fun Categories(navController: NavController) {
         onNavigate = { navController.navigate(SettingsRoutes.Keybindings.route) },
     )
 
+    PreferenceCategory(
+        label = stringResource(strings.guide_title),
+        description = stringResource(strings.guide_desc),
+        iconResource = drawables.info,
+        onNavigate = { navController.navigate(SettingsRoutes.Guide.route) },
+    )
+
     SettingsRegistry.categories.value.forEach { category ->
         PreferenceCategory(
             label = category.label,

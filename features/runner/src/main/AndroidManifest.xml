@@ -7,6 +7,13 @@
             android:name="com.mahdi.runner.runners.web.markdown.MDViewer"
             android:exported="false"
             tools:ignore="Instantiatable" />
+
+        <!-- 2.8.0: متصفح المعاينة الداخلي — يفتح صفحات HTML المحلية دون مغادرة التطبيق -->
+        <activity
+            android:name="com.mahdi.runner.runners.web.PreviewBrowserActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
+            tools:ignore="Instantiatable" />
     </application>
 
 </manifest>
