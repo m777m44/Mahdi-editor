@@ -20,7 +20,9 @@ import com.mahdi.settings.Settings
 import com.mahdi.tabs.base.Tab
 import com.mahdi.tabs.editor.EditorTab
 import java.io.File
+import com.mahdi.utils.logError
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -195,13 +197,27 @@ class MainViewModel : ViewModel() {
     }
 
     private fun restoreSessionsIfNeeded() {
-        if (Settings.restore_sessions) {
-            viewModelScope.launch(Dispatchers.IO) {
-                restoreTabs()
-                sessionRestored.complete(Unit)
-            }
-        } else {
+        if (!Settings.restore_sessions) {
             sessionRestored.complete(Unit)
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            // 2.8.2: يُستدعى هذا من `init` أثناء إنشاء الـViewModel نفسه، أي قبل أن يكتمل
+            // إسناد `MainActivity.viewModel`. ننتظر جاهزية النشاط أولًا بدل قراءة lateinit
+            // غير مهيّأ من خيطية الخلفية (كان سبب انهيار UninitializedPropertyAccessException).
+            awaitHostActivityReady()
+            runCatching { restoreTabs() }
+                .onFailure { logError(it, "MainViewModel.restoreTabs") }
+            sessionRestored.complete(Unit)
+        }
+    }
+
+    /** ينتظر حتى يصبح النشاط المضيف والـViewModel جاهزين (بحد أقصى ~٨ ثوانٍ). */
+    private suspend fun awaitHostActivityReady() {
+        repeat(160) {
+            val activity = MainActivity.instance
+            if (activity != null && activity.isViewModelReady) return
+            delay(50)
         }
     }
 
@@ -210,6 +226,11 @@ class MainViewModel : ViewModel() {
      * restores each tab, and sets the active tab index.
      */
     private suspend fun restoreTabs() {
+        // 2.8.2: قد تبدأ الاستعادة قبل انتهاء التحميل المسبق في App.onCreate،
+        // فكانت الجلسة السابقة تُفقد بصمت. نُحمّلها هنا عند الحاجة قبل أخذ القفل.
+        if (SessionManager.preloadedSession == null) {
+            runCatching { SessionManager.preloadSession() }
+        }
         SessionManager.mutex.withLock {
             val session = SessionManager.preloadedSession ?: return
 

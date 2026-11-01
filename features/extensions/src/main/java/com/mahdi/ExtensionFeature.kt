@@ -35,6 +35,7 @@ import com.mahdi.resources.strings
 import com.mahdi.settings.SettingsCategory
 import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.extension.ExtensionSettings
+import com.mahdi.settings.extension.BuiltinToolScreen
 import com.mahdi.settings.extension.PackageStudioScreen
 import com.mahdi.settings.extension.PackageDetail
 import com.mahdi.settings.extension.StoreScreen
@@ -162,6 +163,12 @@ class ExtensionFeature : Feature {
                 val query = backStackEntry.arguments?.getString("query")
                 val category = backStackEntry.arguments?.getString("category")
                 StoreScreen(navController = navController, query = query, category = category)
+            }
+        )
+        routes.add(
+            DynamicRoute("${SettingsRoutes.BuiltinTool.route}/{toolId}") { _, backStackEntry ->
+                val toolId = backStackEntry.arguments?.getString("toolId").orEmpty()
+                BuiltinToolScreen(toolId)
             }
         )
         routes.add(

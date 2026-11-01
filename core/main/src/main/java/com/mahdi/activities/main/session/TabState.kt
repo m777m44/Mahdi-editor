@@ -25,7 +25,7 @@ data class EditorTabState(
     override suspend fun toTab(): Tab? {
         if (fileObject != null && !fileObject.exists() && !fileObject.canRead()) return null
 
-        return MainActivity.instance?.viewModel?.run {
+        return MainActivity.instance?.viewModelOrNull()?.run {
             val editorTab =
                 editorManager.createEditorTab(
                     file = fileObject,
@@ -54,7 +54,7 @@ data class FileTabState(val fileObject: FileObject, val projectRoot: FileObject?
             file = fileObject,
             projectRoot = projectRoot,
             scopeRoot = scopeRoot,
-            viewModel = MainActivity.instance!!.viewModel,
+            viewModel = MainActivity.instance?.viewModelOrNull() ?: return null,
             readOnly = false,
             customTitle = null,
         )

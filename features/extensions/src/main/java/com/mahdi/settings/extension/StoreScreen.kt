@@ -344,6 +344,14 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
         when (selectedCategory) {
             StoreCategory.EXTENSIONS -> {
                 item {
+                    BuiltinToolsSection(
+                        query = searchQuery.text.toString(),
+                        onOpen = { toolId ->
+                            navController.navigate("${SettingsRoutes.BuiltinTool.route}/$toolId")
+                        },
+                    )
+                }
+                item {
                     BundledPackagesSection(
                         onBrowseServers = { selectedCategory = StoreCategory.SERVERS }
                     )
