@@ -30,8 +30,11 @@ fun setupTerminalFiles() {
     }
 
     // auto_deps: محرّك التعرّف التلقائي على مكتبات السكربتات وتثبيتها قبل التشغيل
-    val internalFiles = listOf("init", "sandbox", "setup", "utils", "auto_deps", "mahdi_dl")
+    val internalFiles = listOf("init", "sandbox", "setup", "utils", "auto_deps", "mahdi_dl", "progress", "install_runtime", "banner")
     internalFiles.forEach { setupAssetFile(it) }
+
+    // 3.0.0: شريط التقدّم الأحادي السطر + مثبّت بيئات التشغيل + شعار MAHDI
+    // (تُنسَخ عبر internalFiles أعلاه، ويُعاد كتابتها تلقائيًا عند تغيّر محتواها)
 
     // مثبّت حزم بايثون الذكي (يعرض نسبة تقدّم حقيقية في التطبيق)
     setupPythonFile("mahdi_pip")

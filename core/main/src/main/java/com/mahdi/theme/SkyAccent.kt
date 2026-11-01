@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mahdi.text.bidiNumbers
 
 /**
  * اللون السمائي الموحّد لشارات الحالة في Mahdi-Editor:
@@ -51,8 +52,9 @@ fun SkyBadge(
         if (showDot) {
             Box(Modifier.size(6.dp).clip(RoundedCornerShape(50)).background(SkyAccent))
         }
+        // 3.0.0: الأرقام داخل الشارة معزولة LTR فلا تنعكس داخل واجهة RTL
         Text(
-            text = text,
+            text = text.bidiNumbers(),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = SkyAccent,

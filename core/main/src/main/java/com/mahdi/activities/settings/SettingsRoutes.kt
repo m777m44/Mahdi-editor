@@ -72,4 +72,8 @@ sealed class SettingsRoutes(val route: String) {
     data object Guide : SettingsRoutes("guide")
 
     data object BuiltinTool : SettingsRoutes("builtin_tool")
+
+    data object Runtimes : SettingsRoutes("runtimes")
+
+    data object BuiltinExtensions : SettingsRoutes("builtin_extensions")
 }
