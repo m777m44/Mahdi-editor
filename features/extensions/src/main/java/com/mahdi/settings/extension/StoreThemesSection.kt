@@ -100,12 +100,15 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
 
     fun apply(theme: FeaturedTheme) {
         runCatching {
-                val holder = if (theme.id in installedIds) null else install(theme)
-                if (theme.id !in installedIds) return@runCatching
-                Settings.theme = theme.id
-                themeManager.ensureThemeMode(holder ?: themeManager.currentTheme)
-                refreshEditors()
+                val alreadyInstalled = theme.id in installedIds
+                val holder = if (alreadyInstalled) null else install(theme)
+                // التثبيت قد يفشل — لا نطبّق ثيمًا غير موجود
+                if (!alreadyInstalled && holder == null) return@runCatching
+
+                themeManager.setTheme(theme.id, holder)
                 appliedId = theme.id
+                installedIds = installedIds + theme.id
+                toast(if (isArabic) "تم تطبيق الثيم: ${theme.nameAr}" else "Theme applied: ${theme.nameEn}")
             }
             .onFailure { toast(strings.unknown_err) }
     }

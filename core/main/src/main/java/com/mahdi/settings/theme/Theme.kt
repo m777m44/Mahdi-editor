@@ -121,11 +121,8 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
                     },
                     endWidget = deleteAction,
                     sideEffect = {
-                        val oldTheme = themeManager.currentTheme
-                        Settings.theme = theme.id
-                        themeManager.ensureThemeMode(theme)
-                        refreshEditors()
-                        DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(theme, oldTheme)) }
+                        // 3.1.0: setTheme يجعل تغيير الثيم حالة قابلة للمراقبة فتتحدّث الواجهة فورًا
+                        themeManager.setTheme(theme.id, theme)
                     },
                 )
             }

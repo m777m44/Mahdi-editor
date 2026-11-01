@@ -189,4 +189,32 @@ object RuntimeCatalog {
         )
 
     fun byId(id: String): RuntimeSpec? = all.firstOrNull { it.id == id }
+
+    /**
+     * خريطة «لغة المحرّر ← بيئة التشغيل التي تُشغّلها».
+     *
+     * JavaScript وTypeScript تحتاجان Node، وJava وKotlin تحتاجان JDK، وC/C++ تحتاجان GCC…
+     * فبدل تثبيت حزم ناقصة عبر أوامر خام، تُثبَّت البيئة الصحيحة ويُقرأ تقدّمها الحقيقي.
+     */
+    private val languageToRuntime =
+        mapOf(
+            "python" to "python",
+            "javascript" to "node",
+            "typescript" to "node",
+            "node" to "node",
+            "php" to "php",
+            "ruby" to "ruby",
+            "lua" to "lua",
+            "java" to "java",
+            "kotlin" to "java",
+            "c" to "gcc",
+            "cpp" to "gcc",
+            "go" to "go",
+            "rust" to "rust",
+            "perl" to "perl",
+            "sql" to "sqlite",
+        )
+
+    /** بيئة التشغيل التي تُشغّل لغة المحرّر (أو null إن كانت لا تحتاج تثبيتًا). */
+    fun forLanguage(languageId: String): RuntimeSpec? = languageToRuntime[languageId]?.let { byId(it) }
 }

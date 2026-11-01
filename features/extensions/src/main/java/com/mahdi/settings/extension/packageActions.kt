@@ -424,10 +424,8 @@ fun runThemeInstallAction(
 }
 
 fun applyThemeAfterInstall(id: String) {
-    val oldTheme = themeManager.currentTheme
-    Settings.theme = id
-    refreshEditors()
-    DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(themeManager.currentTheme, oldTheme)) }
+    // 3.1.0: تمرير كل شيء عبر setTheme حتى تُعاد رسم الواجهة والمحرّر والطرفية فورًا
+    themeManager.setTheme(id)
 }
 
 fun runIconPackInstallAction(
