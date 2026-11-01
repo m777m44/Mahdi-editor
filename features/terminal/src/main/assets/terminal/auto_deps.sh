@@ -523,7 +523,7 @@ mahdi_py_deps() {
   done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
 
   if [ ${#missing[@]} -eq 0 ]; then
-    info "كل المكتبات موجودة مسبقًا — لا تثبيت"
+    # 3.0.0: صمت تام — لا تُطبع أي رسالة إذا كانت كل المكتبات موجودة
     return 0
   fi
 
@@ -617,7 +617,7 @@ mahdi_node_deps() {
   done < <(node /tmp/mahdi_node_scan.js "$file" 2>/dev/null)
 
   if [ ${#missing[@]} -eq 0 ]; then
-    info "كل مكتبات Node موجودة مسبقًا"
+    # 3.0.0: صمت تام عند عدم وجود نواقص
     return 0
   fi
 

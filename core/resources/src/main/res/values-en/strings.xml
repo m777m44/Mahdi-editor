@@ -1052,4 +1052,8 @@ Thank you for using Mahdi-Editor.</string>
     <string name="package_studio_desc">Theme, icon pack and extension templates, pack validation and theme import</string>
     <string name="guide_title">Mahdi-Editor guide</string>
     <string name="guide_desc">Complete docs: editor, terminal, Git, themes, packages, servers, languages</string>
+    <string name="runtimes_title">Runtimes</string>
+    <string name="runtimes_desc">Real install state: Python · Node · PHP · Ruby · Go · Rust…</string>
+    <string name="builtin_ext_title">Bundled extensions</string>
+    <string name="builtin_ext_desc">36 ready extensions: 12 system capabilities and 24 text tools, all offline</string>
 </resources>

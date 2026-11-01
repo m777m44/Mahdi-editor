@@ -22,7 +22,6 @@ fi
 # نسخة المجلد الرئيسي (مأخوذة من /sdcard لأنها للقراءة فقط)
 case "$file" in
   /home/mahdi-run/*)
-    info "نسخة قابلة للكتابة: $file"
     ;;
 esac
 

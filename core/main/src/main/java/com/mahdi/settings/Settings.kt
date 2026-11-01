@@ -170,7 +170,7 @@ object Settings {
             "default_night_mode",
             AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
         )
-    var terminal_font_size by CachedPreference("terminal_font_size", 13)
+    var terminal_font_size by CachedPreference("terminal_font_size", 12)
     var terminal_scrollback_buffer by CachedPreference("terminal_scrollback_buffer", 5000)
     var auto_save_delay by CachedPreference("auto_save_delay", 400L)
     var lsp_log_limit by CachedPreference("lsp_log_limit", 5000)

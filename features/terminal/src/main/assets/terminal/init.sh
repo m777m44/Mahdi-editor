@@ -121,3 +121,9 @@ fi
 
 # shellcheck disable=SC2164
 cd "$WKDIR" || cd $HOME
+
+# 3.0.0: شعار MAHDI في الجلسات التفاعلية فقط (يُتجاهل عند تنفيذ أمر مباشر)
+if [ -f "$LOCAL/bin/banner" ]; then
+    # shellcheck disable=SC1091
+    source "$LOCAL/bin/banner"
+fi

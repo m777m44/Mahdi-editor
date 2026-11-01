@@ -1080,4 +1080,8 @@
     <string name="package_studio_desc">قوالب ثيمات وأيقونات وإضافات، فحص الحزم، واستيراد ثيمات المحرّرات</string>
     <string name="guide_title">دليل Mahdi-Editor</string>
     <string name="guide_desc">التوثيق الكامل: المحرّر، الطرفية، Git، الثيمات، الحزم، الخوادم، اللغات</string>
+    <string name="runtimes_title">بيئات التشغيل</string>
+    <string name="runtimes_desc">حالة تثبيت حقيقية: Python · Node · PHP · Ruby · Go · Rust…</string>
+    <string name="builtin_ext_title">الإضافات المدمجة</string>
+    <string name="builtin_ext_desc">٣٦ إضافة جاهزة: ١٢ قدرة نظام و٢٤ أداة نصّية تعمل بلا إنترنت</string>
 </resources>

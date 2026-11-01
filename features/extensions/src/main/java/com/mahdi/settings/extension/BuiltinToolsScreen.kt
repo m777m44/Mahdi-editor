@@ -43,6 +43,7 @@ import com.mahdi.components.compose.preferences.base.PreferenceLayout
 import com.mahdi.theme.SkyAccent
 import com.mahdi.theme.SkyBadge
 import com.mahdi.tools.BuiltinTool
+import com.mahdi.text.bidiNumbers
 import com.mahdi.tools.BuiltinTools
 import com.mahdi.utils.copyToClipboard
 
@@ -290,8 +291,9 @@ fun BuiltinToolScreen(toolId: String, modifier: Modifier = Modifier) {
             ) {
                 SelectionContainer {
                     Text(
+                        // الأرقام داخل نصّ عربي قد تُقلَب (100 → 001) — نعزلها بـ LRI/PDI قبل العرض
                         text =
-                            output.ifBlank {
+                            output.bidiNumbers().ifBlank {
                                 if (isArabic) {
                                     "ستظهر النتيجة هنا بعد اختيار إجراء."
                                 } else {

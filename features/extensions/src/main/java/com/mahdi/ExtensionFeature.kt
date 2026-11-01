@@ -35,8 +35,10 @@ import com.mahdi.resources.strings
 import com.mahdi.settings.SettingsCategory
 import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.extension.ExtensionSettings
+import com.mahdi.settings.extension.BuiltinExtensionsScreen
 import com.mahdi.settings.extension.BuiltinToolScreen
 import com.mahdi.settings.extension.PackageStudioScreen
+import com.mahdi.settings.extension.RuntimesScreen
 import com.mahdi.settings.extension.PackageDetail
 import com.mahdi.settings.extension.StoreScreen
 import java.io.File
@@ -59,6 +61,8 @@ class ExtensionFeature : Feature {
     private var dialogProvider: DialogProvider? = null
     private var settingsCategory: SettingsCategory? = null
     private var studioCategory: SettingsCategory? = null
+    private var runtimesCategory: SettingsCategory? = null
+    private var bundledCategory: SettingsCategory? = null
     private val routes = mutableListOf<DynamicRoute>()
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -141,9 +145,37 @@ class ExtensionFeature : Feature {
                 )
                 .also { SettingsRegistry.registerCategory(it) }
 
+        // 3.0.0: «بيئات التشغيل» — حالة تثبيت حقيقية لكل مفسّر/مشغّل
+        runtimesCategory =
+            SettingsCategory(
+                    label = strings.runtimes_title.getString(),
+                    description = strings.runtimes_desc.getString(),
+                    icon = Icon.ResourceIcon(drawables.run),
+                    route = SettingsRoutes.Runtimes.route,
+                )
+                .also { SettingsRegistry.registerCategory(it) }
+
+        // 3.0.0: «الإضافات المدمجة» — ٣٦ إضافة جاهزة (قدرات نظام + أدوات)
+        bundledCategory =
+            SettingsCategory(
+                    label = strings.builtin_ext_title.getString(),
+                    description = strings.builtin_ext_desc.getString(),
+                    icon = Icon.ResourceIcon(drawables.widgets),
+                    route = SettingsRoutes.BuiltinExtensions.route,
+                )
+                .also { SettingsRegistry.registerCategory(it) }
+
         // Register settings routes
         routes.add(
             DynamicRoute(SettingsRoutes.PackageStudio.route) { _, _ -> PackageStudioScreen() }
+        )
+        routes.add(
+            DynamicRoute(SettingsRoutes.Runtimes.route) { _, _ -> RuntimesScreen() }
+        )
+        routes.add(
+            DynamicRoute(SettingsRoutes.BuiltinExtensions.route) { navController, _ ->
+                BuiltinExtensionsScreen(navController)
+            }
         )
         routes.add(
             DynamicRoute(
@@ -215,6 +247,8 @@ class ExtensionFeature : Feature {
         dialogProvider?.let { DialogRegistry.unregister(it) }
         settingsCategory?.let { SettingsRegistry.unregisterCategory(it) }
         studioCategory?.let { SettingsRegistry.unregisterCategory(it) }
+        runtimesCategory?.let { SettingsRegistry.unregisterCategory(it) }
+        bundledCategory?.let { SettingsRegistry.unregisterCategory(it) }
         runCatching { CommandProvider.commandList.value.filterIsInstance<StoreCommand>().forEach { CommandProvider.unregisterCommand(it) } }
         routes.forEach { SettingsRegistry.unregisterRoute(it) }
         routes.clear()

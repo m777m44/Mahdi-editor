@@ -45,6 +45,8 @@ import com.mahdi.TerminalLauncher
 import com.mahdi.components.SettingsItem
 import com.mahdi.icons.MahdiIcon
 import com.mahdi.lang.LanguageInstallStore
+import com.mahdi.runtime.RuntimeCatalog
+import com.mahdi.runtime.RuntimeInstaller
 import com.mahdi.lang.LanguageRegistry
 import com.mahdi.lang.LanguageToolchain
 import com.mahdi.lsp.LspRegistry
@@ -280,12 +282,19 @@ fun ServersAndRunnersSection(
                                 onClick = {
                                     val act = activity ?: return@IconButton
                                     pendingInstalls[lang.id] = true
-                                    TerminalLauncher.launch(
-                                        activity = act,
-                                        exe = "/bin/bash",
-                                        args = arrayOf("-lc", LanguageInstallStore.installCommand(lang.id)),
-                                        id = "install-${lang.id}",
-                                    )
+                                    // 3.0.0: إن كانت للغة بيئة تشغيل معروفة نستخدم المثبّت
+                                    // الذي يكتب حالة حقيقية (نسبة/فشل/نسخة) بدل أمر خام.
+                                    val spec = RuntimeCatalog.byId(lang.id)
+                                    if (spec != null) {
+                                        RuntimeInstaller.install(act, spec)
+                                    } else {
+                                        TerminalLauncher.launch(
+                                            activity = act,
+                                            exe = "/bin/bash",
+                                            args = arrayOf("-lc", LanguageInstallStore.installCommand(lang.id)),
+                                            id = "install-${lang.id}",
+                                        )
+                                    }
                                 }
                             ) {
                                 Icon(
