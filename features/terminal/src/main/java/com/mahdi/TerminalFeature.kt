@@ -29,7 +29,10 @@ import com.mahdi.lsp.LspRegistry
 import com.mahdi.lsp.servers.Bash
 import com.mahdi.lsp.servers.CSS
 import com.mahdi.lsp.servers.Emmet
+import com.mahdi.lsp.servers.ESLint
 import com.mahdi.lsp.servers.HTML
+import com.mahdi.lsp.servers.JSON
+import com.mahdi.lsp.servers.Markdown
 import com.mahdi.lsp.servers.Python
 import com.mahdi.lsp.servers.TypeScript
 import com.mahdi.lsp.servers.XML
@@ -149,7 +152,7 @@ class TerminalFeature : Feature {
         ToolbarConfiguration.addGlobalToolbarCommand(TerminalCommand, index = 1)
 
         // Register built-in LSP servers
-        LspRegistry.addBuiltInServers(HTML, Emmet, CSS, TypeScript, Bash, XML, Python)
+        LspRegistry.addBuiltInServers(HTML, Emmet, CSS, TypeScript, Bash, XML, Python, JSON, Markdown, ESLint)
     }
 
     override fun dispose(application: Application) {
@@ -164,7 +167,7 @@ class TerminalFeature : Feature {
         SandboxedProcessRegistry.provider = null
         CommandProvider.unregisterCommand(TerminalCommand)
         ToolbarConfiguration.removeGlobalToolbarCommand(TerminalCommand)
-        LspRegistry.removeBuiltInServers(HTML, Emmet, CSS, TypeScript, Bash, XML, Python)
+        LspRegistry.removeBuiltInServers(HTML, Emmet, CSS, TypeScript, Bash, XML, Python, JSON, Markdown, ESLint)
     }
 }
 

@@ -1048,4 +1048,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="install_inventory">Inventory</string>
     <string name="featured_themes">Featured themes</string>
     <string name="applied_state">Applied</string>
+    <string name="package_studio">Package studio</string>
+    <string name="package_studio_desc">Theme, icon pack and extension templates, pack validation and theme import</string>
 </resources>

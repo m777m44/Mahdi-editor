@@ -35,6 +35,7 @@ import com.mahdi.resources.strings
 import com.mahdi.settings.SettingsCategory
 import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.extension.ExtensionSettings
+import com.mahdi.settings.extension.PackageStudioScreen
 import com.mahdi.settings.extension.PackageDetail
 import com.mahdi.settings.extension.StoreScreen
 import java.io.File
@@ -56,6 +57,7 @@ class ExtensionFeature : Feature {
     private var intentHandler: IntentHandler? = null
     private var dialogProvider: DialogProvider? = null
     private var settingsCategory: SettingsCategory? = null
+    private var studioCategory: SettingsCategory? = null
     private val routes = mutableListOf<DynamicRoute>()
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -128,7 +130,20 @@ class ExtensionFeature : Feature {
                 )
                 .also { SettingsRegistry.registerCategory(it) }
 
+        // 2.8.0: «استوديو الحزم» — توليد القوالب وفحص الحزم واستيراد الثيمات القياسية
+        studioCategory =
+            SettingsCategory(
+                    label = strings.package_studio.getString(),
+                    description = strings.package_studio_desc.getString(),
+                    icon = Icon.ResourceIcon(drawables.widgets),
+                    route = SettingsRoutes.PackageStudio.route,
+                )
+                .also { SettingsRegistry.registerCategory(it) }
+
         // Register settings routes
+        routes.add(
+            DynamicRoute(SettingsRoutes.PackageStudio.route) { _, _ -> PackageStudioScreen() }
+        )
         routes.add(
             DynamicRoute(
                 "${SettingsRoutes.Extensions.route}?query={query}&category={category}",
@@ -192,6 +207,7 @@ class ExtensionFeature : Feature {
         intentHandler?.let { IntentHandleRegistry.unregister(it) }
         dialogProvider?.let { DialogRegistry.unregister(it) }
         settingsCategory?.let { SettingsRegistry.unregisterCategory(it) }
+        studioCategory?.let { SettingsRegistry.unregisterCategory(it) }
         runCatching { CommandProvider.commandList.value.filterIsInstance<StoreCommand>().forEach { CommandProvider.unregisterCommand(it) } }
         routes.forEach { SettingsRegistry.unregisterRoute(it) }
         routes.clear()

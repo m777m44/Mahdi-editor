@@ -391,6 +391,45 @@ fun ThemeHolder.toMahdiColors(): MahdiColors {
     )
 }
 
+/**
+ * يبني [ThemeHolder] كامل من **لوحتين منفصلتين**: فاتحة وداكنة.
+ *
+ * هذا هو ما يسمح لثيمات المتجر بأن تحمل ألوان الوضع الفاتح والداكن الحقيقية،
+ * بدل اشتقاق إحداهما من الأخرى — وهو نفس ما تفعله حزم الثيمات القياسية.
+ */
+fun themeHolderFrom(id: String, name: String, light: MahdiColors, dark: MahdiColors): ThemeHolder {
+    val lightScheme = light.toLightScheme()
+    val darkScheme = dark.toDarkScheme()
+    return ThemeHolder(
+        id = id,
+        name = name,
+        inheritBase = false,
+        lightScheme = lightScheme,
+        darkScheme = darkScheme,
+        lightTerminalColors = terminalColors(lightScheme, light.accent.c().toHex()),
+        darkTerminalColors = terminalColors(darkScheme, dark.accent.c().toHex()),
+        lightEditorColors = emptyList(),
+        darkEditorColors = emptyList(),
+        lightTokenColors = JsonArray(),
+        darkTokenColors = JsonArray(),
+    )
+}
+
+/**
+ * مخطط Material 3 الفاتح من أي لوحة ألوان (2.8.0).
+ * يُستخدم عند تصدير الثيم إلى حزمة قياسية `theme.json` تحتاج توكنات Material 3 كاملة.
+ */
+fun MahdiColors.asLightColorScheme(): ColorScheme = toLightScheme()
+
+/** مخطط Material 3 الداكن من أي لوحة ألوان. */
+fun MahdiColors.asDarkColorScheme(): ColorScheme = toDarkScheme()
+
+/** ألوان الطرفية (color0..color21 + cursor) للوضع الفاتح من هذه اللوحة. */
+fun MahdiColors.terminalLightPalette(): Properties = terminalColors(toLightScheme(), accent.c().toHex())
+
+/** ألوان الطرفية (color0..color21 + cursor) للوضع الداكن من هذه اللوحة. */
+fun MahdiColors.terminalDarkPalette(): Properties = terminalColors(toDarkScheme(), accent.c().toHex())
+
 /** الثيم الافتراضي جاهزًا للاستخدام. */
 val defaultTheme: ThemeHolder = MahdiDark.toThemeHolder()
 
