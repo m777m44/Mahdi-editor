@@ -304,8 +304,13 @@ internal fun spec(
 // الثيم الافتراضي
 // ——————————————————————————————————————————————————————————————
 
-/** معرّف الثيم الافتراضي عند أول تشغيل. */
-const val DEFAULT_THEME_ID = "mahdi-dark"
+/**
+ * معرّف الثيم الافتراضي عند أول تشغيل (3.2.0).
+ *
+ * صار **السمائي** بدل الداكن، ويُعرض بوضعه الداكن افتراضيًا — كما طُلب:
+ * «الثيم الأساسي والافتراضي هو السمائي مع المظلم».
+ */
+const val DEFAULT_THEME_ID = "mahdi-sky"
 
 // ——————————————————————————————————————————————————————————————
 // مكتبة الثيمات — أربعة ثيمات فقط: الفاتح، الداكن، المظلم، السمائي
@@ -370,7 +375,10 @@ val MahdiSky =
         extras = listOf(0xFF38BDF8, 0xFF0A1B2E, 0xFF7DD3FC),
     )
 
-val themeCatalog: List<ThemeSpec> = listOf(MahdiLight, MahdiDark, MahdiDim, MahdiSky)
+/**
+ * ترتيب العرض (3.2.0): **السمائي** أولًا لأنه الثيم الأساسي والافتراضي، ثم الداكن والمظلم، ثم الفاتح.
+ */
+val themeCatalog: List<ThemeSpec> = listOf(MahdiSky, MahdiDark, MahdiDim, MahdiLight)
 
 /** يقرأ ألوان ثيم قائم ليبني عليها شاشة التخصيص. */
 fun ThemeHolder.toMahdiColors(): MahdiColors {
@@ -431,7 +439,7 @@ fun MahdiColors.terminalLightPalette(): Properties = terminalColors(toLightSchem
 fun MahdiColors.terminalDarkPalette(): Properties = terminalColors(toDarkScheme(), accent.c().toHex())
 
 /** الثيم الافتراضي جاهزًا للاستخدام. */
-val defaultTheme: ThemeHolder = MahdiDark.toThemeHolder()
+val defaultTheme: ThemeHolder = MahdiSky.toThemeHolder()
 
 /** نمط الثيم (صلب/زجاجي/نيون…) بحسب معرّفه في كتالوج 2.0، أو `null` للثيمات الموروثة والمخصّصة. */
 fun themeStyleOf(id: String): ThemeStyle? = themeCatalog.firstOrNull { it.id == id }?.style

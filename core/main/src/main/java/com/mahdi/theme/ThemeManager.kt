@@ -1,5 +1,6 @@
 package com.mahdi.theme
 
+import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.State
@@ -54,6 +55,13 @@ import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement as KJsonElement
+
+/** ثيم الافتراضي القديم (قبل 3.2.0) — يُستخدم في الترحيل فقط. */
+private const val LEGACY_DEFAULT_THEME_ID = "mahdi-dark"
+
+/** مفاتيح ترحيل الافتراضيات (مرّة واحدة لكل تثبيت). */
+private const val PREFS_THEME_DEFAULTS = "mahdi_theme_defaults"
+private const val KEY_THEME_DEFAULT_MIGRATED = "default_theme_migrated_v320"
 
 @Serializable
 data class ThemeEntry(
@@ -120,6 +128,8 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
      * @see indexLocalThemes
      */
     suspend fun loadActiveTheme() {
+        // ترحيل لمرّة واحدة قبل قراءة الثيم: الافتراضي صار «السمائي» (3.2.0)
+        runCatching { migrateDefaultTheme() }
         val id = Settings.theme
         _themeIdState.value = id
 
@@ -215,6 +225,25 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
         ensureThemeMode(newTheme)
         runCatching { refreshEditors() }
         DefaultScope.launch { Events.publish(AppEvent.ThemeChanged(newTheme, oldTheme)) }
+    }
+
+    /**
+     * ترحيل لمرّة واحدة (3.2.0): الثيم الافتراضي صار **السمائي** بدل الداكن.
+     *
+     * لا نلمس ثيمًا اختاره المستخدم بنفسه (فاتح/مظلم/ثيم متجر) — نُحوّل فقط من كان
+     * على الافتراضي القديم أو لم يُحفظ له ثيم أصلًا. ويعمل مرة واحدة فقط لكل تثبيت.
+     */
+    fun migrateDefaultTheme() {
+        val prefs = application?.getSharedPreferences(PREFS_THEME_DEFAULTS, Context.MODE_PRIVATE) ?: return
+        if (prefs.getBoolean(KEY_THEME_DEFAULT_MIGRATED, false)) return
+        runCatching {
+            val stored = Settings.theme
+            if (stored.isBlank() || stored == LEGACY_DEFAULT_THEME_ID) {
+                Settings.theme = DEFAULT_THEME_ID
+                _themeIdState.value = DEFAULT_THEME_ID
+            }
+        }.onFailure { logError(it, "Theme default migration failed") }
+        prefs.edit().putBoolean(KEY_THEME_DEFAULT_MIGRATED, true).apply()
     }
 
     /** يُزامن معرّف الثيم النشط مع المحفوظ (يُستدعى عند الإقلاع وبعد الاستيراد). */
