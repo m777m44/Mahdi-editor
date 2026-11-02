@@ -577,10 +577,24 @@ private fun TerminalQuickBar(modifier: Modifier = Modifier) {
         terminalView.get()?.currentSession?.write(text)
     }
 
-    fun zoom(delta: Int) {
-        val newSize = (Settings.terminal_font_size + delta).coerceIn(8, 32)
+    // 3.3.0: مستويات ثابتة لا خطوة عشوائية — التكبير والتصغير يمرّان على الدرجات نفسها
+    // دائمًا، فلا تتراكم فروق غريبة بين الجهاز والإعدادات، و«إعادة الضبط» تعود إلى 12.
+    fun applySize(size: Int) {
+        val newSize = size.coerceIn(8, 32)
         Settings.terminal_font_size = newSize
         terminalView.get()?.setTextSize(dpToPx(newSize.toFloat(), context))
+    }
+
+    fun zoomToNextLevel(up: Boolean) {
+        val levels = listOf(8, 10, 12, 14, 16, 18, 20, 24, 28, 32)
+        val current = Settings.terminal_font_size
+        val target =
+            if (up) {
+                levels.firstOrNull { it > current } ?: levels.last()
+            } else {
+                levels.lastOrNull { it < current } ?: levels.first()
+            }
+        applySize(target)
     }
 
     val items: List<Pair<String, () -> Unit>> =
@@ -597,8 +611,10 @@ private fun TerminalQuickBar(modifier: Modifier = Modifier) {
             stringResource(strings.terminal_tool_paste) to {
                 clipboard.getText()?.text?.let { text -> if (text.isNotEmpty()) send(text) }
             },
-            stringResource(strings.terminal_tool_zoom_in) to { zoom(+1) },
-            stringResource(strings.terminal_tool_zoom_out) to { zoom(-1) },
+            stringResource(strings.terminal_tool_zoom_in) to { zoomToNextLevel(true) },
+            stringResource(strings.terminal_tool_zoom_out) to { zoomToNextLevel(false) },
+            // إعادة الضبط تعادل Ctrl+0: حجم 12 الافتراضي
+            stringResource(strings.terminal_tool_zoom_reset) to { applySize(12) },
         )
 
     Row(

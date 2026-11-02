@@ -8,9 +8,9 @@ import com.blankj.utilcode.util.ClipboardUtils
 import com.blankj.utilcode.util.KeyboardUtils
 import com.mahdi.activities.terminal.Terminal
 import com.mahdi.settings.Settings
+import com.mahdi.utils.dpToPx
 import com.mahdi.settings.terminal.TerminalCursorStyle
 import com.mahdi.terminal.virtualkeys.SpecialButton
-import com.mahdi.utils.dpToPx
 import com.mahdi.utils.logError
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
@@ -162,9 +162,14 @@ class TerminalBackEnd : TerminalViewClient, TerminalSessionClient {
         val smoothed = smoothStep(appliedSp, target, ZOOM_STEP_SP)
         if (abs(smoothed - appliedSp) >= 0.1f) {
             appliedSp = smoothed
+            // TerminalView.setTextSize يتوقّع **بكسلات** (يمرّرها إلى Paint.setTextSize)،
+            // والإعدادات بالـsp — لذلك التحويل هنا إلزامي. غيابه كان سبب القفزة إلى حجم 3:
+            // كان الرقم الخام (11) يُعامل كأنه بكسل أي ≈4sp على شاشة 2.75x.
             view.setTextSize(dpToPx(smoothed, view.context))
-            // حفظ القيمة المقرّبة (8..32) ليبقى الحجم بعد إعادة الفتح
-            Settings.terminal_font_size = smoothed.roundToInt().coerceIn(MIN_FONT_SP.toInt(), MAX_FONT_SP.toInt())
+            // حفظ القيمة المقرّبة (8..32) ليبقى الحجم بعد إعادة الفتح — نكتب فقط عند تغيّرها
+            // الفعلي حتى لا نلمس التخزين مع كل إطار من الإيماءة
+            val savedSp = smoothed.roundToInt().coerceIn(MIN_FONT_SP.toInt(), MAX_FONT_SP.toInt())
+            if (savedSp != Settings.terminal_font_size) Settings.terminal_font_size = savedSp
         }
 
         // نُعيد عامل التراكم نفسه الذي سنقسم عليه في الحدث القادم

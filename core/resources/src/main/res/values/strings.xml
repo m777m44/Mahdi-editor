@@ -1065,6 +1065,8 @@
     <string name="terminal_tool_paste">لصق</string>
     <string name="terminal_tool_zoom_in">تكبير</string>
     <string name="terminal_tool_zoom_out">تصغير</string>
+    <string name="terminal_tool_zoom_reset">إعادة ضبط الخط</string>
+    <string name="terminal_font_size_label">حجم الخط</string>
     <string name="open_store">تصفح الإضافات</string>
     <string name="ready_state">جاهز</string>
     <string name="installing_state">قيد التثبيت…</string>

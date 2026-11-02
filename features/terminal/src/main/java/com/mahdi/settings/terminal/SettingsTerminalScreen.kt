@@ -105,9 +105,10 @@ fun SettingsTerminalScreen(overrideNavController: NavController? = null) {
         PreferenceGroup(heading = stringResource(strings.appearance)) {
             SteppedValueSlider(
                 label = stringResource(strings.text_size),
-                min = 10,
-                max = 20,
-                default = Settings.terminal_font_size,
+                // 3.3.0: نفس مدى الإيماءة (8–32) حتى لا تتناقض الإعدادات مع التكبير باللمس
+                min = 8,
+                max = 32,
+                default = Settings.terminal_font_size.coerceIn(8, 32),
                 onValueChanged = {
                     Settings.terminal_font_size = it
                     terminalView.get()?.setTextSize(dpToPx(it.toFloat(), context))

@@ -21,6 +21,8 @@ import com.mahdi.utils.errorDialog
 import io.github.rosemoe.sora.graphics.inlayHint.ColorInlayHintRenderer
 import io.github.rosemoe.sora.graphics.inlayHint.TextInlayHintRenderer
 import io.github.rosemoe.sora.lang.EmptyLanguage
+import io.github.rosemoe.sora.event.ContentChangeEvent
+import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.lsp.editor.LspLanguage
 import io.github.rosemoe.sora.text.CharPosition
@@ -105,8 +107,8 @@ class Editor : CodeEditor {
             val left = event.left
             caretObserver?.invoke(left.line, left.column)
         }
-        subscribeAlways(io.github.rosemoe.sora.event.ContentChangeEvent::class.java) { event ->
-            if (event.action == io.github.rosemoe.sora.event.ContentChangeEvent.ACTION_SET_NEW_TEXT) return@subscribeAlways
+        subscribeAlways(ContentChangeEvent::class.java) { event ->
+            if (event.action == ContentChangeEvent.ACTION_SET_NEW_TEXT) return@subscribeAlways
             val end = event.changeEnd
             caretObserver?.invoke(end.line, end.column)
         }
