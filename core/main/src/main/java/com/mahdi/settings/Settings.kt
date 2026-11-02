@@ -171,6 +171,8 @@ object Settings {
             "default_night_mode",
             AppCompatDelegate.MODE_NIGHT_YES,
         )
+    // 3.3.0: شريط الاقتراحات داخل المحرّر (يمكن تعطيله من إعدادات المحرّر)
+    var editor_autocomplete_bar by CachedPreference("editor_autocomplete_bar", true)
     var terminal_font_size by CachedPreference("terminal_font_size", 12)
     var terminal_scrollback_buffer by CachedPreference("terminal_scrollback_buffer", 5000)
     var auto_save_delay by CachedPreference("auto_save_delay", 400L)

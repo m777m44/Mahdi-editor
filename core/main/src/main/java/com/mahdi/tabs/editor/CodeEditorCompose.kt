@@ -12,6 +12,19 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
+import com.mahdi.editor.complete.AutocompleteBar
+import com.mahdi.editor.complete.AutocompleteEngine
+import com.mahdi.editor.complete.Suggestion
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -86,9 +99,52 @@ fun EditorTab.CodeEditor(
     val colorScheme = MaterialTheme.colorScheme
     val gitColorScheme = GitColorScheme.create()
 
+    // ————— شريط الاقتراحات (3.3.0) —————
+    val isArabicUi = LocalConfiguration.current.locales[0].language == "ar"
+    val extension = file?.getExtension() ?: fallbackExtension
+    var caretLine by remember { mutableIntStateOf(0) }
+    var caretColumn by remember { mutableIntStateOf(0) }
+    var caretTick by remember { mutableIntStateOf(0) }
+    var suggestions by remember { mutableStateOf<List<Suggestion>>(emptyList()) }
+    var suggestionsVisible by remember { mutableStateOf(false) }
+    var currentPrefix by remember { mutableStateOf("") }
+    val autocompleteOn = Settings.editor_autocomplete_bar
+
+    // حساب الاقتراحات مع تأجيل 180ms بعد آخر ضغطة مفتاح
+    LaunchedEffect(caretTick, caretLine, caretColumn, autocompleteOn) {
+        if (!autocompleteOn) {
+            suggestionsVisible = false
+            suggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(180)
+        val ed = editorState.editor.get()
+        if (ed == null) {
+            suggestionsVisible = false
+            return@LaunchedEffect
+        }
+        val content = ed.text
+        val cursor = runCatching { content.getCharIndex(caretLine, caretColumn) }.getOrNull()
+        if (cursor == null || cursor <= 0) {
+            suggestionsVisible = false
+            return@LaunchedEffect
+        }
+        val prefix = AutocompleteEngine.currentPrefix(content, cursor)
+        val list =
+            if (prefix.length >= AutocompleteEngine.MIN_PREFIX) {
+                AutocompleteEngine.suggest(content, cursor, extension, AutocompleteEngine.MAX_SUGGESTIONS)
+            } else {
+                emptyList()
+            }
+        currentPrefix = prefix
+        suggestions = list
+        suggestionsVisible = list.isNotEmpty() && !ed.text.cursor.isSelected
+    }
+
     Column(modifier = modifier) {
         AndroidView(
-            modifier = Modifier.weight(1f),
+            // 3.3.0: هامش بسيط على اليمين يمنع قصّ آخر حرف في السطر الطويل
+            modifier = Modifier.weight(1f).padding(end = 4.dp),
             onRelease = { it.release() },
             update = { logInfo("Editor view update") },
             factory = { ctx ->
@@ -113,6 +169,13 @@ fun EditorTab.CodeEditor(
 
                     editorState.editor = WeakReference(this)
 
+                    // 3.3.0: يُخبر شريط الاقتراحات بموضع المؤشر عند كل كتابة/تحريك
+                    caretObserver = { line, column ->
+                        caretLine = line
+                        caretColumn = column
+                        caretTick++
+                    }
+
                     registerMahdiFormatter(this@CodeEditor)
                     registerMahdiActions(scope, viewModel, this@CodeEditor)
                     registerMahdiEvents(this@CodeEditor, intelligentFeatures, file, onTextChange)
@@ -134,6 +197,28 @@ fun EditorTab.CodeEditor(
                         }
                     }
                 }
+            },
+        )
+
+        // شريط الاقتراحات أسفل المحرّر وقبل أزرار المفاتيح الإضافية
+        AutocompleteBar(
+            suggestions = suggestions,
+            visible = suggestionsVisible,
+            isArabic = isArabicUi,
+            onSelect = { suggestion ->
+                val ed = editorState.editor.get()
+                if (ed != null && currentPrefix.isNotEmpty()) {
+                    runCatching {
+                        val content = ed.text
+                        val cursor = content.getCharIndex(caretLine, caretColumn)
+                        val start = AutocompleteEngine.prefixStart(cursor, currentPrefix)
+                        if (cursor in currentPrefix.length..content.length) {
+                            content.replace(start, cursor, suggestion.text)
+                            ed.setSelection(caretLine, caretColumn - currentPrefix.length + suggestion.text.length)
+                        }
+                    }
+                }
+                suggestionsVisible = false
             },
         )
 

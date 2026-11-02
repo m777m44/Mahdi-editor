@@ -367,7 +367,7 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
             }
             StoreCategory.THEMES -> {
                 item { ThemesHeaderCard() }
-                item { FeaturedThemesSection(query = searchQuery.text.toString()) }
+                item { FeaturedThemesSection(query = searchQuery.text.toString(), navController = navController) }
                 packageList(
                     packages = sortedThemes,
                     isIndexing = isIndexing,
