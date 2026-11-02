@@ -1056,4 +1056,10 @@ Thank you for using Mahdi-Editor.</string>
     <string name="runtimes_desc">Real install state: Python · Node · PHP · Ruby · Go · Rust…</string>
     <string name="builtin_ext_title">Bundled extensions</string>
     <string name="builtin_ext_desc">36 ready extensions: 12 system capabilities and 24 text tools, all offline</string>
+    <string name="autocomplete_bar">Autocomplete bar</string>
+    <string name="autocomplete_bar_desc">Function and word suggestions while typing, fully offline — turn it off if it gets in the way</string>
+    <string name="autocomplete_hint">Tap a suggestion to insert it</string>
+    <string name="added_themes">Added themes</string>
+    <string name="added_themes_desc">Themes you installed from the store — applied in one tap and kept across restarts</string>
+    <string name="base_themes">Base themes</string>
 </resources>

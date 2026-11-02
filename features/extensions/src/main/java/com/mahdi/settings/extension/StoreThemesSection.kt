@@ -38,6 +38,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.App.Companion.themeManager
 import com.mahdi.theme.CustomThemes
 import com.mahdi.resources.drawables
@@ -59,7 +61,11 @@ import com.mahdi.utils.toast
  * ويبقى متاحًا في شاشة الثيمات بعد إعادة تشغيل التطبيق.
  */
 @Composable
-fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
+fun FeaturedThemesSection(
+    query: String,
+    modifier: Modifier = Modifier,
+    navController: NavController? = null,
+) {
     val context = LocalContext.current
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val isDarkMode = isSystemInDarkTheme()
@@ -108,7 +114,13 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
                 themeManager.setTheme(theme.id, holder)
                 appliedId = theme.id
                 installedIds = installedIds + theme.id
-                toast(if (isArabic) "تم تطبيق الثيم: ${theme.nameAr}" else "Theme applied: ${theme.nameEn}")
+                toast(
+                    if (isArabic) {
+                        "تم تطبيق الثيم: ${theme.nameAr} — تجده في الإعدادات ‹ الثيمات ‹ ثيمات مضافة"
+                    } else {
+                        "Theme applied: ${theme.nameEn} — find it in Settings › Themes › Added themes"
+                    }
+                )
             }
             .onFailure { toast(strings.unknown_err) }
     }
@@ -124,7 +136,19 @@ fun FeaturedThemesSection(query: String, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.weight(1f))
-            // مبدّل المعاينة: كل ثيم يحمل لوحة فاتحة ولوحة داكنة
+            // 3.3.0: كل ثيم يُثبَّت هنا ينتقل إلى «الثيمات ← ثيمات مضافة»
+            navController?.let { nav ->
+                TextButton(
+                    onClick = { nav.navigate(SettingsRoutes.Themes.route) },
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Text(
+                        text = if (isArabic) "الثيمات" else "Themes",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SkyAccent,
+                    )
+                }
+            }
             SkyBadge(
                 text = "${themes.size} · ${if (isDarkMode) "داكن" else "فاتح"}",
                 showDot = false,

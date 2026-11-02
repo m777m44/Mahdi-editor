@@ -1,5 +1,6 @@
 package com.mahdi.terminal
 
+import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -9,11 +10,14 @@ import com.mahdi.activities.terminal.Terminal
 import com.mahdi.settings.Settings
 import com.mahdi.settings.terminal.TerminalCursorStyle
 import com.mahdi.terminal.virtualkeys.SpecialButton
+import com.mahdi.utils.dpToPx
 import com.mahdi.utils.logError
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalViewClient
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class TerminalBackEnd : TerminalViewClient, TerminalSessionClient {
     override fun onTextChanged(changedSession: TerminalSession) {
@@ -81,16 +85,102 @@ class TerminalBackEnd : TerminalViewClient, TerminalSessionClient {
         e?.let { logError(it) }
     }
 
+    // ————— حالة التكبير (3.3.0) —————
+    /** الحجم المرجعي (sp) عند بداية الإيماءة. */
+    private var baseSp = 0f
+
+    /** عامل التراكم منذ بداية الإيماءة. */
+    private var zoom = 1f
+
+    /** آخر عامل أعدناه إلى [com.termux.view.TerminalView]. */
+    private var lastReturned = 1f
+
+    /** آخر حجم طُبّق فعلًا (sp) — لكشف التغيير الخارجي. */
+    private var appliedSp = 0f
+
+    /** وقت آخر حدث تكبير. */
+    private var lastScaleAt = 0L
+
+    /** آخر قيمة أعدناها في حال وصول نسبة غير صالحة. */
+    private var lastZoom = 1f
+
+    private companion object {
+        const val MIN_FONT_SP = 8f
+        const val MAX_FONT_SP = 32f
+        const val ZOOM_STEP_SP = 0.5f
+        const val GESTURE_GAP_MS = 220L
+    }
+
     /**
-     * تكبير/تصغير بإصبعين — كما كان في الإصدار الأصلي (بلا تحويل أو حفظ إضافي).
+     * تكبير/تصغير بإصبعين — متدرّج بلا قفزات (3.3.0).
      *
-     * `TerminalView` يضرب عامل الإيماءة في آخر قيمة أعدناها، فنقصّها بين 11 و45
-     * ونمرّرها إلى `setTextSize` مباشرة.
+     * كانت المشكلة: `TerminalView` يمرّر **حاصل ضرب عوامل الإيماءة** لا الحجم، فإذا عومل
+     * كأنه حجم خط (أو قُصَّ إلى حدّ أدنى) قفز الخط من 12 إلى 11 أو 3 فورًا عند أول حركة.
+     *
+     * الحل الآن ثلاثي:
+     * 1. **حجم مرجعي** [baseSp] يُلتقط عند بداية كل إيماءة، و[zoom] تراكم نسبي يبدأ من 1.
+     *    الحجم المستهدف = baseSp × zoom، فلا تراكم أسّي ولا قفزة افتتاحية.
+     * 2. **تنعيم** [smoothStep]: الحجم المعروض يقترب من الهدف بخطوة 0.5sp كحدّ أقصى للمرّة،
+     *    فتبدو الحركة متدرّجة حتى لو وصلت أحداث اللمس متباعدة.
+     * 3. **حفظ تلقائي**: كل خطوة تُحفظ في الإعدادات، فيبقى الحجم بعد إعادة التشغيل،
+     *    ولا يعيد أي recomposition ضبطه إلى القيمة القديمة.
+     *
+     * المدى 8–32sp، وأي تغيير خارجي (زرّا + و −) يُلتقط تلقائيًا كنقطة مرجعية جديدة.
      */
     override fun onScale(scale: Float): Float {
-        val fontScale = scale.coerceIn(11f, 45f)
-        terminalView.get()?.setTextSize(fontScale.toInt())
-        return fontScale
+        val view = terminalView.get() ?: return scale
+        if (!scale.isFinite()) return lastZoom
+        val now = SystemClock.uptimeMillis()
+        val settingsSp = Settings.terminal_font_size.toFloat().coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+
+        val idleGap = now - lastScaleAt > GESTURE_GAP_MS
+        val externalChange = abs(settingsSp - appliedSp) > 1.5f
+
+        // بداية إيماءة جديدة أو تغيير خارجي: التقط المرجع وأعد ضبط التراكم
+        if (baseSp <= 0f || idleGap || externalChange) {
+            baseSp = settingsSp
+            zoom = 1f
+            appliedSp = settingsSp
+            // نعيد 1 ونعتمدها أساسًا للحدث القادم: العرض يضربها في نسبة الإيماءة التالية،
+            // فتُستخرج الخطوة الحقيقية بلا أي قفزة افتتاحية مهما كانت قيمته القديمة.
+            lastReturned = 1f
+            lastZoom = 1f
+            lastScaleAt = now
+            return 1f
+        }
+
+        lastScaleAt = now
+
+        // الخطوة الحقيقية = النسبة الجديدة ÷ آخر قيمة أعدناها
+        val rawStep = if (lastReturned != 0f) scale / lastReturned else 1f
+        val step = if (rawStep.isFinite()) rawStep.coerceIn(0.5f, 2f) else 1f
+
+        zoom = (zoom * step).coerceIn(MIN_FONT_SP / baseSp, MAX_FONT_SP / baseSp)
+        val target = (baseSp * zoom).coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+
+        // تنعيم الخطوة: 0.5sp على الأكثر في التحديث الواحد
+        val smoothed = smoothStep(appliedSp, target, ZOOM_STEP_SP)
+        if (abs(smoothed - appliedSp) >= 0.1f) {
+            appliedSp = smoothed
+            view.setTextSize(dpToPx(smoothed, view.context))
+            // حفظ القيمة المقرّبة (8..32) ليبقى الحجم بعد إعادة الفتح
+            Settings.terminal_font_size = smoothed.roundToInt().coerceIn(MIN_FONT_SP.toInt(), MAX_FONT_SP.toInt())
+        }
+
+        // نُعيد عامل التراكم نفسه الذي سنقسم عليه في الحدث القادم
+        lastReturned = zoom
+        lastZoom = zoom
+        return zoom
+    }
+
+    /** يقترب من الهدف بخطوة [maxStep] كحدّ أقصى. */
+    private fun smoothStep(current: Float, target: Float, maxStep: Float): Float {
+        val delta = target - current
+        return when {
+            abs(delta) <= maxStep -> target
+            delta > 0 -> current + maxStep
+            else -> current - maxStep
+        }
     }
 
     override fun onSingleTapUp(e: MotionEvent) {

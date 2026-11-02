@@ -25,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import com.mahdi.theme.ThemeHolder
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -49,6 +51,7 @@ import com.mahdi.theme.CustomThemes
 import com.mahdi.theme.DEFAULT_THEME_ID
 import com.mahdi.theme.THEME_MODE_AUTO_TIME
 import com.mahdi.theme.supportsDynamicTheming
+import com.mahdi.theme.themeCatalog
 import com.mahdi.theme.themeStyleOf
 import kotlinx.coroutines.launch
 
@@ -81,52 +84,30 @@ fun ThemeScreen(navController: NavController, modifier: Modifier = Modifier) {
 
         }
 
-        PreferenceGroup(heading = stringResource(strings.themes)) {
-            loadedThemes.forEach { theme ->
-                // ثيمات المستخدم المخصّصة وحدها تُحذف بزرّ الحذف
-                val deleteAction: (@Composable () -> Unit)? =
-                    if (CustomThemes.isCustom(theme.id)) {
-                        {
-                            IconButton(
-                                onClick = {
-                                    CustomThemes.delete(theme.id)
-                                    themeManager.removeCustomTheme(theme.id)
-                                    if (Settings.theme == theme.id) {
-                                        Settings.theme = DEFAULT_THEME_ID
-                                        themeManager.ensureThemeMode()
-                                        refreshEditors()
-                                    }
-                                }
-                            ) {
-                                Icon(imageVector = Icons.Outlined.Delete, contentDescription = stringResource(strings.delete))
-                            }
-                        }
+        // 3.3.0: فصل واضح — الثيمات الأساسية في مجموعة، وكل ثيم يُثبَّت من المتجر
+        // ينتقل تلقائيًا إلى «ثيمات مضافة» فلا يختلط بالأساسية.
+        // الأساسية = الأربعة المعروفة في الكتالوج؛ كل ما سواها (متجر/مستورد/مخصّص) = مضافة
+        val baseThemes = loadedThemes.filter { theme -> themeCatalog.any { it.id == theme.id } }
+        val addedThemes = loadedThemes.filterNot { theme -> themeCatalog.any { it.id == theme.id } }
+
+        PreferenceGroup(heading = stringResource(strings.base_themes)) {
+            baseThemes.forEach { theme -> ThemeRow(theme) }
+        }
+
+        PreferenceGroup(
+            heading = stringResource(strings.added_themes),
+            description =
+                if (addedThemes.isEmpty()) {
+                    if (LocalConfiguration.current.locales[0].language == "ar") {
+                        "لم تُضف ثيمات بعد — ثبّت أي ثيم من «تصفح الإضافات ‹ الثيمات» وسيظهر هنا فورًا."
                     } else {
-                        null
+                        "No added themes yet — install one from Browse add-ons › Themes and it lands here."
                     }
-
-                SettingsItem(
-                    isEnabled = true,
-                    label = theme.name,
-                    description = themeStyleOf(theme.id)?.label,
-                    showSwitch = false,
-                    default = false,
-                    startWidget = {
-                        RadioButton(
-                            modifier = Modifier.padding(start = 16.dp),
-                            enabled = true,
-                            selected = themeManager.currentTheme.id == theme.id,
-                            onClick = null,
-                        )
-                    },
-                    endWidget = deleteAction,
-                    sideEffect = {
-                        // 3.1.0: setTheme يجعل تغيير الثيم حالة قابلة للمراقبة فتتحدّث الواجهة فورًا
-                        themeManager.setTheme(theme.id, theme)
-                    },
-                )
-            }
-
+                } else {
+                    stringResource(strings.added_themes_desc)
+                },
+        ) {
+            addedThemes.forEach { theme -> ThemeRow(theme) }
         }
 
         if (showDayNightBottomSheet.value) {
@@ -209,4 +190,52 @@ fun DayNightDialog(showBottomSheet: MutableState<Boolean>, context: Context) {
             }
         }
     }
+}
+
+/**
+ * صفّ ثيم واحد في شاشة الثيمات (3.3.0) — مستخدم في المجموعتين الأساسية والمضافة.
+ * الثيمات المضافة وحدها تظهر لها زرّ حذف.
+ */
+@Composable
+private fun ThemeRow(theme: ThemeHolder) {
+    // الثيمات المضافة (متجر/مستوردة/مخصّصة) وحدها قابلة للحذف؛ الأربعة الأساسية لا تُحذف
+    val deleteAction: (@Composable () -> Unit)? =
+        if (themeCatalog.none { it.id == theme.id }) {
+            {
+                IconButton(
+                    onClick = {
+                        CustomThemes.delete(theme.id)
+                        themeManager.removeCustomTheme(theme.id)
+                        if (Settings.theme == theme.id) {
+                            themeManager.setTheme(DEFAULT_THEME_ID)
+                        }
+                    }
+                ) {
+                    Icon(imageVector = Icons.Outlined.Delete, contentDescription = stringResource(strings.delete))
+                }
+            }
+        } else {
+            null
+        }
+
+    SettingsItem(
+        isEnabled = true,
+        label = theme.name,
+        description = themeStyleOf(theme.id)?.label,
+        showSwitch = false,
+        default = false,
+        startWidget = {
+            RadioButton(
+                modifier = Modifier.padding(start = 16.dp),
+                enabled = true,
+                selected = themeManager.currentTheme.id == theme.id,
+                onClick = null,
+            )
+        },
+        endWidget = deleteAction,
+        sideEffect = {
+            // 3.1.0: setTheme يجعل تغيير الثيم حالة قابلة للمراقبة فتتحدّث الواجهة فورًا
+            themeManager.setTheme(theme.id, theme)
+        },
+    )
 }

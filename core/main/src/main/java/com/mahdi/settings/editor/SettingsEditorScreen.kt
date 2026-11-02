@@ -135,6 +135,19 @@ fun SettingsEditorScreen(navController: NavController) {
                 },
             )
 
+            // 3.3.0: شريط الاقتراحات تحت المحرّر — يعمل بلا خادم لغة وبلا إنترنت
+            val autocompleteState = remember { mutableStateOf(Settings.editor_autocomplete_bar) }
+            EditorSettingsItem(
+                label = stringResource(strings.autocomplete_bar),
+                description = stringResource(strings.autocomplete_bar_desc),
+                state = autocompleteState,
+                sideEffect = {
+                    autocompleteState.value = it
+                    Settings.editor_autocomplete_bar = it
+                    refreshEditors()
+                },
+            )
+
             EditorSettingsItem(
                 label = stringResource(strings.read_mode),
                 description = stringResource(strings.read_mode_desc),

@@ -1079,4 +1079,10 @@
     <string name="runtimes_desc">حالة تثبيت حقيقية: Python · Node · PHP · Ruby · Go · Rust…</string>
     <string name="builtin_ext_title">الإضافات المدمجة</string>
     <string name="builtin_ext_desc">٣٦ إضافة جاهزة: ١٢ قدرة نظام و٢٤ أداة نصّية تعمل بلا إنترنت</string>
+    <string name="autocomplete_bar">شريط الاقتراحات</string>
+    <string name="autocomplete_bar_desc">اقتراحات الدوال والكلمات أثناء الكتابة، تعمل بلا إنترنت — أطفئها إن أزعجتك</string>
+    <string name="autocomplete_hint">اضغط اقتراحًا لإدراجه</string>
+    <string name="added_themes">ثيمات مضافة</string>
+    <string name="added_themes_desc">الثيمات التي ثبّتها من المتجر — تُطبَّق بضغطة وتبقى بعد إعادة التشغيل</string>
+    <string name="base_themes">الثيمات الأساسية</string>
 </resources>

@@ -1006,8 +1006,13 @@ public final class TerminalView extends View {
         int viewHeight = getHeight();
         if (viewWidth == 0 || viewHeight == 0 || mTermSession == null) return;
 
+        // 3.3.0: نحجز هامشًا صغيرًا على اليمين حتى لا يُقصّ آخر حرف في السطر
+        // (كانت الكلمات الطويلة تُعرض ناقصة الحرف الأخير عند حافة الشاشة).
+        int rightGutter = Math.round(6f * getResources().getDisplayMetrics().density);
+        int usableWidth = Math.max(1, viewWidth - rightGutter);
+
         // Set to 80 and 24 if you want to enable vttest.
-        int newColumns = Math.max(4, (int) (viewWidth / mRenderer.mFontWidth));
+        int newColumns = Math.max(4, (int) (usableWidth / mRenderer.mFontWidth));
         int newRows = Math.max(4, (viewHeight - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing);
 
         if (mEmulator == null || (newColumns != mEmulator.mColumns || newRows != mEmulator.mRows)) {

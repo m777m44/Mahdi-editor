@@ -28,6 +28,7 @@ import io.github.rosemoe.sora.text.TextRange
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.component.EditorAutoCompletion
 import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
+import io.github.rosemoe.sora.widget.component.Magnifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -50,6 +51,13 @@ class Editor : CodeEditor {
     var insertFinalNewline = false
     var trimTrailingWhitespace = false
     var ownerTab: Tab? = null
+
+    /**
+     * يُنادى كلما تحرّك المؤشر أو تغيّر النصّ — يستخدمه شريط الاقتراحات (3.3.0)
+     * ليعرف موضع الكتابة بلا الحاجة إلى قراءة الملف كاملًا.
+     */
+    @Volatile
+    var caretObserver: ((line: Int, column: Int) -> Unit)? = null
 
     data class PatchArgs(
         val isDarkMode: Boolean,
@@ -90,6 +98,25 @@ class Editor : CodeEditor {
         MahdiTextActionWindow(this).also { window ->
             mahdiTextActionWindow = window
             replaceComponent(EditorTextActionWindow::class.java, window)
+        }
+
+        // 3.3.0: مؤشّر موضع واضح لشريط الاقتراحات (كتابة أو تحريك للمؤشر)
+        subscribeAlways(SelectionChangeEvent::class.java) { event ->
+            val left = event.left
+            caretObserver?.invoke(left.line, left.column)
+        }
+        subscribeAlways(io.github.rosemoe.sora.event.ContentChangeEvent::class.java) { event ->
+            if (event.action == io.github.rosemoe.sora.event.ContentChangeEvent.ACTION_SET_NEW_TEXT) return@subscribeAlways
+            val end = event.changeEnd
+            caretObserver?.invoke(end.line, end.column)
+        }
+
+        // 3.3.0: عدسة أوضح (1.5×) لمقابض التحديد والسحب — خطوة أكبر من الافتراضي 1.25×
+        runCatching {
+            getComponent(Magnifier::class.java).apply {
+                setScaleFactor(1.5f)
+                setMaxTextSize(30f * resources.displayMetrics.scaledDensity)
+            }
         }
     }
 
@@ -217,6 +244,9 @@ class Editor : CodeEditor {
         props.deleteEmptyLineFast = fastDelete
         props.stickyScroll = stickyScroll
         props.useICULibToSelectWords = true
+        // 3.3.0: لا تباعد حروف (يمنع قصّ آخر حرف) + سحب التحديد بعد الضغط المطوّل مع العدسة
+        setTextLetterSpacing(0f)
+        props.dragSelectAfterLongPress = true
         props.selectCompletionItemOnEnterForSoftKbd = completeOnEnter
         props.symbolPairAutoCompletion = autoClosingBracket
         props.showMinimap = showMinimap
