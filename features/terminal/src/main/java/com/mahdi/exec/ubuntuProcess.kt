@@ -51,9 +51,14 @@ fun getDefaultBindings(): List<Binding> {
     with(list) {
         bind(sandboxHomeDir().absolutePath, "/home")
         bind(sandboxHomeDir().absolutePath, "/root")
+        // 4.2.0: كل أماكن ملفات الهاتف — لا Download وحده
         bind("/sdcard")
         bind("/storage")
+        bind("/mnt")            // /mnt/media_rw و/mnt/user و/mnt/expand
+        bind("/media")
         bind("/data")
+        bind("/run")
+        bind("/etc/hosts")
         bind(application!!.filesDir.parentFile!!.absolutePath)
         bind("/dev")
         bind("/proc")
@@ -73,6 +78,31 @@ fun getDefaultBindings(): List<Binding> {
     }
 
     return list
+}
+
+/**
+ * ينشئ نقاط الربط داخل نظام الملفات قبل تشغيل proot (4.2.0).
+ *
+ * كان `-b /storage:/storage` يفشل بصمت إذا لم يكن `/storage` موجودًا **داخل** صورة
+ * أوبنتو، فيرى المستخدم أن الطرفية «لا ترى» ملفات الهاتف إلا ما كان في مجلدها الخاص.
+ * إنشاء نقاط الربط مسبقًا يجعل **كل مسار خارجي** (بما فيه /sdcard و/mnt و/media)
+ * متاحًا داخل الطرفية من أول تشغيل، وهذا ما يجعل تشغيل السكربتات ممكنًا من أي مكان
+ * في ملفات الهاتف لا من Download فقط.
+ */
+private fun ensureMountPoints(root: File, bindings: List<Binding>) {
+    bindings.forEach { binding ->
+        val inside = binding.inside ?: binding.outside
+        val target = File(root, inside.removePrefix("/"))
+        runCatching {
+            if (File(binding.outside).isDirectory) {
+                if (!target.exists()) target.mkdirs()
+            } else {
+                // ملف مفرد (مثل ld.config.txt) — ننشئ أباه وملفًا فارغًا
+                target.parentFile?.mkdirs()
+                if (!target.exists()) target.createNewFile()
+            }
+        }.onFailure { logError(it, "mount point $inside") }
+    }
 }
 
 suspend fun ubuntuProcess(
@@ -102,7 +132,9 @@ suspend fun ubuntuProcess(
                     add(workingDir)
                 }
 
-                getDefaultBindings().attachTo(this, excludeMounts)
+                val activeBindings = getDefaultBindings().filterNot { it.outside in excludeMounts }
+                ensureMountPoints(root, activeBindings)
+                activeBindings.attachTo(this)
 
                 bind(tmpDir.absolutePath)
 

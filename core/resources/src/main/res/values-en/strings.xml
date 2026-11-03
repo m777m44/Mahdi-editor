@@ -1095,4 +1095,27 @@ Thank you for using Mahdi-Editor.</string>
     <string name="encoding_reopened">Reopened with %1$s</string>
     <string name="encoding_fallback_saved">%1$s cannot represent some characters — saved as %2$s</string>
     <string name="readonly_saving_as">File is read-only — choose a new location to save</string>
+    <string name="languages_hub">Languages</string>
+    <string name="languages_hub_desc">Everything language-related in one place: UI language, plus install/remove programming languages with ✖️.</string>
+    <string name="app_language_section">App language</string>
+    <string name="programming_languages">Programming languages</string>
+    <string name="languages_hub_stats">Available: %1$d · bundled: %2$d · installed by you: %3$d</string>
+    <string name="app_icon_desc_v2">%1$d built-in icons: 14 symbols × 9 palettes. Pick one and your launcher icon changes instantly — no reinstall.</string>
+    <string name="app_icon_search">Search by name or color</string>
+    <string name="app_icon_all">All</string>
+    <string name="app_icon_empty">No icon matches your search</string>
+    <string name="unreadable_file">This file could not be read from its provider. Try copying it to a folder on the device, then run it.</string>
+    <string name="all_files_access">Access all phone files</string>
+    <string name="all_files_access_on">Enabled: the terminal can read and run files from any folder on the device.</string>
+    <string name="all_files_access_off">Disabled: the terminal only sees its own folders. Enable it to run scripts from anywhere.</string>
+    <string name="all_files_access_open">Open settings</string>
+    <string name="icon_packs_desc">%1$d pack(s) available. Bundled packs work offline and apply instantly to the file tree and tabs.</string>
+    <string name="icon_pack_builtin">Built-in icons</string>
+    <string name="icon_pack_builtin_desc">The editor built-in symbols — no external pack</string>
+    <string name="icon_pack_applied">Icon pack applied</string>
+    <string name="icon_pack_reset">Built-in icons restored</string>
+    <string name="icon_pack_restored">Bundled packs restored</string>
+    <string name="icon_packs_empty">No icon packs installed</string>
+    <string name="icon_packs_restore">Restore bundled packs</string>
+    <string name="icon_packs_entry_desc">File-tree icon packs — 3 bundled packs, ready offline</string>
 </resources>

@@ -11,6 +11,7 @@ import com.mahdi.lsp.LspRegistry
 import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.SettingsScreen
 import com.mahdi.settings.app.SettingsAppScreen
+import com.mahdi.settings.app.IconPackScreen
 import com.mahdi.settings.debugOptions.AppLogs
 import com.mahdi.settings.debugOptions.DeveloperOptions
 import com.mahdi.settings.editor.AppFontScreen
@@ -25,6 +26,7 @@ import com.mahdi.settings.editor.SettingsEditorScreen
 import com.mahdi.settings.keybinds.KeybindingsScreen
 import com.mahdi.settings.guide.GuideScreen
 import com.mahdi.settings.language.LanguageScreen
+import com.mahdi.settings.language.LanguagesHub
 import com.mahdi.settings.language.SupportedLanguages
 import com.mahdi.settings.lsp.LspInitializationOptions
 import com.mahdi.settings.lsp.LspServerDetail
@@ -50,6 +52,7 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
         composable(SettingsRoutes.EditorFontScreen.route) { EditorFontScreen() }
         composable(SettingsRoutes.AppFontScreen.route) { AppFontScreen() }
         composable(SettingsRoutes.AppIcon.route) { com.mahdi.settings.app.AppIconScreen() }
+        composable(SettingsRoutes.IconPacks.route) { IconPackScreen() }
 
         composable(SettingsRoutes.DefaultEncoding.route) { DefaultEncoding() }
         composable(SettingsRoutes.DefaultLineEnding.route) { DefaultLineEnding() }
@@ -65,6 +68,7 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
         composable(SettingsRoutes.DeveloperOptions.route) { DeveloperOptions(navController = navController) }
         composable(SettingsRoutes.AppLogs.route) { AppLogs() }
         composable(SettingsRoutes.LanguageScreen.route) { LanguageScreen() }
+        composable(SettingsRoutes.Languages.route) { LanguagesHub() }
         composable(SettingsRoutes.Formatters.route) { FormatterSettings(navController) }
         composable(SettingsRoutes.LspSettings.route) { LspSettings(navController) }
         composable(

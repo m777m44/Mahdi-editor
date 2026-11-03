@@ -50,21 +50,81 @@ object UniversalRunner : FileRunner() {
         // مثبّت بايثون الذكي + المخزن الدائم (يعمل حتى قبل إنشاء جلسة طرفية جديدة)
         setupPythonFile("mahdi_pip")
 
+        // 4.2.0: أي ملف من أي مكان — بما فيه مستندات فُتحت من تطبيق آخر (content://)
         if (fileObject !is FileWrapper) {
-            dialogRes(title = strings.attention.getString(), msg = strings.non_native_filetype.getString(), onOk = {})
+            launchFromAnywhere(activity, fileObject)
             return
         }
 
         val path = fileObject.getAbsolutePath()
-        if (isOnExternalStorage(path)) {
-            // ملفات /sdcard للقراءة فقط على أندرويد الحديث (Media is read-only)،
-            // لذلك ننسخ السكربت إلى المجلد الرئيسي للطرفية ونشغّله من هناك.
-            // التشغيل يبدأ فورًا بلا أي رسالة موافقة: زرّ ▶️ يشغّل السكربت مباشرة.
+        if (isOnExternalStorage(path) && !hasAllFilesAccess()) {
+            // بلا إذن «كل الملفات» يكون /sdcard للقراءة فقط، فننسخ السكربت إلى مجلد
+            // الطرفية القابل للكتابة. أما ومع الإذن فنشغّله في مكانه ليصل إلى
+            // ملفاته المجاورة (imports، بيانات، مجلدات مشروع) بلا نسخ ولا فقدان.
             launchFromSandboxHome(activity, fileObject)
             return
         }
 
         launchUniversalRunner(activity, fileObject)
+    }
+
+    /**
+     * هل يملك التطبيق إذن «الوصول لكل الملفات»؟
+     *
+     * بدونه تظهر /sdcard داخل الطرفية فارغة أو للقراءة فقط على أندرويد 11+، وهذا
+     * السبب الحقيقي لقصر التشغيل على مجلد Download أو على مجلد التطبيق.
+     */
+    private fun hasAllFilesAccess(): Boolean =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            runCatching { android.os.Environment.isExternalStorageManager() }.getOrDefault(false)
+        } else {
+            true
+        }
+
+    /**
+     * تشغيل مستند ليس ملفًا مباشرًا (‏content:// من أي مزوّد: التنزيلات، Drive،
+     * مدير ملفات آخر…). ننسخ بايتاته إلى `/home/mahdi-run` داخل الطرفية ثم نشغّله
+     * هناك — فيعمل من **أي مكان في ملفات الهاتف** لا من Download وحده.
+     */
+    private suspend fun launchFromAnywhere(activity: Activity, fileObject: FileObject) {
+        val name = sanitizeName(fileObject.getName())
+        val runDir = sandboxHomeDir().child("mahdi-run").also { it.mkdirs() }
+        val target = File(runDir, name)
+
+        val copied =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    fileObject.getInputStream().use { input ->
+                        target.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    target.exists() && target.length() > 0
+                }.getOrDefault(false)
+            }
+
+        if (!copied) {
+            dialogRes(title = strings.attention.getString(), msg = strings.unreadable_file.getString(), onOk = {})
+            return
+        }
+
+        launchTerminal(
+            activity = activity,
+            terminalCommand =
+                TerminalCommand(
+                    sandbox = true,
+                    exe = "/bin/bash",
+                    args = arrayOf(localBinDir().child("universal_runner").absolutePath, "/home/mahdi-run/$name"),
+                    id = strings.universal_runner.getString(),
+                    terminatePreviousSession = true,
+                    workingDir = "/home/mahdi-run",
+                ),
+        )
+    }
+
+    /** يمنع أسماء فيها مسارات أو أحرف غريبة عند النسخ إلى مجلد التشغيل. */
+    private fun sanitizeName(name: String): String {
+        val base = name.substringAfterLast('/').substringAfterLast('\\')
+        val cleaned = base.replace(Regex("[^A-Za-z0-9._-]"), "_").trim('_', '.')
+        return if (cleaned.isBlank()) "mahdi_script" else cleaned
     }
 
     /** هل المسار على التخزين الخارجي (‏/sdcard أو /storage)؟ */

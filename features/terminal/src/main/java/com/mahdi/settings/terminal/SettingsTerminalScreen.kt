@@ -71,6 +71,45 @@ fun SettingsTerminalScreen(overrideNavController: NavController? = null) {
         val context = LocalContext.current
         val activity = LocalActivity.current as? AppCompatActivity
 
+        // 4.2.0: حالة الوصول إلى ملفات الهاتف — سبب «التشغيل من Download فقط» سابقًا.
+        // تُقرأ من النظام وتُحدَّث عند العودة من شاشة الإذن (ON_RESUME) فلا تبقى قديمة.
+        var allFilesAccess by remember { mutableStateOf(readAllFilesAccess()) }
+        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+            val observer =
+                androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                        allFilesAccess = readAllFilesAccess()
+                    }
+                }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+
+        PreferenceGroup(heading = stringResource(strings.all_files_access)) {
+            SettingsItem(
+                label = stringResource(strings.all_files_access),
+                description =
+                    stringResource(
+                        if (allFilesAccess) strings.all_files_access_on else strings.all_files_access_off,
+                    ),
+                showSwitch = false,
+                default = false,
+                sideEffect = {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(
+                                    android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    android.net.Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        }
+                    }
+                },
+            )
+        }
+
         PreferenceGroup(heading = stringResource(strings.advanced)) {
             if (FeatureRegistry.isEnabled("debug_mode")) {
                 SettingsItem(
@@ -362,3 +401,11 @@ fun SettingsTerminalScreen(overrideNavController: NavController? = null) {
         }
     }
 }
+
+/** هل يملك التطبيق إذن «كل الملفات»؟ (أندرويد 11+ فقط؛ وقبله يكفي إذن التخزين.) */
+private fun readAllFilesAccess(): Boolean =
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        runCatching { android.os.Environment.isExternalStorageManager() }.getOrDefault(false)
+    } else {
+        true
+    }

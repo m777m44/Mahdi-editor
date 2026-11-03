@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_bg_sky">#0B1E33</color>
+    <color name="ic_bg_amber">#1C1408</color>
+    <color name="ic_bg_mint">#06241D</color>
+    <color name="ic_bg_violet">#1B1030</color>
+    <color name="ic_bg_rose">#2A0B18</color>
+    <color name="ic_bg_slate">#101620</color>
+    <color name="ic_bg_cyan">#04202B</color>
+    <color name="ic_bg_lime">#101A05</color>
+    <color name="ic_bg_magenta">#26062B</color>
+</resources>

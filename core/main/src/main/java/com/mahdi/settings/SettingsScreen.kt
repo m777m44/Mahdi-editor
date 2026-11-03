@@ -52,18 +52,19 @@ private fun Categories(navController: NavController) {
         onNavigate = { navController.navigate(SettingsRoutes.EditorSettings.route) },
     )
 
+    // 4.2.0: كل ما يخصّ اللغة (لغة الواجهة + لغات البرمجة) في بوابة واحدة
+    PreferenceCategory(
+        label = stringResource(strings.languages_hub),
+        description = stringResource(strings.languages_hub_desc),
+        iconResource = drawables.text,
+        onNavigate = { navController.navigate(SettingsRoutes.Languages.route) },
+    )
+
     PreferenceCategory(
         label = stringResource(strings.keybindings),
         description = stringResource(strings.keybindings_desc),
         iconResource = drawables.keyboard,
         onNavigate = { navController.navigate(SettingsRoutes.Keybindings.route) },
-    )
-
-    PreferenceCategory(
-        label = stringResource(strings.guide_title),
-        description = stringResource(strings.guide_desc),
-        iconResource = drawables.info,
-        onNavigate = { navController.navigate(SettingsRoutes.Guide.route) },
     )
 
     SettingsRegistry.categories.value.forEach { category ->
@@ -90,6 +91,15 @@ private fun Categories(navController: NavController) {
             onNavigate = { navController.navigate(SettingsRoutes.DeveloperOptions.route) },
         )
     }
+
+    // 4.2.0: «دليل النظام» صار آخر عنصر في الإعدادات بالضبط — بعد كل التصنيفات
+    // والمفاتيح التي تضيفها الإضافات، فلا يزاحم الاستخدام اليومي.
+    PreferenceCategory(
+        label = stringResource(strings.guide_title),
+        description = stringResource(strings.guide_desc),
+        iconResource = drawables.info,
+        onNavigate = { navController.navigate(SettingsRoutes.Guide.route) },
+    )
 
     // سطر الحقوق فقط — أُزيلت صفحات «حول» و«الدعم» بطلب من صاحب التطبيق
     Text(
