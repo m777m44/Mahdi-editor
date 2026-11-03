@@ -201,7 +201,9 @@ object AppIconSwitcher {
         val chosen = icons.firstOrNull { it.id == id } ?: return false
         val pm = context.packageManager
         val packageName = context.packageName
-        val previousId = prefs(context).getString(KEY_CURRENT, null)
+        // عند أول تبديل لا يوجد معرّف محفوظ، والمعلَن افتراضيًا هو IconCodeSky المفعّل
+        // في البيان — نعتبره «السابق» وإلا بقيت أيقونتان على الشاشة الرئيسية.
+        val previousId = prefs(context).getString(KEY_CURRENT, null) ?: DEFAULT_ICON_ID
         var ok = true
 
         fun setState(icon: AppIcon, enabled: Boolean) {
