@@ -19,6 +19,8 @@ sealed class SettingsRoutes(val route: String) {
 
     data object AppFontScreen : SettingsRoutes("app_font_screen")
 
+    data object AppIcon : SettingsRoutes("app_icon")
+
     data object TerminalFontScreen : SettingsRoutes("terminal_font_screen")
 
     data object DefaultEncoding : SettingsRoutes("default_encoding")
@@ -66,8 +68,6 @@ sealed class SettingsRoutes(val route: String) {
     data object LspServerLogs : SettingsRoutes("lsp_server_logs")
 
     data object Git : SettingsRoutes("git")
-
-    data object PackageStudio : SettingsRoutes("package_studio")
 
     data object Guide : SettingsRoutes("guide")
 

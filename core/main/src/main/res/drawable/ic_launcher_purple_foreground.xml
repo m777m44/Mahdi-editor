@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- أيقونة purple: braces بلون التمييز -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M44,32L38,32Q32,32 32,38L32,48Q32,54 26,54Q32,54 32,60L32,70Q32,76 38,76L44,76"
+        android:strokeColor="#C084FC"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="5" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M64,32L70,32Q76,32 76,38L76,48Q76,54 82,54Q76,54 76,60L76,70Q76,76 70,76L64,76"
+        android:strokeColor="#C084FC"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="5" />
+</vector>

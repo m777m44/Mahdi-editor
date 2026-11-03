@@ -5,7 +5,9 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,6 +77,7 @@ import com.mahdi.resources.drawables
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.theme.Typography
+import com.mahdi.theme.SkyAccent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -236,15 +242,6 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
             }
         }
 
-    val sortedThemes by
-        remember(localThemes, storeThemes) {
-            derivedStateOf {
-                val all = themeManager.getSyncedThemes()
-                val filtered = applyGenericFilter(searchQuery, all)
-                filtered.sortedBy { it.name }
-            }
-        }
-
     val sortedIconPacks by
         remember(localIconPacks, storeIconPacks) {
             derivedStateOf {
@@ -365,17 +362,10 @@ fun StoreScreen(navController: NavController, query: String?, category: String? 
                     noPkgRes = strings.no_ext,
                 )
             }
+            // 4.0.0: الثيمات انتقلت إلى «الإعدادات ‹ الثيمات» — هنا بطاقة تحويل فقط،
+            // فلا يوجد مكانان مختلفان لتثبيت الثيم وحذفه.
             StoreCategory.THEMES -> {
-                item { ThemesHeaderCard() }
-                item { FeaturedThemesSection(query = searchQuery.text.toString(), navController = navController) }
-                packageList(
-                    packages = sortedThemes,
-                    isIndexing = isIndexing,
-                    isFetching = isFetching,
-                    navController = navController,
-                    dialogManager = dialogManager,
-                    noPkgRes = strings.no_themes,
-                )
+                item { ThemesMovedCard(navController = navController) }
             }
             StoreCategory.ICON_PACKS -> {
                 packageList(
@@ -625,6 +615,51 @@ private fun applyGenericFilter(
             val authorMatch = pkg.author.displayName.contains(query, ignoreCase = true)
             val authorGithubMatch = pkg.author.github?.contains(query, ignoreCase = true) == true
             labelMatch || descriptionMatch || tagMatch || authorMatch || authorGithubMatch
+        }
+    }
+}
+
+/**
+ * بطاقة تحويل داخل تبويب الثيمات في المتجر (4.0.0).
+ *
+ * الثيمات كلها (الأساسية، المثبّتة، والمتاحة) صارت في مكان واحد:
+ * **الإعدادات ‹ الثيمات**، مع زرّ تثبيت وحذف بتأكيد. هذه البطاقة تمنع أن يبحث
+ * المستخدم عن الثيمات في تبويب فارغ.
+ */
+@Composable
+private fun ThemesMovedCard(navController: NavController) {
+    val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SkyAccent.copy(alpha = 0.12f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(text = "🎨", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = if (isArabic) "الثيمات صارت في الإعدادات" else "Themes moved to Settings",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text =
+                    if (isArabic) {
+                        "كل الثيمات — الأساسية والمثبّتة والمتاحة — في «الإعدادات ‹ الثيمات»: " +
+                            "تثبيت بضغطة، وحذف بزرّ X مع تأكيد."
+                    } else {
+                        "All themes — base, installed and available — now live in Settings › Themes: " +
+                            "one-tap install and an X with confirmation to remove."
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            TextButton(onClick = { navController.navigate(SettingsRoutes.Themes.route) }) {
+                Text(text = if (isArabic) "فتح الثيمات" else "Open themes", color = SkyAccent)
+            }
         }
     }
 }

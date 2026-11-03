@@ -49,6 +49,7 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
 
         composable(SettingsRoutes.EditorFontScreen.route) { EditorFontScreen() }
         composable(SettingsRoutes.AppFontScreen.route) { AppFontScreen() }
+        composable(SettingsRoutes.AppIcon.route) { com.mahdi.settings.app.AppIconScreen() }
 
         composable(SettingsRoutes.DefaultEncoding.route) { DefaultEncoding() }
         composable(SettingsRoutes.DefaultLineEnding.route) { DefaultLineEnding() }

@@ -53,7 +53,6 @@ import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.search.EditorSearchPanel
 import com.mahdi.search.FindingsDialog
-import com.mahdi.motivation.Motivation
 import com.mahdi.settings.Settings
 import com.mahdi.settings.editor.refreshEditorSettings
 import com.mahdi.tabs.base.Tab
@@ -449,8 +448,6 @@ open class EditorTab(
         Events.publish(EditorTabEvent.Saved(this, file, false))
 
         Settings.saves += 1
-        // تحفيز: سلسلة الأيام + الهدف اليومي + الإنجازات (2.5.0)
-        runCatching { Motivation.onSave(editorState.editor.get()?.text?.lineCount ?: 0) }
     }
 
     @MahdiExtensionPoint

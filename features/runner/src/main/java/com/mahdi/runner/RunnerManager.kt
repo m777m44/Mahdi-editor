@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateListOf
 import com.mahdi.DefaultScope
 import com.mahdi.events.Events
 import com.mahdi.extension.api.MahdiExtensionPoint
-import com.mahdi.motivation.Motivation as Motiv
 import com.mahdi.file.FileObject
 import com.mahdi.icons.Icon
 import com.mahdi.runner.runners.MahdiProjectRunner
@@ -102,7 +101,6 @@ object RunnerManager {
                     runner.run(activity, projectRoot)
                 }
                 Settings.runs += 1
-                runCatching { Motiv.onRun() }
                 Events.publish(RunnerEvent.RunnerRun(runner))
             }
         } else {
@@ -121,7 +119,6 @@ object RunnerManager {
                                 runner.run(activity, projectRoot)
                             }
                             Settings.runs += 1
-                            runCatching { Motiv.onRun() }
                             Events.publish(RunnerEvent.RunnerRun(runner))
                         }
                     }

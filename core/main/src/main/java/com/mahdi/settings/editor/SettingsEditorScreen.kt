@@ -61,12 +61,6 @@ fun SettingsEditorScreen(navController: NavController) {
         }
 
         PreferenceGroup(heading = stringResource(strings.formatting)) {
-            NextScreenCard(
-                label = stringResource(strings.manage_formatters),
-                description = stringResource(strings.manage_formatters_desc),
-                onClick = { navController.navigate(SettingsRoutes.Formatters.route) },
-            )
-
             EditorSettingsItem(
                 label = stringResource(strings.format_on_save),
                 description = stringResource(strings.format_on_save_desc),

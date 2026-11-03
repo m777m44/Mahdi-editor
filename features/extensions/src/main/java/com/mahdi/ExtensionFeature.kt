@@ -37,7 +37,6 @@ import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.extension.ExtensionSettings
 import com.mahdi.settings.extension.BuiltinExtensionsScreen
 import com.mahdi.settings.extension.BuiltinToolScreen
-import com.mahdi.settings.extension.PackageStudioScreen
 import com.mahdi.settings.extension.RuntimesScreen
 import com.mahdi.settings.extension.PackageDetail
 import com.mahdi.settings.extension.StoreScreen
@@ -60,7 +59,6 @@ class ExtensionFeature : Feature {
     private var intentHandler: IntentHandler? = null
     private var dialogProvider: DialogProvider? = null
     private var settingsCategory: SettingsCategory? = null
-    private var studioCategory: SettingsCategory? = null
     private var runtimesCategory: SettingsCategory? = null
     private var bundledCategory: SettingsCategory? = null
     private val routes = mutableListOf<DynamicRoute>()
@@ -135,16 +133,6 @@ class ExtensionFeature : Feature {
                 )
                 .also { SettingsRegistry.registerCategory(it) }
 
-        // 2.8.0: «استوديو الحزم» — توليد القوالب وفحص الحزم واستيراد الثيمات القياسية
-        studioCategory =
-            SettingsCategory(
-                    label = strings.package_studio.getString(),
-                    description = strings.package_studio_desc.getString(),
-                    icon = Icon.ResourceIcon(drawables.widgets),
-                    route = SettingsRoutes.PackageStudio.route,
-                )
-                .also { SettingsRegistry.registerCategory(it) }
-
         // 3.0.0: «بيئات التشغيل» — حالة تثبيت حقيقية لكل مفسّر/مشغّل
         runtimesCategory =
             SettingsCategory(
@@ -166,9 +154,6 @@ class ExtensionFeature : Feature {
                 .also { SettingsRegistry.registerCategory(it) }
 
         // Register settings routes
-        routes.add(
-            DynamicRoute(SettingsRoutes.PackageStudio.route) { _, _ -> PackageStudioScreen() }
-        )
         routes.add(
             DynamicRoute(SettingsRoutes.Runtimes.route) { _, _ -> RuntimesScreen() }
         )
@@ -246,7 +231,6 @@ class ExtensionFeature : Feature {
         intentHandler?.let { IntentHandleRegistry.unregister(it) }
         dialogProvider?.let { DialogRegistry.unregister(it) }
         settingsCategory?.let { SettingsRegistry.unregisterCategory(it) }
-        studioCategory?.let { SettingsRegistry.unregisterCategory(it) }
         runtimesCategory?.let { SettingsRegistry.unregisterCategory(it) }
         bundledCategory?.let { SettingsRegistry.unregisterCategory(it) }
         runCatching { CommandProvider.commandList.value.filterIsInstance<StoreCommand>().forEach { CommandProvider.unregisterCommand(it) } }
