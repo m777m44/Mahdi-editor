@@ -602,7 +602,7 @@ object BuiltinTools {
 
     private val extraGeneratorTool =
         BuiltinTool(
-            id = "generate2",
+            id = "gen_extra",
             emoji = "✨",
             nameAr = "مولّدات إضافية",
             nameEn = "More generators",
@@ -635,7 +635,7 @@ object BuiltinTools {
 
     private val compareTool =
         BuiltinTool(
-            id = "compare2",
+            id = "similarity",
             emoji = "🔀",
             nameAr = "التشابه والفرق",
             nameEn = "Similarity",

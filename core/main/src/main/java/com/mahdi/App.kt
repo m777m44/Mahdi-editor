@@ -89,6 +89,8 @@ open class App : Application() {
         FileIconProvider.register()
 
         CommandProvider.buildCommands()
+        // 4.2.0: إضافات النظام (11 قدرة + 24 أداة = 35) تُسجَّل في لوحة الأوامر منذ الإقلاع
+        runCatching { com.mahdi.ext.BuiltinExtensions.registerCommands() }
         KeybindingsManager.loadKeybindings()
         // 4.1.0: زرّ «الترميز» في شريط المحرّر (ترحيل لمرّة واحدة لمن لم يعدّل شريطه)
         runCatching { ToolbarConfiguration.migrateEncodingCommand() }
@@ -110,6 +112,8 @@ open class App : Application() {
 
         GlobalScope.launch(Dispatchers.IO) {
             launch(Dispatchers.IO) {
+                // 4.2.0: نسخ حزم الأيقونات المضمّنة (خطّي/ثنائي/نيون) قبل فهرستها
+                runCatching { com.mahdi.icons.pack.BundledIconPacks.ensureInstalled(this@App) }
                 iconPackManager.indexLocalPacks()
                 // 2.5.0: أُزيلت «الألوان الديناميكية» (Monet) — نُبطلها دائمًا حتى تبقى الثيمات الأربعة فقط
                 if (Settings.monet) Settings.monet = false

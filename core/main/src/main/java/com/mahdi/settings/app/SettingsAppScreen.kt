@@ -50,22 +50,7 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
         val gson = remember { GsonBuilder().setPrettyPrinting().create() }
 
         PreferenceGroup {
-            SettingsItem(
-                label = stringResource(strings.lang),
-                description = stringResource(strings.lang_desc),
-                showSwitch = false,
-                default = false,
-                endWidget = {
-                    Icon(
-                        modifier = Modifier.padding(16.dp),
-                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = null,
-                    )
-                },
-                sideEffect = { navController.navigate(SettingsRoutes.LanguageScreen.route) },
-            )
-
-            // 4.0.0: أيقونة التطبيق — 22 أيقونة مدمجة + صورة من المعرض
+            // 4.2.0: أيقونة التطبيق — أكثر من 100 أيقونة مدمجة (أُزيل اختيار صورة من المعرض)
             SettingsItem(
                 label = stringResource(strings.app_icon_title),
                 description = stringResource(strings.app_icon_desc),
@@ -81,9 +66,10 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
                 sideEffect = { navController.navigate(SettingsRoutes.AppIcon.route) },
             )
 
+            // 4.2.0: حزم الأيقونات المضمّنة (خطّي/ثنائي/نيون) — 111 أيقونة لكل حزمة
             SettingsItem(
-                label = stringResource(strings.languages_supported),
-                description = stringResource(strings.languages_supported_desc),
+                label = stringResource(strings.icon_packs),
+                description = stringResource(strings.icon_packs_entry_desc),
                 showSwitch = false,
                 default = false,
                 endWidget = {
@@ -93,7 +79,7 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
                         contentDescription = null,
                     )
                 },
-                sideEffect = { navController.navigate(SettingsRoutes.SupportedLanguages.route) },
+                sideEffect = { navController.navigate(SettingsRoutes.IconPacks.route) },
             )
 
             SettingsItem(

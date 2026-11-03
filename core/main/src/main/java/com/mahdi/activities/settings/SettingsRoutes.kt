@@ -47,6 +47,9 @@ sealed class SettingsRoutes(val route: String) {
 
     data object LanguageScreen : SettingsRoutes("language")
 
+    /** 4.2.0: بوابة واحدة لكل ما يخصّ اللغة (لغة الواجهة + لغات البرمجة). */
+    data object Languages : SettingsRoutes("languages")
+
     data object SupportedLanguages : SettingsRoutes("supported_languages")
 
     data object Runners : SettingsRoutes("runners")
@@ -54,6 +57,9 @@ sealed class SettingsRoutes(val route: String) {
     data object HtmlRunner : SettingsRoutes("html_preview")
 
     data object Themes : SettingsRoutes("theme")
+
+    /** 4.2.0: حزم الأيقونات المضمّنة (خطّي/ثنائي/نيون). */
+    data object IconPacks : SettingsRoutes("icon_packs")
 
     data object ThemeDetail : SettingsRoutes("theme_detail")
 

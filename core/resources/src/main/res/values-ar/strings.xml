@@ -1123,4 +1123,27 @@
     <string name="encoding_reopened">أُعيد فتح الملف بترميز %1$s</string>
     <string name="encoding_fallback_saved">الترميز %1$s لا يمثّل بعض الأحرف — حُفظ الملف بـ %2$s</string>
     <string name="readonly_saving_as">الملف للقراءة فقط — اختر مكانًا جديدًا للحفظ</string>
+    <string name="languages_hub">اللغات</string>
+    <string name="languages_hub_desc">كل ما يخصّ اللغة في مكان واحد: لغة الواجهة، وتثبيت لغات البرمجة أو حذفها بـ ✖️.</string>
+    <string name="app_language_section">لغة الواجهة</string>
+    <string name="programming_languages">لغات البرمجة</string>
+    <string name="languages_hub_stats">المتوفّر: %1$d · مثبّت مسبقًا: %2$d · مثبّت بواسطتك: %3$d</string>
+    <string name="app_icon_desc_v2">%1$d أيقونة مدمجة: 14 رمزًا × 9 لوحات ألوان. اختر أيقونتك وستتغيّر على الشاشة الرئيسية فورًا بلا إعادة تثبيت.</string>
+    <string name="app_icon_search">ابحث باسم الأيقونة أو لونها</string>
+    <string name="app_icon_all">الكل</string>
+    <string name="app_icon_empty">لا توجد أيقونة تطابق البحث</string>
+    <string name="unreadable_file">تعذّر قراءة هذا الملف من مزوّده. جرّب نسخه إلى مجلد على الجهاز ثم تشغيله.</string>
+    <string name="all_files_access">الوصول إلى كل ملفات الهاتف</string>
+    <string name="all_files_access_on">مفعّل: تستطيع الطرفية قراءة وتشغيل الملفات من أي مجلد في الهاتف.</string>
+    <string name="all_files_access_off">غير مفعّل: الطرفية ترى مجلداتها فقط. فعّله لتشغيل السكربتات من أي مكان.</string>
+    <string name="all_files_access_open">فتح الإعداد</string>
+    <string name="icon_packs_desc">%1$d حزمة متاحة. الحزم المضمّنة تعمل بلا إنترنت، والاختيار يُطبَّق فورًا على شجرة الملفات والتبويبات.</string>
+    <string name="icon_pack_builtin">أيقونات النظام</string>
+    <string name="icon_pack_builtin_desc">الرموز المدمجة في المحرّر — بلا حزمة خارجية</string>
+    <string name="icon_pack_applied">تم تطبيق حزمة الأيقونات</string>
+    <string name="icon_pack_reset">أُعيدت أيقونات النظام</string>
+    <string name="icon_pack_restored">أُعيد نسخ الحزم المضمّنة</string>
+    <string name="icon_packs_empty">لا توجد حزم أيقونات مثبّتة</string>
+    <string name="icon_packs_restore">إعادة نسخ الحزم المضمّنة</string>
+    <string name="icon_packs_entry_desc">حزم أيقونات لشجرة الملفات — 3 حزم مضمّنة جاهزة بلا إنترنت</string>
 </resources>
