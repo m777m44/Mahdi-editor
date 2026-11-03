@@ -1089,4 +1089,10 @@ Thank you for using Mahdi-Editor.</string>
     <string name="custom_icon_removed">Picture icon removed</string>
     <string name="custom_icon_shortcut_label">Mahdi · my icon</string>
     <string name="app_icon_changed">Icon changed</string>
+    <string name="encoding_menu">Encoding</string>
+    <string name="encoding_menu_desc">Reopen the file with another encoding — also used when saving this file</string>
+    <string name="encoding_current">Current</string>
+    <string name="encoding_reopened">Reopened with %1$s</string>
+    <string name="encoding_fallback_saved">%1$s cannot represent some characters — saved as %2$s</string>
+    <string name="readonly_saving_as">File is read-only — choose a new location to save</string>
 </resources>

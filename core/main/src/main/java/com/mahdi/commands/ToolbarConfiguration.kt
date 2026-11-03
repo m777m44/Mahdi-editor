@@ -8,8 +8,34 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 object ToolbarConfiguration {
-    const val DEFAULT_EDITOR_TOOLBAR_COMMANDS =
+    /**
+     * الشريط الافتراضي قبل 4.1.0 — يبقى محفوظًا للترحيل فقط، حتى لا نلمس شريطًا
+     * عدّله المستخدم بنفسه.
+     */
+    const val LEGACY_DEFAULT_EDITOR_TOOLBAR_COMMANDS =
         "editor.undo|editor.redo|editor.save|editor.run|global.new_file|editor.editable|editor.search|editor.refresh|global.terminal|global.settings"
+
+    /**
+     * 4.1.0: أُضيف `editor.encoding` — قائمة الترميز صارت في متناول اليد من الشريط
+     * (أو من قائمة «المزيد» حين يضيق المكان) بدل أن تبقى مدفونة في الإعدادات العامة.
+     */
+    const val DEFAULT_EDITOR_TOOLBAR_COMMANDS =
+        "editor.undo|editor.redo|editor.save|editor.run|global.new_file|editor.editable|editor.search|editor.encoding|editor.refresh|global.terminal|global.settings"
+
+    /**
+     * ترحيل لمرّة واحدة: من كان على الشريط الافتراضي القديم بلا تعديل يحصل على زرّ
+     * «الترميز»، ومن عدّل شريطه يبقى كما هو تمامًا.
+     */
+    fun migrateEncodingCommand() {
+        val current = Settings.action_items
+        if (current.contains("editor.encoding")) return
+        if (current != LEGACY_DEFAULT_EDITOR_TOOLBAR_COMMANDS) return
+        Settings.action_items =
+            current.split("|").toMutableList().apply {
+                val index = indexOf("editor.refresh")
+                if (index >= 0) add(index, "editor.encoding") else add("editor.encoding")
+            }.joinToString("|")
+    }
 
     val editorCommands: List<Command>
         get() = Settings.action_items.split("|").mapNotNull { CommandProvider.getForId(it) }

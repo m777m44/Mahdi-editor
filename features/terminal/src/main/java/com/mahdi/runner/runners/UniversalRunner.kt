@@ -140,6 +140,8 @@ object UniversalRunner : FileRunner() {
             "pyw", "mjs", "cjs", "tsx", "cc", "cxx", "kts", "htm", "xhtml",
             "zsh", "fish", "svg", "yml", "markdown", "s", "cmd", "cfg", "conf",
             "patch", "log", "f90", "f95", "f03", "f08", "awk", "fsx", "fs", "elm",
+            // 4.1.0: حِزَم وسكربتات إضافية يدعمها المشغّل الشامل الآن
+            "pyz", "zipapp", "jar", "cgi",
         )
 
     /**

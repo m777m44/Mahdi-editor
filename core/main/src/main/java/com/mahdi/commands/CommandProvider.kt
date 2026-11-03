@@ -3,6 +3,7 @@ package com.mahdi.commands
 import com.mahdi.commands.editor.CopyCommand
 import com.mahdi.commands.editor.CutCommand
 import com.mahdi.commands.editor.DuplicateLineCommand
+import com.mahdi.commands.editor.EncodingCommand
 import com.mahdi.commands.editor.EmulateKeyCommand
 import com.mahdi.commands.editor.JumpToLineCommand
 import com.mahdi.commands.editor.LowerCaseCommand
@@ -75,6 +76,7 @@ object CommandProvider {
     lateinit var RefreshCommand: RefreshCommand
     lateinit var SyntaxHighlightingCommand: SyntaxHighlightingCommand
     lateinit var ToggleWordWrapCommand: ToggleWordWrapCommand
+    lateinit var EncodingCommand: EncodingCommand
     lateinit var JumpToLineCommand: JumpToLineCommand
     lateinit var SortLinesAscendingCommand: SortLinesAscendingCommand
     lateinit var SortLinesDescendingCommand: SortLinesDescendingCommand
@@ -115,6 +117,7 @@ object CommandProvider {
             registerBuiltin(RefreshCommand()) { RefreshCommand = it }
             registerBuiltin(SyntaxHighlightingCommand()) { SyntaxHighlightingCommand = it }
             registerBuiltin(ToggleWordWrapCommand()) { ToggleWordWrapCommand = it }
+            registerBuiltin(EncodingCommand()) { EncodingCommand = it }
             registerBuiltin(JumpToLineCommand()) { JumpToLineCommand = it }
             registerBuiltin(SortLinesAscendingCommand()) { SortLinesAscendingCommand = it }
             registerBuiltin(SortLinesDescendingCommand()) { SortLinesDescendingCommand = it }

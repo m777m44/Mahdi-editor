@@ -9,6 +9,7 @@ import androidx.core.os.LocaleListCompat
 import com.github.anrwatchdog.ANRWatchDog
 import com.mahdi.activities.main.session.SessionManager
 import com.mahdi.commands.CommandProvider
+import com.mahdi.commands.ToolbarConfiguration
 import com.mahdi.commands.KeybindingsManager
 import com.mahdi.crashhandler.CrashHandler
 import com.mahdi.editor.CodeHighlighter
@@ -89,6 +90,8 @@ open class App : Application() {
 
         CommandProvider.buildCommands()
         KeybindingsManager.loadKeybindings()
+        // 4.1.0: زرّ «الترميز» في شريط المحرّر (ترحيل لمرّة واحدة لمن لم يعدّل شريطه)
+        runCatching { ToolbarConfiguration.migrateEncodingCommand() }
 
         // ثيمات المستخدم المخصّصة (Color Wheel) تُدمج في القائمة قبل بناء الواجهة
         themeManager.registerCustomThemes()

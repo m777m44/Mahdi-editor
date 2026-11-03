@@ -149,11 +149,31 @@ class UriWrapper : FileObject {
         }
     }
 
+    /**
+     * يفتح مسار كتابة للمستند (4.1.0).
+     *
+     * أندرويد 11+ يمنح إذن قراءة فقط لمستندات كثيرة (من تطبيق آخر، أو داخل
+     * `/Android/data`)، فيرمي المزوّد `IllegalArgumentException: Media is read-only`.
+     * هنا نلتقط كل أشكال هذا الرفض ونحوّلها إلى [ReadOnlyFileException] واضح،
+     * ليعرف المحرّر أن الحلّ هو «حفظ باسم» بدل عرض الاستثناء الخام للمستخدم.
+     */
     override suspend fun getOutputStream(append: Boolean): OutputStream =
         withContext(Dispatchers.IO) {
+            val uriValue = file.uri
+            val resolver =
+                application?.contentResolver
+                    ?: throw IOException("No content resolver for: $uriValue")
+
+            suspend fun open(mode: String?): OutputStream? =
+                runCatching {
+                    if (mode == null) resolver.openOutputStream(uriValue) else resolver.openOutputStream(uriValue, mode)
+                }.getOrElse { error -> throw error.asWriteFailure(uriValue.toString()) }
+
             val mode = if (append) "wa" else "wt"
-            return@withContext application!!.contentResolver?.openOutputStream(file.uri, mode)
-                ?: throw IOException("Could not open input stream for: ${file.uri}")
+            // المحاولة الأولى: الوضع المطلوب. الثانية: الوضع الافتراضي للمزوّدين الذين
+            // يرفضون "wt" تحديدًا (بعض مزوّدي SAF لا يدعمونه أصلًا).
+            val stream = open(mode) ?: open(null)
+            stream ?: throw IOException("Could not open output stream for: $uriValue")
         }
 
     override suspend fun getMimeType(context: Context): String? =
@@ -224,17 +244,21 @@ class UriWrapper : FileObject {
             return@withContext file.uri
         }
 
+    /**
+     * هل يمكن الكتابة على المستند؟
+     *
+     * لا نعتمد على `DocumentFile.canWrite()` وحده: مزوّدون كثيرون يعيدون `true` ثم يرفضون
+     * الفتح للكتابة. نجمع الإشارتين، وأي فشل بسبب «للقراءة فقط» يعني `false` بلا استثناء
+     * (4.1.0 — كان `runBlocking` هنا يرمي على الخيط الرئيسي في بعض الحالات).
+     */
     override fun canWrite(): Boolean {
-        if (file.canWrite()) {
-            return true
-        }
-
         runCatching {
-            runBlocking { getOutputStream(true).close() }
-            return true
+            if (file.canWrite()) return true
         }
-
-        return false
+        return runCatching {
+            runBlocking { getOutputStream(true).close() }
+            true
+        }.getOrDefault(false)
     }
 
     override fun canRead(): Boolean {
