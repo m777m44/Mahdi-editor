@@ -4,6 +4,11 @@ shopt -s checkwinsize
 
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/games:/usr/local/bin:/usr/local/sbin:$LOCAL/bin:$PATH
 export SHELL="bash"
+# 4.1.0: بيئة UTF-8 افتراضية كما في Termux — نصوص عربية وإيموجي بلا أخطاء ترميز
+export LANG="${LANG:-C.UTF-8}"
+export LC_ALL="${LC_ALL:-C.UTF-8}"
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
 export PS1="\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\] \\$ "
 
 source "$LOCAL/bin/utils"

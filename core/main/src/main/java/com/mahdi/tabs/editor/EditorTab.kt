@@ -47,8 +47,11 @@ import com.mahdi.extension.api.MahdiExtensionPoint
 import com.mahdi.encoding.EncodingManager
 import com.mahdi.file.FileObject
 import com.mahdi.file.FileTypeManager
+import com.mahdi.file.ReadOnlyFileException
+import com.mahdi.file.isReadOnlyDocument
 import com.mahdi.lsp.LspConnector
 import com.mahdi.resources.drawables
+import com.mahdi.resources.getFilledString
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.search.EditorSearchPanel
@@ -57,6 +60,7 @@ import com.mahdi.settings.Settings
 import com.mahdi.settings.editor.refreshEditorSettings
 import com.mahdi.tabs.base.Tab
 import com.mahdi.utils.errorDialog
+import com.mahdi.utils.toast
 import com.mahdi.utils.hasBinaryChars
 import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.text.ContentIO
@@ -112,6 +116,14 @@ open class EditorTab(
     private var activeTasks = mutableStateSetOf<String>()
 
     private var charset = Charset.forName(Settings.encoding)
+
+    /** منع تكرار طلب «حفظ باسم» مع كل حفظ تلقائي لملف للقراءة فقط. */
+    private var readOnlyPrompted = false
+
+    /** الترميز المستخدم حاليًا في هذا الملف — لعرضه في قائمة «الترميز». */
+    val currentCharset: Charset
+        get() = charset
+
     var lspConnector: LspConnector? = null
 
     /**
@@ -349,6 +361,68 @@ open class EditorTab(
         }
     }
 
+    /**
+     * يعيد فتح الملف بترميز آخر (4.1.0) — «فتح بترميز مختلف» كما في المحرّرات الكبرى.
+     *
+     * يقرأ البايتات نفسها من القرص ويفكّها بالترميز المختار، فيظهر النص العربي مثلًا
+     * صحيحًا بدل رموز مشوّهة. الترميز المختار يصبح ترميز الحفظ لهذا الملف أيضًا.
+     *
+     * @return `true` إن نجحت إعادة الفتح.
+     */
+    suspend fun reopenWithEncoding(newCharset: Charset): Boolean {
+        val file = file ?: return false
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                // لا نضيّع تعديلات غير محفوظة قبل إعادة القراءة
+                if (editorState.isDirty) save()
+
+                val bytes = file.getInputStream().use { it.readBytes() }
+                val withoutBom = stripBom(bytes, newCharset)
+                charset = newCharset
+
+                val content = ContentIO.createFrom(ByteArrayInputStream(withoutBom), newCharset)
+                withContext(Dispatchers.Main) {
+                    editorState.updateLock.withLock {
+                        editorState.content = content
+                        editorState.editor.get()?.setText(content)
+                        editorState.updateUndoRedo()
+                        editorState.isDirty = false
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    toast(strings.encoding_reopened.getFilledString(newCharset.name()))
+                }
+                true
+            }.getOrElse { error ->
+                errorDialog(throwable = error)
+                false
+            }
+        }
+    }
+
+    /** يحذف بصمة BOM إن كانت مطابقة للترميز المختار (حتى لا يظهر حرف خفي في أول سطر). */
+    private fun stripBom(bytes: ByteArray, target: Charset): ByteArray {
+        val detected = EncodingManager.bomCharset(bytes) ?: return bytes
+        if (!detected.name().equals(target.name(), ignoreCase = true) &&
+            !(detected.name().startsWith("UTF-16") && target.name().startsWith("UTF-16")) &&
+            !(detected.name().startsWith("UTF-32") && target.name().startsWith("UTF-32"))
+        ) {
+            return bytes
+        }
+        val skip =
+            when {
+                bytes.size >= 4 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte() &&
+                    bytes[2] == 0x00.toByte() && bytes[3] == 0x00.toByte() -> 4
+                bytes.size >= 4 && bytes[0] == 0x00.toByte() && bytes[1] == 0x00.toByte() &&
+                    bytes[2] == 0xFE.toByte() && bytes[3] == 0xFF.toByte() -> 4
+                bytes.size >= 3 && bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() &&
+                    bytes[2] == 0xBF.toByte() -> 3
+                bytes.size >= 2 && (bytes[0] == 0xFF.toByte() || bytes[0] == 0xFE.toByte()) -> 2
+                else -> 0
+            }
+        return if (skip == 0 || bytes.size <= skip) bytes else bytes.copyOfRange(skip, bytes.size)
+    }
+
     fun refresh() {
         val file = file ?: return
         scope.launch(Dispatchers.IO) {
@@ -369,24 +443,62 @@ open class EditorTab(
 
     private val saveMutex = Mutex()
 
-    private suspend fun write() {
-        val file = file ?: return
-        withContext(Dispatchers.IO) {
+    /**
+     * يكتب المحتوى على القرص ويعيد `true` إن نجح فعلًا (4.1.0).
+     *
+     * ثلاث حالات كانت تُفشل الحفظ سابقًا وتُظهر رسالة خطأ خام:
+     * 1. **مستند للقراءة فقط** (`Media is read-only`) — لم يعد يُعرض كخطأ: نفتح «حفظ باسم»
+     *    مرة واحدة ونحوّل التبويب للملف الجديد، فلا يُفقد النص.
+     * 2. **أحرف لا يمثّلها الترميز** (مثل حرف عربي في ملف ASCII) — كان يُكتب `?` بدل
+     *    الحرف (فقدان بيانات صامت). الآن نُحوّل تلقائيًا إلى UTF-8 ونُخبر المستخدم.
+     * 3. أي خطأ آخر — يبقى حوار الخطأ المفهوم كما هو.
+     */
+    private suspend fun write(): Boolean {
+        val file = file ?: return false
+        return withContext(Dispatchers.IO) {
             runCatching {
-                if (!file.canWrite()) {
-                    errorDialog(strings.cant_write)
-                    return@withContext
-                }
-
-                val editor = editorState.editor.get() ?: return@runCatching
+                val editor = editorState.editor.get() ?: return@runCatching false
                 val content = editor.text.toString()
                 val normalizedContent = editor.lineEnding.applyOn(content)
-                file.writeText(normalizedContent, charset)
+
+                // (2) لا نكتب «؟» مكان الأحرف العربية بصمت: نتحوّل إلى UTF-8
+                var target = charset
+                if (!canEncode(normalizedContent, target)) {
+                    target = Charsets.UTF_8
+                    toast(strings.encoding_fallback_saved.getFilledString(charset.name(), target.name()))
+                }
+                charset = target
+
+                // لا نستدعي canWrite() أولًا: هي نفسها قد تنجح ثم يفشل الفتح للكتابة
+                file.writeText(normalizedContent, target)
 
                 editorState.isDirty = false
                 lspConnector?.notifySave()
+                true
             }
-                .onFailure { errorDialog(throwable = it) }
+                .getOrElse { error ->
+                    if (error.isReadOnlyDocument() || error is ReadOnlyFileException) {
+                        onReadOnlyDocument()
+                        false
+                    } else {
+                        errorDialog(throwable = error)
+                        false
+                    }
+                }
+        }
+    }
+
+    /** هل يمكن تمثيل النص كاملًا في [charset]؟ (يمنع استبدال الأحرف بـ `?` عند الحفظ) */
+    private fun canEncode(text: String, charset: Charset): Boolean =
+        runCatching { charset.newEncoder().canEncode(text) }.getOrDefault(true)
+
+    /** يُستدعى مرة واحدة لكل ملف: نُعلم المستخدم ونفتح «حفظ باسم» بدل الشكوى. */
+    private suspend fun onReadOnlyDocument() {
+        if (readOnlyPrompted) return
+        readOnlyPrompted = true
+        withContext(Dispatchers.Main) {
+            toast(strings.readonly_saving_as.getString())
+            saveAs()
         }
     }
 
@@ -395,7 +507,7 @@ open class EditorTab(
         if (isTemp) return@withLock
         val file = file ?: return@withLock
 
-        write()
+        if (!write()) return@withLock
 
         searchViewModel.get()?.syncIndex(file)
         Events.publish(EditorTabEvent.Saved(this, file, true))
@@ -411,12 +523,15 @@ open class EditorTab(
                 if (it != null) {
                     this@EditorTab.file = it
                     title = it.getName()
+                    // ملف جديد قابل للكتابة: نسمح بطلب «حفظ باسم» مرة أخرى لو تكرّر الرفض
+                    readOnlyPrompted = false
                     editorState.textmateScope = FileTypeManager.fromFileName(it.getName()).textmateScope
 
                     scope.launch {
-                        write()
-                        searchViewModel.get()?.syncIndex(it)
-                        Events.publish(EditorTabEvent.Saved(this@EditorTab, it, false))
+                        if (write()) {
+                            searchViewModel.get()?.syncIndex(it)
+                            Events.publish(EditorTabEvent.Saved(this@EditorTab, it, false))
+                        }
                     }
                 }
             }
@@ -442,7 +557,7 @@ open class EditorTab(
         }
         val file = file ?: return@withLock
 
-        write()
+        if (!write()) return@withLock
 
         searchViewModel.get()?.syncIndex(file)
         Events.publish(EditorTabEvent.Saved(this, file, false))

@@ -106,6 +106,8 @@ object EncodingManager {
     /** الترتيب: BOM ← UTF-8 صالح ← تخمين عربي ← Latin-1. */
     fun detect(bytes: ByteArray): Charset {
         bomCharset(bytes)?.let { return it }
+        // 4.1.0: UTF-16 بلا بصمة BOM — كانت تُقرأ كـ«نص فيه أصفار» فيظهر الملف فارغًا
+        utf16WithoutBom(bytes)?.let { return it }
         if (looksLikeUtf8(bytes)) return Charsets.UTF_8
 
         val arabic = runCatching { Charset.forName("windows-1256") }.getOrNull()
@@ -127,6 +129,41 @@ object EncodingManager {
             at(0) == 0xFE && at(1) == 0xFF -> runCatching { Charset.forName("UTF-16BE") }.getOrNull()
             else -> null
         }
+    }
+
+    /**
+     * كشف UTF-16 بلا بصمة BOM (4.1.0).
+     *
+     * كثير من ملفات Windows القديمة تُحفظ UTF-16LE بلا BOM؛ بايتاتها تحتوي صفرًا في كل
+     * موضع ثانٍ. نتحقّق من نسبة الأصفار في المواضع الفردية أو الزوجية، ونرجّح الترميز
+     * المقابل فقط إذا كانت النسبة عالية — فلا نخطئ على نص عادي.
+     */
+    fun utf16WithoutBom(bytes: ByteArray): Charset? {
+        if (bytes.size < 8) return null
+        val sample = minOf(bytes.size, 8192)
+        var evenZeros = 0
+        var oddZeros = 0
+        var pairs = 0
+        var i = 0
+        while (i + 1 < sample) {
+            val even = bytes[i].toInt() and 0xFF
+            val odd = bytes[i + 1].toInt() and 0xFF
+            if (even == 0) evenZeros++
+            if (odd == 0) oddZeros++
+            pairs++
+            i += 2
+        }
+        if (pairs == 0) return null
+        val evenRatio = evenZeros.toFloat() / pairs
+        val oddRatio = oddZeros.toFloat() / pairs
+        // نص لاتيني UTF-16LE: البايت الثاني من كل حرف صفر؛ والعكس في BE
+        if (oddRatio > 0.3f && evenRatio < 0.05f) {
+            return runCatching { Charset.forName("UTF-16LE") }.getOrNull()
+        }
+        if (evenRatio > 0.3f && oddRatio < 0.05f) {
+            return runCatching { Charset.forName("UTF-16BE") }.getOrNull()
+        }
+        return null
     }
 
     /** هل البايتات تسلسل UTF-8 صالح؟ (تحقّق يدوي، لا يعتمد على الاستثناءات) */

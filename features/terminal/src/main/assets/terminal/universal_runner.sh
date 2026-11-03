@@ -26,6 +26,87 @@ if [ ! -f "$file" ]; then
   exit 1
 fi
 
+# ——————————————— 4.1.0: بيئة تشغيل موحّدة ———————————————
+# كل المفسّرات (Python/Node/PHP/Ruby/…‎) تُشغَّل بترميز UTF-8 افتراضيًا، فلا تتعطّل السكربتات
+# التي تحتوي نصًّا عربيًا أو إيموجي، ولا يظهر UnicodeEncodeError على طرفية أندرويد.
+export LANG="${LANG:-C.UTF-8}"
+export LC_ALL="${LC_ALL:-C.UTF-8}"
+export LANGUAGE="${LANGUAGE:-C.UTF-8}"
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
+export PYTHONDONTWRITEBYTECODE=1
+export NODE_NO_WARNINGS=1
+export TERM="${TERM:-xterm-256color}"
+
+# هل الملف تنفيذي حقيقي (ELF) ناتج عن ترجمة سابقة؟
+# يعمل بلا أدوات خارجية (لا od ولا hexdump): أول أربعة بايتات هي 0x7F ثم "ELF".
+is_native_binary() {
+  [ -f "$1" ] || return 1
+  [ "$(head -c 4 "$1" 2>/dev/null)" = $'\177ELF' ]
+}
+
+# 4.1.0: تشغيل أي سكربت عبر سطر shebang — مهما كان امتداده أو انعدامه.
+# مثال: #!/usr/bin/env python3 أو #!/bin/bash أو #!/usr/bin/php
+run_by_shebang() {
+  local f="$1" line cmd interp
+  line=$(head -n 1 "$f" 2>/dev/null || true)
+  case "$line" in
+    '#!'*) : ;;
+    *) return 1 ;;
+  esac
+
+  cmd=${line#'#!'}
+  cmd=${cmd# }
+  # #!/usr/bin/env python3 → python3
+  case "$cmd" in
+    */env\ *) cmd=${cmd#*/env } ;;
+  esac
+  interp=${cmd%% *}
+  interp=${interp##*/}
+  [ -n "$interp" ] || return 1
+
+  if ! command_exists "$interp"; then
+    case "$interp" in
+      python|python3) install_package "python3 python3-pip python3-venv" >/dev/null 2>&1 ;;
+      node) install_nodejs >/dev/null 2>&1 ;;
+      php) install_package "php-cli" >/dev/null 2>&1 ;;
+      ruby) install_package "ruby-full" >/dev/null 2>&1 ;;
+      perl) install_package "perl" >/dev/null 2>&1 ;;
+      lua) install_package "lua5.3" >/dev/null 2>&1 ;;
+      bash|sh|dash) : ;;
+      *)
+        warn "المفسّر المطلوب في سطر shebang غير متوفّر: $interp"
+        return 2
+        ;;
+    esac
+  fi
+
+  if command_exists "$interp"; then
+    info "التشغيل عبر $interp (من سطر shebang)"
+    "$interp" "$f"
+    return 0
+  fi
+  return 1
+}
+
+# 4.1.0: تخمين المفسّر من محتوى الملف — للسكربتات بامتداد غريب أو بلا امتداد.
+guess_interpreter() {
+  local f="$1"
+  if grep -q '<\?php' "$f" 2>/dev/null; then
+    echo php; return
+  fi
+  if grep -qE '^package main$' "$f" 2>/dev/null && grep -q 'func main' "$f" 2>/dev/null; then
+    echo go; return
+  fi
+  if grep -q 'console\.log(' "$f" 2>/dev/null; then
+    echo node; return
+  fi
+  if grep -qE '^(import |from |def |print\()' "$f" 2>/dev/null; then
+    echo python3; return
+  fi
+  echo ""
+}
+
 # نسخة المجلد الرئيسي (مأخوذة من /sdcard لأنها للقراءة فقط)
 case "$file" in
   /home/mahdi-run/*)
@@ -565,7 +646,62 @@ PYEOF
     cat "$file"
     ;;
 
+  # ——— 4.1.0: حِزَم تشغيل جاهزة (zipapp/Java/…) ———
+  *.pyz|*.zipapp)
+    if ! command_exists python3; then
+      install_package "python3"
+    fi
+    mahdi_auto_deps "$file"
+    python3 "$file"
+    ;;
+
+  *.jar)
+    if ! command_exists java; then
+      install_package "default-jdk"
+    fi
+    java -jar "$file"
+    ;;
+
+  *.cgi)
+    chmod +x "$file" 2>/dev/null || true
+    set +e
+    run_by_shebang "$file"
+    cgi_status=$?
+    set -e
+    if [ "$cgi_status" -ne 0 ]; then
+      bash "$file"
+    fi
+    ;;
+
   *)
-    warn "لا يوجد مشغّل لهذا الامتداد بعد — جرّب «تشغيل» من قائمة المشغّلات."
+    # ——— 4.1.0: «يشغّل كل شيء» — أي سكربت مهما كان امتداده أو انعدامه ———
+    # 1) سطر shebang هو المرجع الأول (وهو ما تتبعه طرفية لينكس نفسها)
+    set +e
+    run_by_shebang "$file"
+    shebang_status=$?
+    set -e
+    if [ "$shebang_status" -eq 0 ]; then
+      exit 0
+    fi
+
+    # 2) ملف تنفيذي مترجم مسبقًا
+    if is_native_binary "$file"; then
+      chmod +x "$file" 2>/dev/null || true
+      info "تشغيل ملف تنفيذي…"
+      "$file"
+      exit 0
+    fi
+
+    # 3) تخمين المفسّر من محتوى الملف
+    guess=$(guess_interpreter "$file")
+    if [ -n "$guess" ] && command_exists "$guess"; then
+      info "التشغيل عبر $guess (تعرّف تلقائي على المحتوى)"
+      "$guess" "$file"
+      exit 0
+    fi
+
+    # 4) أخيرًا: bash يستطيع قراءة كثير من السكربتات البسيطة
+    warn "امتداد غير معروف ولا يوجد سطر shebang — نحاول التشغيل بـ bash."
+    bash "$file"
     ;;
 esac

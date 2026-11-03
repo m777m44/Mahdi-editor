@@ -1112,4 +1112,10 @@
     <string name="custom_icon_removed">أُزيلت صورة الأيقونة</string>
     <string name="custom_icon_shortcut_label">Mahdi · أيقونتي</string>
     <string name="app_icon_changed">تم تغيير الأيقونة</string>
+    <string name="encoding_menu">الترميز</string>
+    <string name="encoding_menu_desc">إعادة فتح الملف بترميز آخر — يُستخدم ترميز الحفظ لهذا الملف</string>
+    <string name="encoding_current">الحالي</string>
+    <string name="encoding_reopened">أُعيد فتح الملف بترميز %1$s</string>
+    <string name="encoding_fallback_saved">الترميز %1$s لا يمثّل بعض الأحرف — حُفظ الملف بـ %2$s</string>
+    <string name="readonly_saving_as">الملف للقراءة فقط — اختر مكانًا جديدًا للحفظ</string>
 </resources>
