@@ -151,16 +151,6 @@ object BuiltinExtensions {
                 route = SettingsRoutes.Guide.route,
             ),
             BuiltinExtension(
-                id = "cap.studio",
-                emoji = "🏗️",
-                nameAr = "استوديو الحزم",
-                nameEn = "Package studio",
-                descAr = "توليد قوالب الثيمات والإضافات وفحص الحزم",
-                descEn = "Generate theme/extension templates and lint packages",
-                kind = ExtensionKind.CAPABILITY,
-                route = SettingsRoutes.PackageStudio.route,
-            ),
-            BuiltinExtension(
                 id = "cap.keybindings",
                 emoji = "⌨️",
                 nameAr = "اختصارات المفاتيح",

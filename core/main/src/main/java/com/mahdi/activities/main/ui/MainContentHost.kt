@@ -209,9 +209,6 @@ fun MainActivity.MainContentHost(
                 sheetContent = sheetContent,
             )
 
-            // بطاقة الإنجازات مع القصاصات (2.5.0)
-            com.mahdi.motivation.MotivationOverlay()
-
             GlobalDialogHost(viewModel, drawerViewModel)
 
             DialogRegistry.getDialogs().forEach { dialog -> dialog() }

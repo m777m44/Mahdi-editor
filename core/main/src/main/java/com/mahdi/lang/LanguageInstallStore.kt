@@ -29,7 +29,7 @@ object LanguageInstallStore {
     private const val KEY_INSTALLED = "installed_ids"
     private const val MARKER_DIR = ".mahdi/installed"
 
-    private val _installed = MutableStateFlow<Set<String>>(emptySet())
+    private val _installed = MutableStateFlow<Set<String>>(DefaultLanguages.bundled)
 
     /** معرّفات اللغات المثبَّتة (تتحدّث تلقائيًا بعد كل تثبيت أو إزالة). */
     val installed: StateFlow<Set<String>> = _installed.asStateFlow()
@@ -51,13 +51,18 @@ object LanguageInstallStore {
     fun refresh() {
         val fromDisk =
             runCatching {
-                    markerDir.listFiles()?.filter { it.isFile }?.map { it.name }?.toSet() ?: emptySet()
+                    markerDir.listFiles()
+                        ?.filter { it.isFile && !it.name.startsWith(".") }
+                        ?.map { it.name }
+                        ?.toSet()
+                        ?: emptySet()
                 }
                 .getOrDefault(emptySet())
 
         val fromPrefs = prefs?.getStringSet(KEY_INSTALLED, emptySet())?.toSet() ?: emptySet()
 
-        _installed.value = fromDisk + fromPrefs
+        // 4.0.0: اللغات المدمجة (بايثون/بي إتش بي/HTML) مثبَّتة دائمًا — ليست تخمينًا بل حقيقة التطبيق
+        _installed.value = fromDisk + fromPrefs + DefaultLanguages.bundled
         prefs?.edit()?.putStringSet(KEY_INSTALLED, _installed.value)?.apply()
     }
 
@@ -74,6 +79,57 @@ object LanguageInstallStore {
         val updated = _installed.value - id
         _installed.value = updated
         prefs?.edit()?.putStringSet(KEY_INSTALLED, updated)?.apply()
+    }
+
+    // ————— إدارة الحالة الكاملة (4.0.0) —————
+
+    /** يُعلِّم اللغة «قيد التثبيت» ويحفظ ذلك فورًا (يُقرأ عند إعادة فتح الشاشة). */
+    fun markPending(id: String) {
+        runCatching { File(markerDir, ".pending-$id").writeText(System.currentTimeMillis().toString()) }
+    }
+
+    /** يمحو علامة «قيد التثبيت». */
+    fun clearPending(id: String) {
+        runCatching { File(markerDir, ".pending-$id").delete() }
+    }
+
+    /** هل اللغة قيد التثبيت حاليًا (من القرص)؟ */
+    fun isPending(id: String): Boolean = File(markerDir, ".pending-$id").exists()
+
+    /**
+     * تراجع كامل عن تثبيت لم يكتمل: يزيل العلامة والعلامة المعلّقة وملفّ الحالة
+     * ويُنكر تسجيلها في التفضيلات — حتى لا تبقى لغة «نصف مثبّتة».
+     */
+    fun rollbackInstall(id: String) {
+        clearPending(id)
+        runCatching { markerFile(id).delete() }
+        runCatching { File(markerDir, ".state-$id").delete() }
+        unmark(id)
+    }
+
+    /**
+     * حذف محلّي كامل: العلامة، ملفّ الحالة، علامة الانتظار، وسجلّ التفضيلات.
+     * (إزالة الحزم نفسها تأتي من [purgeCommand] الذي يُنفَّذ في الـ sandbox.)
+     */
+    fun uninstall(id: String) {
+        clearPending(id)
+        runCatching { markerFile(id).delete() }
+        runCatching { File(markerDir, ".state-$id").delete() }
+        unmark(id)
+    }
+
+    /**
+     * أمر إزالة الحزم من داخل الـ sandbox.
+     *
+     * @param includeMarkers إن كان `true` يضيف حذف العلامات إلى نفس الأمر.
+     */
+    fun purgeCommand(id: String, includeMarkers: Boolean = true): String {
+        val packages = LanguageToolchain.packagesFor(id)
+        val rm = if (includeMarkers) "; rm -f ~/$MARKER_DIR/$id ~/$MARKER_DIR/.pending-$id" else ""
+        if (packages.isBlank()) return if (includeMarkers) "rm -f ~/$MARKER_DIR/$id ~/$MARKER_DIR/.pending-$id" else ""
+        return "export DEBIAN_FRONTEND=noninteractive; " +
+            "apt-get -y purge $packages >/dev/null 2>&1; apt-get -y autoremove >/dev/null 2>&1$rm; " +
+            "echo \"✔ $id removed\""
     }
 
     /**

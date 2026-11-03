@@ -20,7 +20,6 @@ import com.mahdi.icons.pack.IconPackManager
 import com.mahdi.lsp.FileIconProvider
 import com.mahdi.lsp.LspPersistence
 import com.mahdi.lsp.MarkdownImageProvider
-import com.mahdi.motivation.Motivation
 import com.mahdi.resources.Res
 import com.mahdi.settings.Preference
 import com.mahdi.settings.Settings
@@ -94,14 +93,14 @@ open class App : Application() {
         // ثيمات المستخدم المخصّصة (Color Wheel) تُدمج في القائمة قبل بناء الواجهة
         themeManager.registerCustomThemes()
 
+        // 4.0.0: أيقونة التطبيق — نضمن أن الأيقونة المحفوظة مفعّلة (بعد تحديث أو إعادة تشغيل)
+        runCatching { com.mahdi.appicon.AppIconSwitcher.restore(this) }
+
         val currentLocale = Locale.forLanguageTag(Settings.current_lang)
         val appLocale = LocaleListCompat.create(currentLocale)
         AppCompatDelegate.setApplicationLocales(appLocale)
         // نصوص خارج Compose (النوافذ المنبثقة، الرسائل السريعة) تتبع اللغة المختارة أيضًا
         Res.updateLocale(currentLocale)
-
-        // تحفيز: قراءة سلسلة الأيام والهدف اليومي عند الإقلاع
-        runCatching { Motivation.refresh() }
 
         // المخزون: قراءة اللغات المثبَّتة فعليًا داخل الـ sandbox (2.7.0)
         runCatching { com.mahdi.lang.LanguageInstallStore.refresh() }

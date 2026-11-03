@@ -2,11 +2,9 @@ package com.mahdi.activities.main.ui
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -33,7 +30,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,7 +42,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -63,8 +58,6 @@ import com.mahdi.file.FileWrapper
 import com.mahdi.filetree.FileTreeTab
 import com.mahdi.filetree.getAppropriateName
 import com.mahdi.icons.MahdiIcon
-import com.mahdi.motivation.Motivation
-import com.mahdi.motivation.MotivationState
 import com.mahdi.resources.drawables
 import com.mahdi.session.RecentFile
 import com.mahdi.session.RecentFiles
@@ -105,10 +98,8 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
     }
 
     LaunchedEffect(Unit) {
-        Motivation.refresh()
         reloadRecent()
     }
-    val motivation by Motivation.state.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -148,12 +139,6 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
             }
 
             Spacer(Modifier.height(18.dp))
-
-            MotivationCard(
-                state = motivation,
-                isArabic = isArabic,
-                modifier = Modifier.fillMaxWidth(),
-            )
 
             AnimatedVisibility(
                 visible = lastFile != null && !dismissed,
@@ -215,81 +200,6 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                         CommandProvider.DocumentationCommand,
                         CommandProvider.SettingsCommand,
                     )
-            )
-        }
-    }
-}
-
-/** بطاقة التحفيز: السلسلة اليومية + هدف اليوم + عدد الإنجازات. */
-@Composable
-fun MotivationCard(state: MotivationState, isArabic: Boolean, modifier: Modifier = Modifier) {
-    val accent = MaterialTheme.colorScheme.primary
-    val progress by animateFloatAsState(state.goalProgress, label = "goal")
-
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(38.dp).background(accent.copy(alpha = 0.16f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(text = "🔥", style = MaterialTheme.typography.titleMedium)
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (isArabic) "${state.streakDays} يوم متتالٍ" else "${state.streakDays}-day streak",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text =
-                            if (isArabic) {
-                                "أفضل سلسلة: ${state.bestStreak} يوم · إنجازات: ${state.unlocked.size}/${Motivation.catalog.size}"
-                            } else {
-                                "Best: ${state.bestStreak} days · Achievements: ${state.unlocked.size}/${Motivation.catalog.size}"
-                            },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(
-                    text = if (state.goalReached) "🌟" else "${state.todaySaves}/${state.dailyGoal}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = accent,
-                )
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)),
-                color = accent,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            )
-
-            Spacer(Modifier.height(6.dp))
-
-            Text(
-                text =
-                    if (state.goalReached) {
-                        if (isArabic) "أنجزت هدف اليوم — أحسنت!" else "Daily goal complete — well done!"
-                    } else {
-                        if (isArabic) {
-                            "هدف اليوم: ${state.todaySaves}/${state.dailyGoal} حفظ · ${state.todayLines} سطر"
-                        } else {
-                            "Today: ${state.todaySaves}/${state.dailyGoal} saves · ${state.todayLines} lines"
-                        }
-                    },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

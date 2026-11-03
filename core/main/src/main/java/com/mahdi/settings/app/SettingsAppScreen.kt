@@ -65,6 +65,22 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
                 sideEffect = { navController.navigate(SettingsRoutes.LanguageScreen.route) },
             )
 
+            // 4.0.0: أيقونة التطبيق — 22 أيقونة مدمجة + صورة من المعرض
+            SettingsItem(
+                label = stringResource(strings.app_icon_title),
+                description = stringResource(strings.app_icon_desc),
+                showSwitch = false,
+                default = false,
+                endWidget = {
+                    Icon(
+                        modifier = Modifier.padding(16.dp),
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                    )
+                },
+                sideEffect = { navController.navigate(SettingsRoutes.AppIcon.route) },
+            )
+
             SettingsItem(
                 label = stringResource(strings.languages_supported),
                 description = stringResource(strings.languages_supported_desc),

@@ -61,11 +61,6 @@
             android:persistableMode="persistAcrossReboots"
             android:windowSoftInputMode="adjustResize">
 
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -96,6 +91,314 @@
                 <data android:pathPattern=".*\\.xedx" />
             </intent-filter>
         </activity>
+
+        <!-- أيقونة default — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconDefault"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_default"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة gold — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconGold"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_gold"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة blue — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconBlue"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_blue"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة green — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconGreen"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_green"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة purple — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconPurple"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_purple"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة dark — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_dark"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة glass — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconGlass"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glass"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة neon — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconNeon"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_neon"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة fire — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconFire"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_fire"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة ocean — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconOcean"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_ocean"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة forest — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconForest"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_forest"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة sky — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconSky"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_sky"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة rose — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconRose"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_rose"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة mint — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconMint"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_mint"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة sunset — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconSunset"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_sunset"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة midnight — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconMidnight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_midnight"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة royal — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconRoyal"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_royal"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة cyberpunk — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconCyberpunk"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cyberpunk"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة retro — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconRetro"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_retro"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة minimal — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconMinimal"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_minimal"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة ember — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconEmber"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_ember"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- أيقونة arctic — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconArctic"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_arctic"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <provider
             android:name="androidx.core.content.FileProvider"
