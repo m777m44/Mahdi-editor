@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
  * 4. **سبب الفشل مكتوب** داخل سجلّ الفحص، مع خطوة الإصلاح المقترحة.
  */
 @Composable
-inline fun terminalChecks(): SnapshotStateList<Check> {
+fun terminalChecks(): SnapshotStateList<Check> {
     val checkProot = stringResource(strings.check_proot)
     val checkSystemShell = stringResource(strings.check_system_shell)
     val checkStoragePermissions = stringResource(strings.check_storage_permissions)

@@ -33,6 +33,7 @@ import com.mahdi.components.compose.preferences.base.PreferenceGroup
 import com.mahdi.components.compose.preferences.base.PreferenceTemplate
 import com.mahdi.components.compose.preferences.base.RefreshablePreferenceLayout
 import com.mahdi.resources.getFilledString
+import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.storage.AppStorage
 import com.mahdi.theme.SkyAccent
