@@ -1146,7 +1146,7 @@ Thank you for using Mahdi-Editor.</string>
     <string name="update_latest_version">Latest version: %1$s</string>
     <string name="update_size">Size: %1$s MB</string>
     <string name="update_published">Released: %1$s</string>
-    <string name="update_release_notes">What's new</string>
+    <string name="update_release_notes">What\'s new</string>
     <string name="update_now">Update now</string>
     <string name="update_downloading">Downloading update…</string>
     <string name="update_dont_close">Keep the app open while downloading</string>
