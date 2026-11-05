@@ -75,10 +75,10 @@ object BuiltinExtensions {
                 emoji = "🖼️",
                 nameAr = "حزم الأيقونات",
                 nameEn = "Icon packs",
-                descAr = "٣ حزم مضمّنة (خطّي · ثنائي · نيون) و١٠٤ امتداد لكل حزمة، وحزم المتجر أيضًا",
-                descEn = "3 bundled packs (line/duo/neon) with 104 extensions each, plus store packs",
+                descAr = "أيقونات الملفات والمجلدات من المتجر أو من حزمة محلية",
+                descEn = "File and folder icons from the store or local packs",
                 kind = ExtensionKind.CAPABILITY,
-                route = SettingsRoutes.IconPacks.route,
+                route = SettingsRoutes.Extensions.route,
             ),
             BuiltinExtension(
                 id = "cap.languages",

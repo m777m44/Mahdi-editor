@@ -112,8 +112,6 @@ open class App : Application() {
 
         GlobalScope.launch(Dispatchers.IO) {
             launch(Dispatchers.IO) {
-                // 4.2.0: نسخ حزم الأيقونات المضمّنة (خطّي/ثنائي/نيون) قبل فهرستها
-                runCatching { com.mahdi.icons.pack.BundledIconPacks.ensureInstalled(this@App) }
                 iconPackManager.indexLocalPacks()
                 // 2.5.0: أُزيلت «الألوان الديناميكية» (Monet) — نُبطلها دائمًا حتى تبقى الثيمات الأربعة فقط
                 if (Settings.monet) Settings.monet = false

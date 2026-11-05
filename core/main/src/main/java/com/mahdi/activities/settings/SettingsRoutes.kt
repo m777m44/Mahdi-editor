@@ -58,9 +58,6 @@ sealed class SettingsRoutes(val route: String) {
 
     data object Themes : SettingsRoutes("theme")
 
-    /** 4.2.0: حزم الأيقونات المضمّنة (خطّي/ثنائي/نيون). */
-    data object IconPacks : SettingsRoutes("icon_packs")
-
     /** 4.3.0: مساحة التخزين — تفصيل الحجم الحقيقي وتنظيف آمن. */
     data object StorageManager : SettingsRoutes("storage_manager")
 

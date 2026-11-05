@@ -1077,7 +1077,7 @@ Thank you for using Mahdi-Editor.</string>
     <string name="available_languages">Available languages</string>
     <string name="no_extra_languages">No extra languages installed yet — pick one from Available languages.</string>
     <string name="app_icon_title">App icon</string>
-    <string name="app_icon_desc">Pick the app icon — it changes instantly on the home screen</string>
+    <string name="app_icon_desc">Ten 3D anime icons with an embossed M — applied instantly</string>
     <string name="app_icon_applied">Icon changed: %1$s</string>
     <string name="app_icon_current">Current</string>
     <string name="app_icon_failed">Could not change the icon on this device</string>
@@ -1109,15 +1109,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="all_files_access_on">Enabled: the terminal can read and run files from any folder on the device.</string>
     <string name="all_files_access_off">Disabled: the terminal only sees its own folders. Enable it to run scripts from anywhere.</string>
     <string name="all_files_access_open">Open settings</string>
-    <string name="icon_packs_desc">%1$d pack(s) available. Bundled packs work offline and apply instantly to the file tree and tabs.</string>
-    <string name="icon_pack_builtin">Built-in icons</string>
-    <string name="icon_pack_builtin_desc">The editor built-in symbols — no external pack</string>
-    <string name="icon_pack_applied">Icon pack applied</string>
-    <string name="icon_pack_reset">Built-in icons restored</string>
-    <string name="icon_pack_restored">Bundled packs restored</string>
-    <string name="icon_packs_empty">No icon packs installed</string>
-    <string name="icon_packs_restore">Restore bundled packs</string>
-    <string name="icon_packs_entry_desc">File-tree icon packs — 3 bundled packs, ready offline</string>
     <string name="terminal_health_checking">Checking the terminal…</string>
     <string name="terminal_health_summary">%1$d of %2$d checks passed</string>
     <string name="terminal_health_all_good">All checks passed</string>

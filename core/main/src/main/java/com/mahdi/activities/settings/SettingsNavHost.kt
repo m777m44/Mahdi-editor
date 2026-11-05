@@ -11,7 +11,6 @@ import com.mahdi.lsp.LspRegistry
 import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.SettingsScreen
 import com.mahdi.settings.app.SettingsAppScreen
-import com.mahdi.settings.app.IconPackScreen
 import com.mahdi.settings.debugOptions.AppLogs
 import com.mahdi.settings.debugOptions.DeveloperOptions
 import com.mahdi.settings.editor.AppFontScreen
@@ -52,7 +51,6 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
         composable(SettingsRoutes.EditorFontScreen.route) { EditorFontScreen() }
         composable(SettingsRoutes.AppFontScreen.route) { AppFontScreen() }
         composable(SettingsRoutes.AppIcon.route) { com.mahdi.settings.app.AppIconScreen() }
-        composable(SettingsRoutes.IconPacks.route) { IconPackScreen() }
 
         composable(SettingsRoutes.DefaultEncoding.route) { DefaultEncoding() }
         composable(SettingsRoutes.DefaultLineEnding.route) { DefaultLineEnding() }

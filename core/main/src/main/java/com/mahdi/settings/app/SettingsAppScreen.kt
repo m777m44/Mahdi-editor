@@ -67,22 +67,6 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
                 sideEffect = { navController.navigate(SettingsRoutes.AppIcon.route) },
             )
 
-            // 4.2.0: حزم الأيقونات المضمّنة (خطّي/ثنائي/نيون) — 111 أيقونة لكل حزمة
-            SettingsItem(
-                label = stringResource(strings.icon_packs),
-                description = stringResource(strings.icon_packs_entry_desc),
-                showSwitch = false,
-                default = false,
-                endWidget = {
-                    Icon(
-                        modifier = Modifier.padding(16.dp),
-                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = null,
-                    )
-                },
-                sideEffect = { navController.navigate(SettingsRoutes.IconPacks.route) },
-            )
-
             // 4.3.0: مساحة التخزين — شاشة تفصيل تُسجَّل من وحدة الطرفية
             if (SettingsRegistry.routes.value.any { it.route == SettingsRoutes.StorageManager.route }) {
                 SettingsItem(

@@ -1100,7 +1100,7 @@
     <string name="available_languages">لغات متاحة</string>
     <string name="no_extra_languages">لم تُثبّت لغات إضافية بعد — اختر لغة من «لغات متاحة».</string>
     <string name="app_icon_title">أيقونة التطبيق</string>
-    <string name="app_icon_desc">اختر أيقونة التطبيق — تتغيّر فورًا على الشاشة الرئيسية</string>
+    <string name="app_icon_desc">عشر أيقونات أنمي ثلاثية الأبعاد بحرف M — تُطبَّق فورًا</string>
     <string name="app_icon_applied">تم تغيير الأيقونة: %1$s</string>
     <string name="app_icon_current">الحالية</string>
     <string name="app_icon_failed">تعذّر تغيير الأيقونة على هذا الجهاز</string>
@@ -1132,15 +1132,6 @@
     <string name="all_files_access_on">مفعّل: تستطيع الطرفية قراءة وتشغيل الملفات من أي مجلد في الهاتف.</string>
     <string name="all_files_access_off">غير مفعّل: الطرفية ترى مجلداتها فقط. فعّله لتشغيل السكربتات من أي مكان.</string>
     <string name="all_files_access_open">فتح الإعداد</string>
-    <string name="icon_packs_desc">%1$d حزمة متاحة. الحزم المضمّنة تعمل بلا إنترنت، والاختيار يُطبَّق فورًا على شجرة الملفات والتبويبات.</string>
-    <string name="icon_pack_builtin">أيقونات النظام</string>
-    <string name="icon_pack_builtin_desc">الرموز المدمجة في المحرّر — بلا حزمة خارجية</string>
-    <string name="icon_pack_applied">تم تطبيق حزمة الأيقونات</string>
-    <string name="icon_pack_reset">أُعيدت أيقونات النظام</string>
-    <string name="icon_pack_restored">أُعيد نسخ الحزم المضمّنة</string>
-    <string name="icon_packs_empty">لا توجد حزم أيقونات مثبّتة</string>
-    <string name="icon_packs_restore">إعادة نسخ الحزم المضمّنة</string>
-    <string name="icon_packs_entry_desc">حزم أيقونات لشجرة الملفات — 3 حزم مضمّنة جاهزة بلا إنترنت</string>
     <string name="terminal_health_checking">جارٍ فحص الطرفية…</string>
     <string name="terminal_health_summary">نجح %1$d من %2$d فحصًا</string>
     <string name="terminal_health_all_good">كل الفحوص سليمة</string>
