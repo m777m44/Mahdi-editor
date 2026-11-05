@@ -6,4 +6,8 @@
     <files-path
         name="internal_files"
         path="." />
+    <!-- 5.0.0: ملفات التحديث تُنزَّل إلى getExternalFilesDir ⇒ يلزم مسار صريح -->
+    <external-files-path
+        name="updates"
+        path="." />
 </paths>

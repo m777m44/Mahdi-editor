@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import com.mahdi.editor.R
 import com.mahdi.utils.logError
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * تبديل أيقونة التطبيق (4.3.0).
@@ -62,6 +63,20 @@ object AppIconSwitcher {
 
     /** الأيقونة الافتراضية (المعلنة `enabled=true` في البيان). */
     const val DEFAULT_ICON_ID = "anime_fox"
+
+    /**
+     * الأيقونة المختارة كما تظهر **داخل الواجهة** (5.0.0).
+     *
+     * `null` = لم يُقرأ بعد؛ تقرأه [com.mahdi.ui.components.AppLogo] من التفضيلات.
+     * كل تبديل ناجح يُحدّثه، فيتغيّر الشعار داخل التطبيق فورًا مع أيقونة الشاشة
+     * الرئيسية بلا إعادة تشغيل.
+     */
+    val selectedId = MutableStateFlow<String?>(null)
+
+    /** يُزامن حالة الواجهة مع القيمة المحفوظة (يُستدعى عند الإقلاع). */
+    fun syncSelected(context: Context) {
+        selectedId.value = currentId(context)
+    }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -122,7 +137,11 @@ object AppIconSwitcher {
             icons.forEach { icon -> if (icon.id != chosen.id) setState(icon, false) }
         }
 
-        if (ok) prefs(context).edit().putString(KEY_CURRENT, chosen.id).apply()
+        if (ok) {
+            prefs(context).edit().putString(KEY_CURRENT, chosen.id).apply()
+            // 5.0.0: الشعار الداخلي (الشريط العلوي/شاشة البداية) يتبع نفس الاختيار
+            selectedId.value = chosen.id
+        }
         return ok
     }
 

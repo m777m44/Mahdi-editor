@@ -17,18 +17,42 @@ package com.mahdi.components.compose.appbars
  */
 
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.mahdi.components.compose.icons.ClickableIcon
+
+/**
+ * إجراء «الرئيسية» (5.0.0).
+ *
+ * يُوفّره نشاط الإعدادات (`SettingsActivity`)، فتظهر أيقونة البيت في الشريط
+ * العلوي **لكل شاشات الإعدادات** بلا تعديل أي شاشة على حدة. ضغطها يعيد المستخدم
+ * إلى المحرّر (الرئيسية) بدل أن يضيع في أعماق الإعدادات.
+ */
+val LocalHomeAction = compositionLocalOf<(() -> Unit)?> { null }
+
+/**
+ * شعار التطبيق داخل الشريط العلوي (5.0.0) — يُوفَّر كـ slot حتى يبقى هذا
+ * المكوّن مستقلًا عن وحدة الأيقونات (`core/main`).
+ */
+val LocalTopBarLogo = compositionLocalOf<(@Composable () -> Unit)?> { null }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,35 +65,49 @@ fun TopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val onHome = LocalHomeAction.current
+    val logo = LocalTopBarLogo.current
+
+    val navigationIcon: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (backArrowVisible) {
+                ClickableIcon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    onClick = { backDispatcher?.onBackPressed() },
+                )
+            }
+            if (onHome != null) {
+                IconButton(onClick = onHome) {
+                    Icon(imageVector = Icons.Rounded.Home, contentDescription = null)
+                }
+            }
+        }
+    }
+
+    val title: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (logo != null) {
+                logo()
+                Spacer(Modifier.width(10.dp))
+            }
+            Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
 
     if (isExpandedScreen) {
         TopAppBar(
             modifier = modifier,
-            title = { Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            title = title,
             actions = actions,
-            navigationIcon = {
-                if (backArrowVisible) {
-                    ClickableIcon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        onClick = { backDispatcher?.onBackPressed() },
-                    )
-                }
-            },
+            navigationIcon = navigationIcon,
             scrollBehavior = scrollBehavior,
         )
     } else {
         LargeTopAppBar(
             modifier = modifier,
-            title = { Text(text = label) },
+            title = title,
             actions = actions,
-            navigationIcon = {
-                if (backArrowVisible) {
-                    ClickableIcon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        onClick = { backDispatcher?.onBackPressed() },
-                    )
-                }
-            },
+            navigationIcon = navigationIcon,
             scrollBehavior = scrollBehavior,
         )
     }
