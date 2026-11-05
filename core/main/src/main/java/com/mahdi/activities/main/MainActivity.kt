@@ -39,6 +39,7 @@ import com.mahdi.settings.Settings
 import com.mahdi.tabs.editor.applyHighlightingAndConnectLSP
 import com.mahdi.utils.errorDialog
 import com.mahdi.utils.toast
+import com.mahdi.utils.logError
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -105,8 +106,8 @@ class MainActivity : AppCompatActivity() {
         // Keep the time based automatic night mode in sync when the app comes back to the foreground.
         themeManager.ensureThemeMode()
         lifecycleScope.launch(Dispatchers.IO) {
-            handleIntent(intent)
-            foregroundListener.values.forEach { it.invoke(true) }
+            runCatching { handleIntent(intent) }.onFailure { logError(it, "handleIntent") }
+            foregroundListener.values.forEach { runCatching { it.invoke(true) } }
 
             val lspConfigChanges = LspRegistry.getConfigurationChanges(this@MainActivity)
             if (lspConfigChanges.isNotEmpty()) {
@@ -172,14 +173,22 @@ class MainActivity : AppCompatActivity() {
         val splash = installSplashScreen()
         splash.setKeepOnScreenCondition { !themeManager.activeThemeReady }
 
+        // 4.3.1: تحميل الثيم محميّ — فشل ثيم مخصّص تالف لم يعد يُسقط الإقلاع،
+        // ونضمن رفع شاشة البداية في كل الأحوال حتى لا تبقى معلّقة للأبد.
         lifecycleScope.launch {
-            themeManager.loadActiveTheme()
-            themeManager.indexLocalThemes()
+            runCatching { themeManager.loadActiveTheme() }
+                .onFailure { logError(it, "loadActiveTheme") }
+            runCatching { themeManager.indexLocalThemes() }
+                .onFailure { logError(it, "indexLocalThemes") }
+            runCatching { themeManager.ensureActiveThemeReady() }
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val db = DocumentStateDatabase.getDatabase(applicationContext)
-            db.documentStateDao().deleteOldestRecords(1000)
+            runCatching {
+                val db = DocumentStateDatabase.getDatabase(applicationContext)
+                db.documentStateDao().deleteOldestRecords(1000)
+            }
+                .onFailure { logError(it, "document state database") }
         }
 
         enableEdgeToEdge()

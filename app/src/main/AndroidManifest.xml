@@ -240,5 +240,36 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- ═══════════════════════════════════════════════════════════════════════
+         4.3.0 — المكوّنات التي يجب أن تبقى دائمًا.
+         (حُذفت خطأً في 4.3.0 عند استبدال كتلة الأيقونات، فصار التطبيق يخرج
+          مباشرة: أي استثناء لا يجد CrashActivity فيموت بصمت، والإعدادات
+          والمشاركة واستوديو الحزم لا تفتح.)
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- شاشة الانهيار: بدونها يموت التطبيق بصمت عند أي خطأ -->
+        <activity
+            android:name="com.mahdi.crashhandler.CrashActivity"
+            android:exported="false" />
+        <activity
+            android:name="com.mahdi.activities.settings.SettingsActivity"
+            android:exported="false" />
+        <activity
+            android:name="com.mahdi.project.ProjectCreatorActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name="com.mahdi.extension.api.ExtensionActivity"
+            android:exported="false" />
     </application>
 </manifest>
