@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      5.0.0 — شاشة بداية مطابقة لكل أيقونة.
+
+      كل activity-alias في البيان يحمل ثيمه الخاص، فيظهر في شاشة البداية
+      **نفس** الأيقونة التي اختارها المستخدم على الشاشة الرئيسية، بخلفية لونها.
+      نُعلن السمتين بصيغتين: صيغة مكتبة core-splashscreen (تعمل على أندرويد 8–11)
+      وسمة المنصّة `android:` (تعمل على أندرويد 12+).
+      المظهر بعد انتهاء شاشة البداية يبقى `Theme.Karbon` كما هو.
+    -->
+
+    <style name="Theme.Karbon.Icon.Fox" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_fox</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_fox</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_fox</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_fox</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Cat" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_cat</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_cat</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_cat</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_cat</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Robot" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_robot</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_robot</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_robot</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_robot</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Owl" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_owl</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_owl</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_owl</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_owl</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Penguin" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_penguin</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_penguin</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_penguin</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_penguin</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Dragon" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_dragon</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_dragon</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_dragon</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_dragon</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Bunny" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_bunny</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_bunny</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_bunny</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_bunny</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Panda" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_panda</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_panda</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_panda</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_panda</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Axolotl" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_axolotl</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_axolotl</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_axolotl</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_axolotl</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Hamster" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_hamster</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_hamster</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_hamster</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_hamster</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+</resources>

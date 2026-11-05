@@ -102,6 +102,10 @@ open class App : Application() {
         // 4.3.1: أيقونة التطبيق تُصلَح **على خيط IO** لا على الخيط الرئيسي.
         // كان هذا الاستدعاء يكتب في PackageManager عشر مرات متزامنة بعد تغيير
         // معرّفات الأيقونات، فيتجاوز مهلة ANR ويقتل النظام التطبيق عند الإقلاع.
+        // 5.0.0: الشعار الداخلي (الشريط العلوي/البداية) يقرأ نفس الأيقونة المختارة
+        runCatching { com.mahdi.appicon.AppIconSwitcher.syncSelected(this) }
+            .onFailure { logError(it, "App icon state") }
+
         GlobalScope.launch(Dispatchers.IO) {
             runCatching { com.mahdi.appicon.AppIconSwitcher.restore(this@App) }
                 .onFailure { logError(it, "App icon restore") }
@@ -181,7 +185,12 @@ open class App : Application() {
             }
         }
 
-        guarded("update check") { UpdateChecker.checkForUpdates("main") }
+        // 5.0.0: فحص إصدارات GitHub Releases (لا الالتزامات) — مرة كل ٦ ساعات،
+        // ونتيجته تظهر كإشعار داخل التطبيق لا كنافذة تحجب العمل.
+        guarded("update check") {
+            // النتيجة تُخزَّن في AppUpdateChecker.pending فتظهر كإشعار في الواجهة
+            com.mahdi.update.AppUpdateChecker.check(this@App, force = false)
+        }
 
         guarded("update manager") { UpdateManager.inspect() }
 

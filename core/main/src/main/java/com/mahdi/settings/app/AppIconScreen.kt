@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -35,9 +36,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +50,8 @@ import com.mahdi.components.compose.preferences.base.PreferenceLayout
 import com.mahdi.components.compose.preferences.base.PreferenceTemplate
 import com.mahdi.resources.strings
 import com.mahdi.theme.SkyAccent
+import com.mahdi.ui.components.AppLogo
+import com.mahdi.ui.graphics.rememberIconImage
 import com.mahdi.utils.toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,11 +99,18 @@ fun AppIconScreen(modifier: Modifier = Modifier) {
                             .padding(6.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Image(
-                        painter = painterResource(id = selected.previewRes),
-                        contentDescription = selected.displayName(isArabic),
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)),
-                    )
+                    // 5.0.0: أيقونة تكيّفية ⇒ Bitmap جاهز، لا painterResource (كان يُسقط التطبيق)
+                    val preview = rememberIconImage(selected.previewRes, sizePx = 384)
+                    if (preview != null) {
+                        Image(
+                            bitmap = preview,
+                            contentDescription = selected.displayName(isArabic),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)),
+                        )
+                    } else {
+                        AppLogo(size = 108.dp, cornerRadius = 26.dp, showBackground = false)
+                    }
                 }
 
                 Spacer(Modifier.height(14.dp))
@@ -162,6 +172,31 @@ fun AppIconScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        // ————— الشعار الداخلي: يتبع نفس الأيقونة —————
+        PreferenceGroup(heading = stringResource(strings.app_icon_internal_note_title)) {
+            PreferenceTemplate(
+                applyPaddings = true,
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppLogo(size = 34.dp, cornerRadius = 10.dp)
+                        Spacer(Modifier.size(12.dp))
+                        Text(
+                            text = selected.displayName(isArabic),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                },
+                description = {
+                    Text(
+                        text = stringResource(strings.app_icon_internal_note_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+            )
+        }
+
         // ————— ملاحظة —————
         PreferenceGroup {
             PreferenceTemplate(
@@ -214,11 +249,18 @@ private fun IconTile(
                         }
                     ),
         ) {
-            Image(
-                painter = painterResource(id = icon.previewRes),
-                contentDescription = icon.displayName(isArabic),
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(22.dp)),
-            )
+            val tileBitmap = rememberIconImage(icon.previewRes, sizePx = 256)
+            if (tileBitmap != null) {
+                Image(
+                    bitmap = tileBitmap,
+                    contentDescription = icon.displayName(isArabic),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)),
+                )
+            } else {
+                // أيقونة تالفة على جهاز معيّن لا تُسقط الشاشة ولا تُخفي الشبكة
+                AppLogo(size = 72.dp, cornerRadius = 22.dp, showBackground = false)
+            }
 
             if (selected) {
                 Box(

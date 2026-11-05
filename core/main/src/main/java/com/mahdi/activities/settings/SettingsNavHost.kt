@@ -32,6 +32,7 @@ import com.mahdi.settings.lsp.LspServerDetail
 import com.mahdi.settings.lsp.LspServerLogs
 import com.mahdi.settings.lsp.LspSettings
 import com.mahdi.settings.theme.ThemeScreen
+import com.mahdi.settings.update.UpdateScreen
 
 @Composable
 fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity) {
@@ -98,6 +99,7 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
             val instanceId = backStackEntry.arguments?.getString("instanceId")!!
             LspServerLogs(server, instanceId)
         }
+        composable(SettingsRoutes.Updates.route) { UpdateScreen() }
         composable(SettingsRoutes.Themes.route) { ThemeScreen(navController) }
         composable(SettingsRoutes.Guide.route) { GuideScreen() }
         composable(SettingsRoutes.SupportedLanguages.route) { SupportedLanguages() }

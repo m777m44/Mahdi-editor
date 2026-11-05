@@ -103,6 +103,7 @@
         <!-- الثعلب · سماوي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeFox"
+            android:theme="@style/Theme.Karbon.Icon.Fox"
             android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_fox"
@@ -117,6 +118,7 @@
         <!-- القط · بنفسجي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeCat"
+            android:theme="@style/Theme.Karbon.Icon.Cat"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_cat"
@@ -131,6 +133,7 @@
         <!-- الروبوت · نعناعي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeRobot"
+            android:theme="@style/Theme.Karbon.Icon.Robot"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_robot"
@@ -145,6 +148,7 @@
         <!-- البومة · ذهبي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeOwl"
+            android:theme="@style/Theme.Karbon.Icon.Owl"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_owl"
@@ -159,6 +163,7 @@
         <!-- البطريق · أزرق — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimePenguin"
+            android:theme="@style/Theme.Karbon.Icon.Penguin"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_penguin"
@@ -173,6 +178,7 @@
         <!-- التنين · زمردي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeDragon"
+            android:theme="@style/Theme.Karbon.Icon.Dragon"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_dragon"
@@ -187,6 +193,7 @@
         <!-- الأرنب · وردي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeBunny"
+            android:theme="@style/Theme.Karbon.Icon.Bunny"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_bunny"
@@ -201,6 +208,7 @@
         <!-- الباندا · فضي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimePanda"
+            android:theme="@style/Theme.Karbon.Icon.Panda"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_panda"
@@ -215,6 +223,7 @@
         <!-- الأكسولوتل · ليموني — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeAxolotl"
+            android:theme="@style/Theme.Karbon.Icon.Axolotl"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_axolotl"
@@ -229,6 +238,7 @@
         <!-- الهمستر · ذهبي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeHamster"
+            android:theme="@style/Theme.Karbon.Icon.Hamster"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_hamster"

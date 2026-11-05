@@ -6,13 +6,18 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.unit.dp
+import com.mahdi.components.compose.appbars.LocalHomeAction
+import com.mahdi.components.compose.appbars.LocalTopBarLogo
 import com.mahdi.file.FileManager
 import com.mahdi.resources.strings
 import com.mahdi.theme.MahdiTheme
+import com.mahdi.ui.components.AppLogo
 import com.mahdi.utils.toast
 import java.lang.ref.WeakReference
 
@@ -37,6 +42,12 @@ class SettingsActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             MahdiTheme {
+                // 5.0.0: زر «الرئيسية» + الشعار الديناميكي في شريط **كل** شاشات الإعدادات.
+                // في الإعدادات «الرئيسية» = المحرّر، لذلك الإجراء هو إنهاء هذا النشاط.
+                CompositionLocalProvider(
+                    LocalHomeAction provides { finish() },
+                    LocalTopBarLogo provides { AppLogo(size = 26.dp, cornerRadius = 8.dp) },
+                ) {
                 Surface {
                     val navController = rememberNavController()
                     settingsNavController = WeakReference(navController)
@@ -55,6 +66,7 @@ class SettingsActivity : AppCompatActivity() {
                             }
                         }
                     }
+                }
                 }
             }
         }

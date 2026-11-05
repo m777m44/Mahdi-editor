@@ -85,6 +85,22 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
                 )
             }
 
+            // 5.0.0: مركز التحديثات — فحص + تنزيل + تثبيت داخل التطبيق
+            SettingsItem(
+                label = stringResource(strings.update_center_title),
+                description = stringResource(strings.update_entry_desc),
+                showSwitch = false,
+                default = false,
+                endWidget = {
+                    Icon(
+                        modifier = Modifier.padding(16.dp),
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                    )
+                },
+                sideEffect = { navController.navigate(SettingsRoutes.Updates.route) },
+            )
+
             SettingsItem(
                 label = stringResource(strings.check_for_updates),
                 description = stringResource(strings.check_for_updates_desc),

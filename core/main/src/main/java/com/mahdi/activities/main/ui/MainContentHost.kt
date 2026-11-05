@@ -1,5 +1,6 @@
 package com.mahdi.activities.main.ui
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,11 +16,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -29,20 +33,25 @@ import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mahdi.activities.main.MainActivity
+import com.mahdi.activities.settings.SettingsActivity
+import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.components.DialogRegistry
 import com.mahdi.components.GlobalDialogHost
 import com.mahdi.components.ResponsiveDrawer
 import com.mahdi.drawer.DrawerContent
 import com.mahdi.drawer.DrawerPersistence
 import com.mahdi.filetree.FileTreeViewModel
+import com.mahdi.resources.getFilledString
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.search.SearchViewModel
 import com.mahdi.settings.Settings
 import com.mahdi.tabs.editor.EditorTab
 import com.mahdi.theme.MahdiTheme
+import com.mahdi.update.AppUpdateChecker
 import com.mahdi.utils.dialogRes
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.launch
@@ -69,6 +78,33 @@ fun MainActivity.MainContentHost(
 
             LaunchedEffect(drawerState) { drawerStateRef = WeakReference(drawerState) }
             LaunchedEffect(snackbarHostState) { snackbarHostStateRef = WeakReference(snackbarHostState) }
+
+            // 5.0.0: إشعار تحديث داخل الواجهة — سطر واحد قابل للضغط، لا نافذة تحجب العمل.
+            // يظهر مرة واحدة لكل إصدار، ويُسجَّل بعد عرضه فعلًا (لا عند اكتشافه).
+            val pendingUpdate by AppUpdateChecker.pending.collectAsStateWithLifecycle()
+            val context = androidx.compose.ui.platform.LocalContext.current
+            LaunchedEffect(pendingUpdate) {
+                val update = pendingUpdate ?: return@LaunchedEffect
+                if (!AppUpdateChecker.shouldNotify(context, update.version)) return@LaunchedEffect
+
+                val result =
+                    snackbarHostState.showSnackbar(
+                        message = strings.update_new_available.getFilledString(update.version),
+                        actionLabel = strings.update_action.getString(),
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Long,
+                    )
+
+                AppUpdateChecker.markNotified(context, update.version)
+
+                if (result == SnackbarResult.ActionPerformed) {
+                    val activity = MainActivity.instance ?: return@LaunchedEffect
+                    activity.startActivity(
+                        Intent(activity, SettingsActivity::class.java)
+                            .putExtra("route", SettingsRoutes.Updates.route)
+                    )
+                }
+            }
 
             LaunchedEffect(drawerState.isOpen) {
                 val viewModel = MainActivity.instance?.viewModel ?: return@LaunchedEffect

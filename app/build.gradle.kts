@@ -17,12 +17,13 @@ android {
         applicationId = "com.mahdi.editor"
         minSdk = 26
 
-        targetSdk = 37
+        // 5.0.0: خُفِّض إلى 35 لتفادي مشاكل توافق أندرويد 16 (SDK 36/37)
+        targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // versioning
-        versionCode = 24
-        versionName = "4.3.2"
+        versionCode = 25
+        versionName = "5.0.0"
         vectorDrawables { useSupportLibrary = true }
     }
 

@@ -61,6 +61,9 @@ sealed class SettingsRoutes(val route: String) {
     /** 4.3.0: مساحة التخزين — تفصيل الحجم الحقيقي وتنظيف آمن. */
     data object StorageManager : SettingsRoutes("storage_manager")
 
+    /** 5.0.0: مركز التحديثات — فحص وتنزيل وتثبيت داخل التطبيق. */
+    data object Updates : SettingsRoutes("updates")
+
     data object ThemeDetail : SettingsRoutes("theme_detail")
 
     data object IconPackDetail : SettingsRoutes("icon_pack_detail")
