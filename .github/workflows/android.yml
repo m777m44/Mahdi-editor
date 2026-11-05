@@ -88,6 +88,51 @@ jobs:
           cp "out/Mahdi-Editor.apk" "out/Mahdi-Editor-v${APP_VERSION}.apk"
           ls -lh out
 
+      # ═══════════════════════════════════════════════════════════════════════════
+      # حرس دائم ضدّ خطأ 4.3.0: عند استبدال كتلة الأيقونات في البيان حُذفت معها
+      # شاشة الانهيار والإعدادات ومزوّد الملفات، فصار أي استثناء يُغلق التطبيق
+      # بصمت. هذه الخطوة تفحص البيان **النهائي داخل الـ APK** وتُفشل البناء إن
+      # غاب أي مكوّن أساسي — فلا يمكن أن يتكرّر العطل مهما تعدّل البيان.
+      # ═══════════════════════════════════════════════════════════════════════════
+      - name: Verify APK manifest components
+        run: |
+          set -uo pipefail
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          if [ ! -x "$AAPT2" ]; then echo "::error::aapt2 غير موجود"; exit 1; fi
+          "$AAPT2" dump xmltree --file AndroidManifest.xml out/Mahdi-Editor.apk > /tmp/apk_manifest.txt
+          echo "أسطر البيان: $(wc -l < /tmp/apk_manifest.txt)"
+          fail=0
+          check() {
+            if grep -qF "$1" /tmp/apk_manifest.txt; then
+              echo "✅ $1"
+            else
+              echo "::error::مكوّن مفقود من بيان الـ APK: $1"
+              fail=1
+            fi
+          }
+          check com.mahdi.activities.main.MainActivity
+          check com.mahdi.crashhandler.CrashActivity
+          check com.mahdi.activities.settings.SettingsActivity
+          check com.mahdi.project.ProjectCreatorActivity
+          check com.mahdi.extension.api.ExtensionActivity
+          check com.mahdi.DocumentProvider
+          check com.mahdi.settings.debugOptions.LogcatService
+          check androidx.core.content.FileProvider
+          check com.mahdi.application.icon.IconAnimeFox
+          check com.mahdi.application.icon.IconAnimeHamster
+          aliases=$(grep -c 'E: activity-alias' /tmp/apk_manifest.txt || true)
+          echo "عدد الأيقونات البديلة: $aliases"
+          if [ "${aliases:-0}" -lt 10 ]; then
+            echo "::error::عدد الأيقونات $aliases أقل من 10"; fail=1
+          fi
+          launcher=$(grep -c 'android.intent.category.LAUNCHER' /tmp/apk_manifest.txt || true)
+          echo "مرشّحات LAUNCHER: $launcher"
+          if [ "${launcher:-0}" -lt 1 ]; then
+            echo "::error::لا توجد أيقونة تشغيل (LAUNCHER) في البيان"; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "❌ بيان الـ APK ناقص — أوقفنا الإصدار"; exit 1; fi
+          echo "✅ بيان الـ APK كامل"
+
       # عند فشل التجميع في طلب دمج: انشر أسطر الخطأ كتعليق على الطلب،
       # حتى يراها من لا يملك صلاحية الوصول إلى سجلات Actions.
       - name: Report build errors on PR

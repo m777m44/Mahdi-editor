@@ -77,20 +77,24 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
                 runCatching { logError(failure, "crash screen failed") }
             }
 
-        // إبقاء الخيط الرئيسي حيًّا بعد عرض الشاشة حتى لا يموت التطبيق فجأة
+        // إبقاء الخيط الرئيسي حيًّا بعد عرض الشاشة حتى لا يموت التطبيق فجأة.
+        // 4.3.2: بحدّ أقصى ثلاث محاولات — قبل ذلك كانت الحلقة لا تنتهي: أي خطأ
+        // متكرّر في الخيط الرئيسي كان يُنشئ خيطًا جديدًا في كل دورة، فيتحوّل
+        // الانهيار إلى دوامة استهلاك (خيوط لا نهائية) بدل إغلاق نظيف.
         if (Looper.myLooper() != null) {
-            while (true) {
+            var recoveries = 0
+            while (recoveries < 3) {
                 try {
                     Looper.loop()
                     return
                 } catch (t: Throwable) {
-                    Thread {
-                        t.printStackTrace()
-                        logErrorOrExit(t)
-                    }
-                        .start()
+                    recoveries++
+                    t.printStackTrace()
+                    runCatching { logError(t, "main looper recovery #$recoveries") }
                 }
             }
+            // ثلاث محاولات فاشلة = الحالة غير قابلة للاستمرار
+            logErrorOrExit(IllegalStateException("main looper kept throwing; giving up"))
         }
     }
 
