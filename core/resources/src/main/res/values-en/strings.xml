@@ -1166,4 +1166,11 @@ Thank you for using Mahdi-Editor.</string>
     <string name="app_icon_internal_note_body">The settings top bar and the splash screen show the same chosen icon, not a fixed one.</string>
     <string name="home_action">Home</string>
     <string name="back_to_home">Back to editor</string>
+    <string name="storage_calculating">Calculating size…</string>
+    <string name="storage_cached">Saved from the last scan — updating now</string>
+    <string name="storage_partial">Approximate (≈): the quick scan did not finish every folder.</string>
+    <string name="storage_full_scan">Full scan</string>
+    <string name="storage_scan_failed">Could not calculate the size</string>
+    <string name="storage_retry">Retry</string>
+    <string name="storage_clean_partial">Partly cleaned: %1$s freed — the Ubuntu cleanup timed out</string>
 </resources>

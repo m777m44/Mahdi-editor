@@ -18,9 +18,8 @@ package com.mahdi.components.compose.appbars
 
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Home
@@ -68,6 +67,14 @@ fun TopBar(
     val onHome = LocalHomeAction.current
     val logo = LocalTopBarLogo.current
 
+    /**
+     * أيقونات البداية: رجوع + الرئيسية.
+     *
+     * 5.0.2: يُوضع الشعار هنا لا داخل العنوان. السبب: `LargeTopAppBar` يرسم
+     * العنوان مرّتين (كبيرًا عند التوسّع وصغيرًا عند الطيّ) مع تلاشٍ متبادل،
+     * فوضع الشعار داخل العنوان كان يُظهره مكرّرًا فوق بعضه أثناء التمرير —
+     * وهو ما ظهر في لقطة شاشة المستخدم. أيقونات البداية تُرسم مرّة واحدة.
+     */
     val navigationIcon: @Composable () -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (backArrowVisible) {
@@ -81,17 +88,14 @@ fun TopBar(
                     Icon(imageVector = Icons.Rounded.Home, contentDescription = null)
                 }
             }
+            if (logo != null) {
+                Row(modifier = Modifier.padding(start = 4.dp, end = 4.dp)) { logo() }
+            }
         }
     }
 
     val title: @Composable () -> Unit = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (logo != null) {
-                logo()
-                Spacer(Modifier.width(10.dp))
-            }
-            Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 
     if (isExpandedScreen) {

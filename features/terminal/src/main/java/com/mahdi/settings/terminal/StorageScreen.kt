@@ -1,5 +1,6 @@
 package com.mahdi.settings.terminal
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,10 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,64 +42,117 @@ import com.mahdi.resources.strings
 import com.mahdi.storage.AppStorage
 import com.mahdi.theme.SkyAccent
 import com.mahdi.theme.SkyBadge
+import com.mahdi.utils.logError
 import com.mahdi.utils.toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * «مساحة التخزين» (4.3.0).
+ * «مساحة التخزين» (5.0.2).
  *
- * الجواب المباشر على سؤال «لماذا ٣ غيغابايت؟»: الرقم في «معلومات التطبيق» يجمع
- * البيانات لا التطبيق — صورة أوبنتو + ما ثبّته المستخدم داخلها + المخازن
- * والبقايا المؤقتة. الشاشة تعرض التفصيل بالحجم الحقيقي من القرص، وتوفّر تنظيفًا
- * آمنًا لا يمسّ ملفات المستخدم ولا الحزم المخزّنة للعمل بلا إنترنت.
+ * ## ما كان معطوبًا
+ * الشاشة كانت تفتح على `…` **إلى الأبد**: الفحص كان يمشي على شجرة بيانات التطبيق
+ * (صورة أوبنتو: مئات آلاف الملفات) **سبع مرّات** بلا مهلة ولا إلغاء، وزرّ
+ * «تنظيف آمن» ينتظر أوبنتو ٩٠ ثانية ثم يعيد المشي مرّتين — فيبدو الزرّ كأنه
+ * لا يعمل، والشاشة كأنها معلّقة.
+ *
+ * ## ما صار الآن
+ * - تُعرض **آخر نتيجة محفوظة فورًا**، ثم يُحدَّث الرقم في الخلفية بفحص **واحد**
+ *   بمهلة ٤ ثوانٍ.
+ * - شاشة تحميل واضحة («جارٍ حساب الحجم…») بدل `…` الصامتة، وحالة خطأ بزرّ
+ *   إعادة محاولة بدل الفشل الصامت.
+ * - إن لم يُكمل الفحص السريع كل المجلدات يظهر الرقم بعلامة «≈» مع زرّ «فحص كامل».
+ * - زرّ التنظيف يعمل على خطوات محدودة المدة، ويعرض حالة «جارٍ التنظيف…»،
+ *   وينتهي **دائمًا** برسالة: إمّا الحجم المحرَّر أو أن شيئًا لم يُنظَّف.
  */
 @Composable
 fun StorageScreen() {
+    val context = LocalContext.current
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val scope = rememberCoroutineScope()
 
-    var report by remember { mutableStateOf<AppStorage.Report?>(null) }
-    var loading by remember { mutableStateOf(true) }
+    // نبدأ من آخر نتيجة محفوظة: الشاشة لا تفتح على "…" أبدًا
+    var report by remember { mutableStateOf(AppStorage.cachedReport(context)) }
+    var loading by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     var cleaning by remember { mutableStateOf(false) }
 
-    fun refresh() {
+    fun scan(full: Boolean = false) {
+        if (loading || cleaning) return
+        loading = true
+        failed = false
         scope.launch {
-            loading = true
-            report = withContext(Dispatchers.IO) { runCatching { AppStorage.report() }.getOrNull() }
+            val result =
+                withContext(Dispatchers.IO) {
+                    runCatching { if (full) AppStorage.fullReport() else AppStorage.report() }
+                }
+            result
+                .onSuccess { report = it }
+                .onFailure {
+                    failed = true
+                    logError(it, "storage report")
+                }
             loading = false
         }
     }
 
-    LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(Unit) { scan() }
 
     RefreshablePreferenceLayout(
         label = stringResource(strings.storage_title),
         isRefreshing = loading,
-        onRefresh = { refresh() },
+        onRefresh = { scan() },
     ) {
-        // ————— البطاقة الرئيسية —————
+        // ——————————————— البطاقة الرئيسية ———————————————
         PreferenceGroup {
             val r = report
+            val ratio by
+                animateFloatAsState(
+                    targetValue =
+                        if (r == null || r.deviceTotal <= 0L) 0f
+                        else (r.total.toFloat() / r.deviceTotal).coerceIn(0f, 1f),
+                    label = "storage-ratio",
+                )
+
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
                 Text(
                     text = stringResource(strings.storage_total),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    text = if (r == null) "…" else AppStorage.format(r.total),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                    color = SkyAccent,
-                )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = when {
+                            r == null && loading -> stringResource(strings.storage_calculating)
+                            r == null -> stringResource(strings.storage_scan_failed)
+                            r.partial -> "≈ ${AppStorage.format(r.total)}"
+                            else -> AppStorage.format(r.total)
+                        },
+                        style =
+                            if (r == null && loading) {
+                                MaterialTheme.typography.titleMedium
+                            } else {
+                                MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                            },
+                        color = SkyAccent,
+                    )
+
+                    if (loading && r != null) {
+                        Spacer(Modifier.size(10.dp))
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = SkyAccent,
+                        )
+                    }
+                }
 
                 Spacer(Modifier.height(10.dp))
 
                 LinearProgressIndicator(
-                    progress = {
-                        if (r == null || r.deviceTotal == 0L) 0f else (r.total.toFloat() / r.deviceTotal).coerceIn(0f, 1f)
-                    },
+                    progress = { ratio },
                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)),
                     color = SkyAccent,
                 )
@@ -108,11 +165,42 @@ fun StorageScreen() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(strings.storage_free, if (r == null) "…" else AppStorage.format(r.deviceFree)),
+                        text =
+                            stringResource(
+                                strings.storage_free,
+                                if (r == null) "…" else AppStorage.format(r.deviceFree),
+                            ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     SkyBadge(text = stringResource(strings.storage_app_data), showDot = false)
+                }
+
+                // حالة «بلا بيانات» أو «فشل الفحص»: زرّ إعادة بدل الانتظار الصامت
+                if (r == null && !loading) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text =
+                            if (failed) {
+                                stringResource(strings.storage_scan_failed)
+                            } else {
+                                stringResource(strings.storage_calculating)
+                            },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    TextButton(onClick = { scan() }) {
+                        Text(stringResource(strings.storage_retry))
+                    }
+                }
+
+                if (r != null && r.fromCache && !loading) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(strings.storage_cached),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -124,13 +212,13 @@ fun StorageScreen() {
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
         )
 
-        // ————— التفصيل —————
+        // ——————————————— التفصيل ———————————————
         val r = report
-        if (r != null) {
+        if (r != null && r.groups.isNotEmpty()) {
             val max = r.groups.maxOfOrNull { it.size }?.coerceAtLeast(1) ?: 1
 
             PreferenceGroup(heading = stringResource(strings.storage_where)) {
-                r.groups.forEach { entry ->
+                r.groups.filter { it.size > 0 }.forEach { entry ->
                     StorageRow(
                         label = entry.label(isArabic),
                         size = entry.size,
@@ -144,16 +232,32 @@ fun StorageScreen() {
                     val maxInner = r.sandboxTop.maxOf { it.size }.coerceAtLeast(1)
                     r.sandboxTop.forEach { entry ->
                         StorageRow(
-                            label = "${entry.labelAr}/",
+                            label = if (isArabic) entry.labelAr else entry.labelEn,
                             size = entry.size,
                             fraction = entry.size.toFloat() / maxInner,
                         )
                     }
                 }
             }
+
+            // أرقام تقريبية ⇒ نُخبر المستخدم ونعطيه فحصًا كاملًا
+            if (r.partial) {
+                PreferenceGroup {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        Text(
+                            text = stringResource(strings.storage_partial),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = { scan(full = true) }, enabled = !loading) {
+                            Text(stringResource(strings.storage_full_scan))
+                        }
+                    }
+                }
+            }
         }
 
-        // ————— التنظيف —————
+        // ——————————————— التنظيف ———————————————
         PreferenceGroup(heading = stringResource(strings.storage_clean_section)) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
                 Text(
@@ -161,23 +265,57 @@ fun StorageScreen() {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+
                 Spacer(Modifier.height(12.dp))
+
                 FilledTonalButton(
                     onClick = {
                         if (cleaning) return@FilledTonalButton
                         cleaning = true
                         val before = report?.total ?: 0L
+
                         scope.launch {
-                            val freed = withContext(Dispatchers.IO) { runCatching { AppStorage.clean() }.getOrDefault(0L) }
-                            val fresh = withContext(Dispatchers.IO) { runCatching { AppStorage.report() }.getOrNull() }
-                            report = fresh
+                            val result =
+                                withContext(Dispatchers.IO) {
+                                    runCatching { AppStorage.cleanDetailed() }
+                                }
+
+                            result
+                                .onSuccess { outcome ->
+                                    // فحص قصير جدًا للرقم الجديد — لا نُجمّد الشاشة بفحص كامل
+                                    val fresh =
+                                        withContext(Dispatchers.IO) {
+                                            runCatching { AppStorage.report(budgetMs = 2_500L) }.getOrNull()
+                                        }
+                                    if (fresh != null) report = fresh
+
+                                    val measured =
+                                        if (fresh != null && before > 0L) {
+                                            (before - fresh.total).coerceAtLeast(0L)
+                                        } else {
+                                            outcome.freed
+                                        }
+
+                                    when {
+                                        measured > 0L && outcome.sandboxFailed ->
+                                            toast(
+                                                strings.storage_clean_partial
+                                                    .getFilledString(AppStorage.format(measured)),
+                                            )
+                                        measured > 0L ->
+                                            toast(
+                                                strings.storage_cleaned
+                                                    .getFilledString(AppStorage.format(measured)),
+                                            )
+                                        else -> toast(strings.storage_nothing.getString())
+                                    }
+                                }
+                                .onFailure {
+                                    logError(it, "storage clean")
+                                    toast(strings.storage_nothing.getString())
+                                }
+
                             cleaning = false
-                            val actual = if (fresh != null && before > 0) (before - fresh.total).coerceAtLeast(0) else freed
-                            if (actual > 0) {
-                                toast(strings.storage_cleaned.getFilledString(AppStorage.format(actual)))
-                            } else {
-                                toast(strings.storage_nothing.getString())
-                            }
                         }
                     },
                     enabled = !cleaning,
@@ -190,6 +328,15 @@ fun StorageScreen() {
                             } else {
                                 stringResource(strings.storage_clean)
                             }
+                    )
+                }
+
+                // مؤشّر تقدّم غير محدّد: المستخدم يرى أن العمل جارٍ، والزرّ معطّل
+                if (cleaning) {
+                    Spacer(Modifier.height(10.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(6.dp)),
+                        color = SkyAccent,
                     )
                 }
             }
