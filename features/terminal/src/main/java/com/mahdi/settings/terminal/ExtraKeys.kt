@@ -40,6 +40,10 @@ import com.mahdi.utils.openDocs
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.rounded.Home
+import com.mahdi.components.compose.appbars.LocalHomeAction
 
 const val DEFAULT_TERMINAL_EXTRA_KEYS =
     ("[" +
@@ -92,8 +96,17 @@ fun TerminalExtraKeys() {
             Column {
                 TopAppBar(
                     navigationIcon = {
-                        IconButton(onClick = { backDispatcher?.onBackPressed() }) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { backDispatcher?.onBackPressed() }) {
+                                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                            // 5.0.0: زر «الرئيسية» — يعيد إلى المحرّر من أي شاشة
+                            val homeAction = LocalHomeAction.current
+                            if (homeAction != null) {
+                                IconButton(onClick = { homeAction() }) {
+                                    Icon(imageVector = Icons.Rounded.Home, contentDescription = null)
+                                }
+                            }
                         }
                     },
                     title = { Text(stringResource(strings.change_extra_keys)) },
