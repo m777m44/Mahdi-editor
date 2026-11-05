@@ -57,6 +57,7 @@ object AppIconSwitcher {
             AppIcon("anime_bunny", "IconAnimeBunny", "الأرنب الوردي", "Pink Bunny", R.mipmap.ic_launcher_anime_bunny, 0xFF1E0E12),
             AppIcon("anime_panda", "IconAnimePanda", "الباندا الفضائي", "Space Panda", R.mipmap.ic_launcher_anime_panda, 0xFF04091C),
             AppIcon("anime_axolotl", "IconAnimeAxolotl", "الأكسولوتل الأخضر", "Green Axolotl", R.mipmap.ic_launcher_anime_axolotl, 0xFF010C01),
+            AppIcon("anime_hamster", "IconAnimeHamster", "الهمستر الذهبي", "Golden Hamster", R.mipmap.ic_launcher_anime_hamster, 0xFF130403),
         )
 
     /** الأيقونة الافتراضية (المعلنة `enabled=true` في البيان). */
