@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mahdi.appicon.AppIconSwitcher
@@ -51,7 +52,10 @@ fun AppLogo(
             AppIconSwitcher.icons.firstOrNull { it.id == currentId } ?: AppIconSwitcher.icons.first()
         }
 
-    val bitmap = rememberIconImage(icon.previewRes, sizePx = 512)
+    // نطلب من الأيقونة بعدد البكسلات الفعلي على الشاشة (لا 512 دائمًا) حتى لا
+    // نستهلك ميغابايت لكل شعار صغير في الشريط العلوي.
+    val sizePx = with(LocalDensity.current) { size.roundToPx() }.coerceIn(48, 768)
+    val bitmap = rememberIconImage(icon.previewRes, sizePx = sizePx)
 
     Box(
         modifier =
