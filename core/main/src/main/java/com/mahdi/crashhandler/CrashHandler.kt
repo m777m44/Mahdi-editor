@@ -39,10 +39,10 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
         runCatching { persist(ex, thread) }
 
         runCatching {
-            if (
-                ex.message.toString().contains("android.view.View$BaseSavedState") ||
-                    ex.message.toString().contains("android.widget.HorizontalScrollView$SavedState")
-            ) {
+            // الأقواس الدولارية داخل نص Kotlin تُهرَّب حتى تبقى أسماء الأصناف حرفية
+            val viewState = "android.view.View" + '\u0024' + "BaseSavedState"
+            val scrollState = "android.widget.HorizontalScrollView" + '\u0024' + "SavedState"
+            if (ex.message.toString().contains(viewState) || ex.message.toString().contains(scrollState)) {
                 Log.w("CrashHandler", "Ignoring crash")
             }
 
