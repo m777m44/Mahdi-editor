@@ -346,15 +346,15 @@ object AppStorage {
 
             // 1) ذاكرة التطبيق
             steps++
-            freed += deleteChildren(app.cacheDir, note)
+            freed += deleteChildren(app.cacheDir, ::note)
 
             // 2) مجلد الملفات المؤقتة للتطبيق
             steps++
-            freed += deleteChildren(runCatching { getTempDir() }.getOrNull(), note)
+            freed += deleteChildren(runCatching { getTempDir() }.getOrNull(), ::note)
 
             // 3) مجلد tmp المحلي
             steps++
-            freed += deleteChildren(File(runCatching { localDir() }.getOrNull() ?: app.filesDir, "tmp"), note)
+            freed += deleteChildren(File(runCatching { localDir() }.getOrNull() ?: app.filesDir, "tmp"), ::note)
 
             // 4) مجلدات التشغيل القديمة في ~/mahdi-run (أقدم من ٣ أيام)
             steps++
