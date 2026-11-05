@@ -35,6 +35,7 @@ import com.mahdi.icons.MahdiIcon
 import com.mahdi.resources.strings
 import com.mahdi.settings.Preference
 import com.mahdi.settings.Settings
+import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.editor.refreshEditors
 import com.mahdi.utils.application
 import com.mahdi.utils.logError
@@ -81,6 +82,24 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
                 },
                 sideEffect = { navController.navigate(SettingsRoutes.IconPacks.route) },
             )
+
+            // 4.3.0: مساحة التخزين — شاشة تفصيل تُسجَّل من وحدة الطرفية
+            if (SettingsRegistry.routes.value.any { it.route == SettingsRoutes.StorageManager.route }) {
+                SettingsItem(
+                    label = stringResource(strings.storage_title),
+                    description = stringResource(strings.storage_entry_desc),
+                    showSwitch = false,
+                    default = false,
+                    endWidget = {
+                        Icon(
+                            modifier = Modifier.padding(16.dp),
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                        )
+                    },
+                    sideEffect = { navController.navigate(SettingsRoutes.StorageManager.route) },
+                )
+            }
 
             SettingsItem(
                 label = stringResource(strings.check_for_updates),

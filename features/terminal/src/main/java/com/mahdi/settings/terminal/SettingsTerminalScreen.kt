@@ -110,6 +110,16 @@ fun SettingsTerminalScreen(overrideNavController: NavController? = null) {
             )
         }
 
+        // 4.3.0: مساحة التخزين — أين تذهب البيانات وكيف تُنظَّف بأمان
+        PreferenceGroup(heading = stringResource(strings.storage_title)) {
+            NextScreenCard(
+                label = stringResource(strings.storage_title),
+                description = stringResource(strings.storage_entry_desc),
+                navController = overrideNavController ?: settingsNavController.get(),
+                route = SettingsRoutes.StorageManager,
+            )
+        }
+
         PreferenceGroup(heading = stringResource(strings.advanced)) {
             if (FeatureRegistry.isEnabled("debug_mode")) {
                 SettingsItem(

@@ -113,6 +113,7 @@ class TerminalFeature : Feature {
         routes.add(DynamicRoute(SettingsRoutes.TerminalSettings.route) { _, _ -> SettingsTerminalScreen() })
         routes.add(DynamicRoute(SettingsRoutes.TerminalExtraKeys.route) { _, _ -> TerminalExtraKeys() })
         routes.add(DynamicRoute(SettingsRoutes.TerminalCheck.route) { _, _ -> TerminalCheckScreen() })
+        routes.add(DynamicRoute(SettingsRoutes.StorageManager.route) { _, _ -> com.mahdi.settings.terminal.StorageScreen() })
         routes.add(DynamicRoute(SettingsRoutes.TerminalFontScreen.route) { _, _ -> TerminalFontScreen() })
 
         routes.forEach { SettingsRegistry.registerRoute(it) }

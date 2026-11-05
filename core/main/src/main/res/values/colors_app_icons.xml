@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_bg_sky">#0B1E33</color>
-    <color name="ic_bg_amber">#1C1408</color>
-    <color name="ic_bg_mint">#06241D</color>
-    <color name="ic_bg_violet">#1B1030</color>
-    <color name="ic_bg_rose">#2A0B18</color>
-    <color name="ic_bg_slate">#101620</color>
-    <color name="ic_bg_cyan">#04202B</color>
-    <color name="ic_bg_lime">#101A05</color>
-    <color name="ic_bg_magenta">#26062B</color>
+    <!-- 4.3.0: خلفيات أيقونات الأنمي العشر (لون مستخرج من حافة كل عمل فني) -->
+    <color name="ic_bg_anime_fox">#030E2F</color>
+    <color name="ic_bg_anime_cat">#1C073F</color>
+    <color name="ic_bg_anime_robot">#000A0D</color>
+    <color name="ic_bg_anime_owl">#170D0A</color>
+    <color name="ic_bg_anime_penguin">#1D466E</color>
+    <color name="ic_bg_anime_dragon">#040F19</color>
+    <color name="ic_bg_anime_bunny">#1E0E12</color>
+    <color name="ic_bg_anime_panda">#04091C</color>
+    <color name="ic_bg_anime_axolotl">#010C01</color>
 </resources>
