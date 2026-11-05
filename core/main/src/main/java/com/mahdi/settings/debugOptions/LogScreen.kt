@@ -49,6 +49,8 @@ import com.mahdi.utils.dialogRes
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.rounded.Home
+import com.mahdi.components.compose.appbars.LocalHomeAction
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,8 +91,17 @@ fun LogScreen(
                 Column {
                     TopAppBar(
                         navigationIcon = {
-                            IconButton(onClick = { backDispatcher?.onBackPressed() }) {
-                                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { backDispatcher?.onBackPressed() }) {
+                                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                }
+                                // 5.0.0: زر «الرئيسية» — يعيد إلى المحرّر من أي شاشة
+                                val homeAction = LocalHomeAction.current
+                                if (homeAction != null) {
+                                    IconButton(onClick = { homeAction() }) {
+                                        Icon(imageVector = Icons.Rounded.Home, contentDescription = null)
+                                    }
+                                }
                             }
                         },
                         title = { Text(stringResource(strings.logs)) },
