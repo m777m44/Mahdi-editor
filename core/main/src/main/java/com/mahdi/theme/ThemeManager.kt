@@ -127,6 +127,18 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
      *
      * @see indexLocalThemes
      */
+    /**
+     * يضمن رفع شاشة البداية (4.3.1).
+     *
+     * كانت شاشة البداية تبقى معلّقة للأبد لو فشل تحميل الثيم قبل الوصول إلى
+     * `_activeThemeReady = true` (ثيم مخصّص تالف، أو استثناء غير متوقّع). الآن
+     * يُستدعى هذا بعد محاولة التحميل دائمًا، فلا يبقى المستخدم أمام شعار ساكن.
+     */
+    fun ensureActiveThemeReady() {
+        if (_activeThemeReady.value) return
+        _activeThemeReady.value = true
+    }
+
     suspend fun loadActiveTheme() {
         // ترحيل لمرّة واحدة قبل قراءة الثيم: الافتراضي صار «السمائي» (3.2.0)
         runCatching { migrateDefaultTheme() }

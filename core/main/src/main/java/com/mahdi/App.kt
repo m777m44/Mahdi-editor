@@ -18,6 +18,7 @@ import com.mahdi.editor.KeywordManager
 import com.mahdi.editor.LanguageManager
 import com.mahdi.extension.ActivityProvider
 import com.mahdi.icons.pack.IconPackManager
+import com.mahdi.icons.pack.currentIconPack
 import com.mahdi.lsp.FileIconProvider
 import com.mahdi.lsp.LspPersistence
 import com.mahdi.lsp.MarkdownImageProvider
@@ -83,23 +84,28 @@ open class App : Application() {
         logInfo("App.onCreate")
         registerActivityLifecycleCallbacks(ActivityProvider)
 
-        LspPersistence.restoreServers()
+        runCatching { LspPersistence.restoreServers() }.onFailure { logError(it, "LSP restore") }
 
         MarkdownImageProvider.register()
         FileIconProvider.register()
 
-        CommandProvider.buildCommands()
+        runCatching { CommandProvider.buildCommands() }.onFailure { logError(it, "buildCommands") }
         // 4.2.0: إضافات النظام (11 قدرة + 24 أداة = 35) تُسجَّل في لوحة الأوامر منذ الإقلاع
         runCatching { com.mahdi.ext.BuiltinExtensions.registerCommands() }
-        KeybindingsManager.loadKeybindings()
+        runCatching { KeybindingsManager.loadKeybindings() }.onFailure { logError(it, "keybindings") }
         // 4.1.0: زرّ «الترميز» في شريط المحرّر (ترحيل لمرّة واحدة لمن لم يعدّل شريطه)
         runCatching { ToolbarConfiguration.migrateEncodingCommand() }
 
         // ثيمات المستخدم المخصّصة (Color Wheel) تُدمج في القائمة قبل بناء الواجهة
-        themeManager.registerCustomThemes()
+        runCatching { themeManager.registerCustomThemes() }.onFailure { logError(it, "custom themes") }
 
-        // 4.0.0: أيقونة التطبيق — نضمن أن الأيقونة المحفوظة مفعّلة (بعد تحديث أو إعادة تشغيل)
-        runCatching { com.mahdi.appicon.AppIconSwitcher.restore(this) }
+        // 4.3.1: أيقونة التطبيق تُصلَح **على خيط IO** لا على الخيط الرئيسي.
+        // كان هذا الاستدعاء يكتب في PackageManager عشر مرات متزامنة بعد تغيير
+        // معرّفات الأيقونات، فيتجاوز مهلة ANR ويقتل النظام التطبيق عند الإقلاع.
+        GlobalScope.launch(Dispatchers.IO) {
+            runCatching { com.mahdi.appicon.AppIconSwitcher.restore(this@App) }
+                .onFailure { logError(it, "App icon restore") }
+        }
 
         val currentLocale = Locale.forLanguageTag(Settings.current_lang)
         val appLocale = LocaleListCompat.create(currentLocale)
@@ -110,65 +116,85 @@ open class App : Application() {
         // المخزون: قراءة اللغات المثبَّتة فعليًا داخل الـ sandbox (2.7.0)
         runCatching { com.mahdi.lang.LanguageInstallStore.refresh() }
 
-        GlobalScope.launch(Dispatchers.IO) {
-            launch(Dispatchers.IO) {
-                iconPackManager.indexLocalPacks()
-                // 2.5.0: أُزيلت «الألوان الديناميكية» (Monet) — نُبطلها دائمًا حتى تبقى الثيمات الأربعة فقط
-                if (Settings.monet) Settings.monet = false
-
-                iconPackManager.indexStoreIconPacks()
+        // 4.3.1: كل تهيئة خلفية محميّة على حدة.
+        // قبل ذلك كان أي استثناء في أي `launch` (شبكة المتجر، جلسة قديمة تالفة،
+        // خط محفوظ مفقود…) يُسقط العملية كلها بلا رسالة — فيرى المستخدم التطبيق
+        // يُغلق وحده بعد ثانية من فتحه.
+        fun guarded(name: String, block: suspend () -> Unit) {
+            GlobalScope.launch(Dispatchers.IO) {
+                runCatching { block() }.onFailure { logError(it, "startup: $name") }
             }
-            launch(Dispatchers.IO) {
-                themeManager.indexLocalThemes()
-                themeManager.indexStoreThemes()
-            }
+        }
 
-            launch { LanguageManager.initGrammarRegistry() }
+        guarded("icon packs") {
+            iconPackManager.indexLocalPacks()
+            // 2.5.0: أُزيلت «الألوان الديناميكية» (Monet) — نُبطلها دائمًا حتى تبقى الثيمات الأربعة فقط
+            if (Settings.monet) Settings.monet = false
 
-            launch { KeywordManager.initKeywordRegistry(this@App) }
-
-            launch { CodeHighlighter.registerMarkdownCodeHighlighter(this@App) }
-
-            launch(Dispatchers.IO) { SessionManager.preloadSession() }
-
-            launch(Dispatchers.IO) {
-                val editorFontPath = Settings.editor_font_path.ifEmpty { DEFAULT_EDITOR_FONT_PATH }
-                val isEditorAsset = if (editorFontPath.isNotEmpty()) Settings.is_editor_font_asset else true
-
-                val appFontPath = Settings.app_font_path.ifEmpty { DEFAULT_APP_FONT_PATH }
-                val isAppAsset = if (editorFontPath.isNotEmpty()) Settings.is_app_font_asset else true
-
-                val terminalFontPath = Settings.terminal_font_path.ifEmpty { DEFAULT_TERMINAL_FONT_PATH }
-                val isTerminalAsset = if (terminalFontPath.isNotEmpty()) Settings.is_terminal_font_asset else true
-
-                FontCache.loadFont(this@App, editorFontPath, isEditorAsset)
-                FontCache.loadFont(this@App, appFontPath, isAppAsset)
-                FontCache.loadFont(this@App, terminalFontPath, isTerminalAsset)
+            // حزمة أيقونات محذوفة في الإعدادات → نرجع إلى أيقونات النظام بدل حالة معلّقة
+            if (Settings.icon_pack.isNotEmpty() && iconPackManager.localIconPacks.value[Settings.icon_pack] == null) {
+                Settings.icon_pack = ""
+                currentIconPack.value = null
             }
 
-            launch(Dispatchers.IO) { Preference.preloadAllSettings() }
+            iconPackManager.indexStoreIconPacks()
+        }
 
-            launch { DocumentProvider.setDocumentProviderEnabled(this@App, Settings.expose_home_dir) }
+        guarded("themes") {
+            themeManager.indexLocalThemes()
+            themeManager.indexStoreThemes()
+        }
 
-            launch(Dispatchers.IO) {
-                getTempDir().apply {
-                    if (exists() && listFiles().isNullOrEmpty().not()) {
-                        deleteRecursively()
-                    }
+        guarded("grammars") { LanguageManager.initGrammarRegistry() }
+
+        guarded("keywords") { KeywordManager.initKeywordRegistry(this@App) }
+
+        guarded("markdown") { CodeHighlighter.registerMarkdownCodeHighlighter(this@App) }
+
+        // استعادة الجلسة: ملف تالف أو تبويب لملف محذوف لا يجب أن يُسقط التطبيق
+        guarded("session") { SessionManager.preloadSession() }
+
+        guarded("fonts") {
+            val editorFontPath = Settings.editor_font_path.ifEmpty { DEFAULT_EDITOR_FONT_PATH }
+            val isEditorAsset = if (editorFontPath.isNotEmpty()) Settings.is_editor_font_asset else true
+
+            val appFontPath = Settings.app_font_path.ifEmpty { DEFAULT_APP_FONT_PATH }
+            val isAppAsset = if (editorFontPath.isNotEmpty()) Settings.is_app_font_asset else true
+
+            val terminalFontPath = Settings.terminal_font_path.ifEmpty { DEFAULT_TERMINAL_FONT_PATH }
+            val isTerminalAsset = if (terminalFontPath.isNotEmpty()) Settings.is_terminal_font_asset else true
+
+            runCatching { FontCache.loadFont(this@App, editorFontPath, isEditorAsset) }
+            runCatching { FontCache.loadFont(this@App, appFontPath, isAppAsset) }
+            runCatching { FontCache.loadFont(this@App, terminalFontPath, isTerminalAsset) }
+        }
+
+        guarded("preferences") { Preference.preloadAllSettings() }
+
+        guarded("document provider") { DocumentProvider.setDocumentProviderEnabled(this@App, Settings.expose_home_dir) }
+
+        guarded("temp dir") {
+            getTempDir().apply {
+                if (exists() && listFiles().isNullOrEmpty().not()) {
+                    deleteRecursively()
                 }
             }
+        }
 
-            launch { runCatching { UpdateChecker.checkForUpdates("main") } }
+        guarded("update check") { UpdateChecker.checkForUpdates("main") }
 
-            // wait until UpdateManager is done, it should only take few milliseconds
-            UpdateManager.inspect()
+        guarded("update manager") { UpdateManager.inspect() }
 
-            // debug options
-            startThemeFlipperIfNotRunning()
+        guarded("theme flipper") { startThemeFlipperIfNotRunning() }
+
+        guarded("logcat") {
             if (Settings.enable_logcat) {
                 LogcatService.start(this@App)
             }
         }
+
+        // 4.3.1: تقرير آخر انهيار (إن وُجد) يظهر في «سجلّات التطبيق» ليعرف المستخدم السبب
+        guarded("crash report") { CrashHandler.surfaceLastCrash(this@App) }
 
         if (Settings.anr_watchdog) {
             ANRWatchDog().start()

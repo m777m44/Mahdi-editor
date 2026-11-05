@@ -127,25 +127,36 @@ object AppIconSwitcher {
     }
 
     /**
-     * يُصلح الحالة عند الإقلاع بلا أي مسح شامل.
+     * يُصلح الحالة عند الإقلاع — **بلا أي كتابة على الخيط الرئيسي**.
      *
-     * نتحقّق من مكوّن واحد فقط: هل alias المحفوظ مفعّل؟ إن كان كذلك لا نلمس شيئًا.
-     * إن لم يكن (تحديث أزال الأيقونة من الشاشة الرئيسية، أو اختلال حالة) نُعيد
-     * التطبيق بقوة مرة واحدة.
+     * تاريخ هذا الإصلاح (4.3.1): في 4.3.0 كانت هذه الدالة تُستدعى من
+     * `App.onCreate` على الخيط الرئيسي، وبعد تغيير معرّفات الأيقونات صارت تأخذ
+     * مسار `force` في كل إقلاع أول بعد التحديث = **عشر عمليات كتابة في
+     * PackageManager** متزامنة. على أجهزة MIUI/HyperOS هذه العمليات بطيئة
+     * وتأخذ قفل الحزم، فيتجاوز الإقلاع مهلة ANR فيقتل النظام التطبيق — وهو ما
+     * يراه المستخدم «يفتح التطبيق ثم يخرج وحده».
+     *
+     * الآن: قراءة واحدة، ولا نلمس شيئًا إن كانت الأيقونة مفعّلة أصلًا، ولا
+     * نستدعي `force` أبدًا هنا. الاستدعاء نفسه انتقل إلى خيط IO في [App].
      */
     fun restore(context: Context) {
         val chosen = current(context)
+        val pm = context.packageManager
         val component = ComponentName(context.packageName, chosen.aliasClassName)
 
-        val enabled =
-            runCatching {
-                    context.packageManager.getComponentEnabledSetting(component) ==
-                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                }
-                .getOrDefault(false)
+        val state =
+            runCatching { pm.getComponentEnabledSetting(component) }
+                .getOrDefault(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT)
 
-        if (enabled) return
-        runCatching { apply(context, chosen.id, force = true) }
+        val alreadyActive =
+            state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED ||
+                // الافتراضية معلنة enabled=true في البيان، فحالة DEFAULT تعني مفعّلة
+                (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && chosen.id == DEFAULT_ICON_ID)
+
+        if (alreadyActive) return
+
+        runCatching { apply(context, chosen.id, force = false) }
+            .onFailure { logError(it, "Failed to restore app icon") }
     }
 
     /** اسم الأيقونة العربية/الإنجليزية للعرض. */
