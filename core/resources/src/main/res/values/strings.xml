@@ -1189,4 +1189,11 @@
     <string name="app_icon_internal_note_body">الشريط العلوي في الإعدادات وشاشة البداية يعرضان الأيقونة المختارة نفسها، لا أيقونة ثابتة.</string>
     <string name="home_action">الرئيسية</string>
     <string name="back_to_home">العودة إلى المحرّر</string>
+    <string name="storage_calculating">جارٍ حساب الحجم…</string>
+    <string name="storage_cached">قيمة محفوظة من آخر فحص — تُحدَّث الآن</string>
+    <string name="storage_partial">الأرقام تقريبية (≈): الفحص السريع لم يُكمل كل المجلدات.</string>
+    <string name="storage_full_scan">فحص كامل</string>
+    <string name="storage_scan_failed">تعذّر حساب الحجم</string>
+    <string name="storage_retry">إعادة المحاولة</string>
+    <string name="storage_clean_partial">نُظِّف جزئيًا: حُرِّر %1$s — انتهت مهلة تنظيف أوبنتو</string>
 </resources>
