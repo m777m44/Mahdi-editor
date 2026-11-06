@@ -22,6 +22,14 @@ class HttpServer(
         start()
     }
 
+    private companion object {
+        /**
+         * صفحات أكبر من هذا تُخدم كما هي (لا تُقرأ في الذاكرة) — المعاينة تبقى آمنة.
+         * ملاحظة: `MIME_HTML` غير معرّف هنا عمدًا؛ فهو ثابت موروث من `NanoHTTPD`.
+         */
+        const val MAX_INJECT_BYTES = 4 * 1024 * 1024L
+    }
+
     override fun useGzipWhenAccepted(r: Response?): Boolean {
         return false
     }
@@ -59,6 +67,48 @@ class HttpServer(
         }
     }
 
+    /**
+     * 6.0.0: يجعل **كل** صفحة HTML يخدمها الخادم متجاوبة مع شاشة الهاتف.
+     *
+     * سبب المشكلة في الجهاز الحقيقي: صفحة بلا `<meta name="viewport">` تُخطَّط
+     * بعرض افتراضي (980px) فلا تنكمش على شاشة ٤٠٠dp، فتُقطع من اليمين ولا يمكن
+     * التمرير أفقياً (أو يظهر شريط أفقي). الحل هنا لا يعتمد على أن يكتب المستخدم
+     * الوسم بنفسه:
+     *
+     * 1. يُحقن وسم viewport إن كان غائبًا.
+     * 2. تُحقن قاعدة CSS تصغيرية تُبقي الصور والجداول داخل العرض.
+     *
+     * يتمّ كل ذلك على الخادم، فتستفيد منه المعاينة وأي متصفح خارجي يفتح العنوان.
+     */
+    private fun injectResponsive(html: String): String {
+        if (html.length.toLong() > MAX_INJECT_BYTES) return html
+
+        val viewport =
+            """<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">"""
+        val css =
+            """<style id="mahdi-responsive">html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden;box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}img,video,iframe,svg,table,pre{max-width:100%;height:auto}pre{overflow-x:auto}</style>"""
+
+        val needsViewport = !html.contains("name=\"viewport\"", ignoreCase = true)
+        val needsCss = !html.contains("id=\"mahdi-responsive\"")
+        if (!needsViewport && !needsCss) return html
+
+        val head = buildString {
+            if (needsViewport) append(viewport)
+            if (needsCss) append(css)
+        }
+
+        val headIndex = html.indexOf("</head>", ignoreCase = true)
+        if (headIndex >= 0) return html.substring(0, headIndex) + head + html.substring(headIndex)
+
+        val htmlTag = Regex("<html[^>]*>", RegexOption.IGNORE_CASE).find(html)
+        if (htmlTag != null) {
+            val end = htmlTag.range.last + 1
+            return html.substring(0, end) + head + html.substring(end)
+        }
+
+        return head + html
+    }
+
     private suspend fun serveFileWithEruda(file: FileObject): Response {
         return try {
             val mime = URLConnection.guessContentTypeFromName(file.getName()) ?: "application/octet-stream"
@@ -78,11 +128,12 @@ class HttpServer(
                     .trimIndent()
 
             val html = file.getInputStream().bufferedReader().use { it.readText() }
+            val withResponsive = injectResponsive(html)
             val injected =
-                if (html.contains("<head>", ignoreCase = true)) {
-                    html.replace("<head>", "<head>$erudaScript", ignoreCase = true)
+                if (withResponsive.contains("<head>", ignoreCase = true)) {
+                    withResponsive.replace("<head>", "<head>$erudaScript", ignoreCase = true)
                 } else {
-                    erudaScript + html
+                    erudaScript + withResponsive
                 }
 
             newFixedLengthResponse(Status.OK, mime, injected)
@@ -95,9 +146,17 @@ class HttpServer(
 
     private suspend fun serveFileWithoutEruda(file: FileObject): Response {
         return try {
+            val mime = URLConnection.guessContentTypeFromName(file.getName()) ?: "application/octet-stream"
+
+            // صفحات HTML: تُقرأ وتُحقن ثم تُرسل، لضمان التجاوب مع كل شاشة (6.0.0)
+            if (mime == MIME_HTML && file.length() <= MAX_INJECT_BYTES) {
+                val html = file.getInputStream().bufferedReader().use { it.readText() }
+                return newFixedLengthResponse(Status.OK, mime, injectResponsive(html))
+            }
+
             newFixedLengthResponse(
                 Status.OK,
-                URLConnection.guessContentTypeFromName(file.getName()) ?: "application/octet-stream",
+                mime,
                 file.getInputStream(),
                 file.length(),
             )

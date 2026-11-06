@@ -1182,4 +1182,6 @@
 
     <string name="storage_clean_cache">تنظيف الذاكرة المؤقتة</string>
     <string name="storage_clean_temp">تنظيف الملفات المؤقتة</string>
+
+    <string name="languages_tab_commands">الأوامر</string>
 </resources>
