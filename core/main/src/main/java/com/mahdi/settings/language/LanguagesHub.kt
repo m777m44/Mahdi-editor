@@ -37,13 +37,16 @@ import com.mahdi.settings.lsp.LspContent
 import com.mahdi.theme.SkyAccent
 
 /**
- * مركز اللغات (6.0.0) — كل ما يخصّ اللغة في شاشة واحدة، خمسة تبويبات:
+ * مركز اللغات (6.1.0) — كل ما يخصّ اللغة في شاشة واحدة، أربعة تبويبات:
  *
  * 1. **لغة الواجهة** — العربية/الإنجليزية، وعلامة ✓ على المختار.
  * 2. **لغات البرمجة** — المضمّنة · المثبّتة (✖️ للحذف) · المتاحة للتثبيت.
- * 3. **المشغلات** — إصدار كل مفسّر، مساره، التثبيت بنسبة حقيقية، وإعادة المحاولة.
- * 4. **الأوامر** — الأسماء الحقيقية والاختصارات التي تُحلّ داخليًا (`py` → `python3`).
- * 5. **خوادم اللغة** — خوادم LSP: تثبيت، تشغيل/إيقاف، ✖️ للحذف.
+ * 3. **المشغلات** — إصدار كل مفسّر، مساره، تثبيت **وحذف**، وإعادة المحاولة.
+ * 4. **خوادم اللغة** — خوادم LSP: تثبيت، تشغيل/إيقاف، ✖️ للحذف.
+ *
+ * (6.1.0) أُزيل تبويب «الأوامر»: الاختصارات تعمل كما هي (`py` → `python3`) بلا
+ * واجهة تعرضها، لأن الشاشة يجب أن تحتوي أدوات لا شروحًا — والاختصارات ليست
+ * إعدادًا يغيّره المستخدم.
  *
  * ## لماذا أُعيدت كتابة هذه الشاشة (إصلاح الشاشة الفارغة)
  * النسخة السابقة كانت تبني الشاشة كـ `Column` ثم تُسند إلى القائمة `Modifier.weight(1f)`
@@ -71,7 +74,6 @@ fun LanguagesHub(modifier: Modifier = Modifier, navController: NavController? = 
             stringResource(strings.app_language_section),
             stringResource(strings.programming_languages),
             stringResource(strings.languages_tab_runtimes),
-            stringResource(strings.languages_tab_commands),
             stringResource(strings.languages_tab_lsp),
         )
 
@@ -135,7 +137,6 @@ fun LanguagesHub(modifier: Modifier = Modifier, navController: NavController? = 
                             0 -> LanguageContent()
                             1 -> SupportedLanguagesContent()
                             2 -> RuntimesContent()
-                            3 -> TerminalAliasesContent()
                             else ->
                                 if (navController != null) {
                                     LspContent(navController)

@@ -1,6 +1,5 @@
 package com.mahdi.terminal
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -11,14 +10,11 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -54,8 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mahdi.file.child
 import com.mahdi.file.sandboxHomeDir
@@ -138,28 +134,33 @@ fun rememberDownloadProgress(): DownloadProgress? {
     }.value
 }
 
-/** الغلاف المتحرّك: يظهر بانزلاق ناعم من الأسفل ويختفي بتلاشٍ. */
+/**
+ * بطاقة التقدّم المصغّرة (6.1.0).
+ *
+ * قبل 6.1.0 كانت بطاقة بعرض الشاشة كامل تلتصق بأسفل الطرفية فوق شريط المفاتيح.
+ * الآن صارت بطاقة صغيرة **مثبَّتة داخل الطرفية** في طرفها السفلي: الاسم والنسبة
+ * وشريط رقيق في مساحة لا تتجاوز ١٩٦dp، فلا تحجب نصًّا ولا تغطّي الأزرار.
+ */
 @Composable
-fun DownloadProgressOverlay(progress: DownloadProgress?, modifier: Modifier = Modifier) {
+fun DownloadProgressDock(progress: DownloadProgress?, modifier: Modifier = Modifier) {
     var last by remember { mutableStateOf<DownloadProgress?>(null) }
     LaunchedEffect(progress) { if (progress != null) last = progress }
 
     AnimatedVisibility(
         visible = progress != null,
         enter =
-            slideInVertically(animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f)) { it / 2 } +
-                fadeIn(animationSpec = tween(220)),
-        exit = slideOutVertically(animationSpec = tween(260)) { it / 2 } + fadeOut(animationSpec = tween(200)),
+            slideInHorizontally(animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f)) { it / 2 } +
+                fadeIn(animationSpec = tween(160)),
+        exit = slideOutHorizontally(animationSpec = tween(180)) { it / 2 } + fadeOut(animationSpec = tween(140)),
         modifier = modifier,
     ) {
-        last?.let { DownloadProgressCard(it) }
+        last?.let { DockCard(it) }
     }
 }
 
 @Composable
-private fun DownloadProgressCard(progress: DownloadProgress) {
+private fun DockCard(progress: DownloadProgress) {
     val scheme = MaterialTheme.colorScheme
-    // نص الطور بلغة التطبيق: العربية افتراضيًا، والإنجليزية عند اختيارها
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val stageText = if (isArabic || progress.stageEn.isBlank()) progress.stage else progress.stageEn
     val done = progress.done
@@ -180,95 +181,60 @@ private fun DownloadProgressCard(progress: DownloadProgress) {
     val animatedPercent by
         animateFloatAsState(
             targetValue = progress.percent.toFloat(),
-            animationSpec = tween(durationMillis = 650, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-            label = "percent",
+            animationSpec = tween(durationMillis = 400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            label = "dockPercent",
         )
 
+    val shape = RoundedCornerShape(14.dp)
+
     Surface(
-        shape = RoundedCornerShape(26.dp),
-        color = scheme.surfaceContainerHigh,
-        shadowElevation = 14.dp,
-        tonalElevation = 3.dp,
+        shape = shape,
+        color = scheme.surfaceContainerHigh.copy(alpha = 0.97f),
+        shadowElevation = 6.dp,
         modifier =
-            Modifier.fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+            Modifier.widthIn(max = 196.dp)
                 .border(
                     width = 1.dp,
                     brush =
                         Brush.linearGradient(
-                            listOf(accentStart.copy(alpha = 0.55f), accentEnd.copy(alpha = 0.20f)),
+                            listOf(accentStart.copy(alpha = 0.55f), accentEnd.copy(alpha = 0.18f)),
                         ),
-                    shape = RoundedCornerShape(26.dp),
+                    shape = shape,
                 ),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier =
-                        Modifier.size(44.dp)
-                            .background(
-                                brush = Brush.linearGradient(listOf(accentStart, accentEnd)),
-                                shape = CircleShape,
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector =
-                            when {
-                                failed -> Icons.Filled.Warning
-                                done -> Icons.Filled.CheckCircle
-                                else -> Icons.Filled.KeyboardArrowDown
-                            },
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-
-                Spacer(Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = progress.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    AnimatedContent(
-                        targetState = stageText,
-                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
-                        label = "stage",
-                    ) { stage ->
-                        Text(
-                            text = stage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = "${animatedPercent.toInt()}",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        color = if (done || failed) accentStart else scheme.onSurface,
-                    )
-                    Text(
-                        text = "%",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                }
+                Icon(
+                    imageVector =
+                        when {
+                            failed -> Icons.Filled.Warning
+                            done -> Icons.Filled.CheckCircle
+                            else -> Icons.Filled.KeyboardArrowDown
+                        },
+                    contentDescription = null,
+                    tint = accentStart,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text = progress.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "${animatedPercent.toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Black,
+                    color = accentStart,
+                )
             }
-
-            Spacer(Modifier.height(12.dp))
 
             GradientProgress(
                 progress = (animatedPercent / 100f).coerceIn(0f, 1f),
@@ -276,19 +242,16 @@ private fun DownloadProgressCard(progress: DownloadProgress) {
                 end = accentEnd,
                 track = scheme.surfaceContainerHighest,
                 animated = !done && !failed,
+                height = 5.dp,
             )
 
-            if (progress.detail.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = progress.detail,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = scheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Start,
-                )
-            }
+            Text(
+                text = if (progress.detail.isNotBlank() && !done && !failed) progress.detail else stageText,
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -301,6 +264,7 @@ private fun GradientProgress(
     end: Color,
     track: Color,
     animated: Boolean,
+    height: Dp = 10.dp,
 ) {
     val shimmer =
         rememberInfiniteTransition(label = "shimmer")
@@ -311,7 +275,7 @@ private fun GradientProgress(
                 label = "shimmerOffset",
             )
 
-    Canvas(modifier = Modifier.fillMaxWidth().height(10.dp)) {
+    Canvas(modifier = Modifier.fillMaxWidth().height(height)) {
         val h = size.height
         val w = size.width
         val radius = CornerRadius(h / 2f, h / 2f)

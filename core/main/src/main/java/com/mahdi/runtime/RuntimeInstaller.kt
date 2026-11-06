@@ -171,7 +171,36 @@ object RuntimeInstaller {
         markNotInstalled(id)
     }
 
-    /** يزيل بيئة تشغيل: يحذف العلامة ويُخبر المستخدم أن إزالة الحزم من الطرفية. */
+    /**
+     * يحذف بيئة تشغيل فعليًا (6.1.0).
+     *
+     * قبل 6.1.0 كانت الإزالة «نسيانًا» فقط: تُمسح علامة التثبيت وتبقى الحزم في
+     * الجذر، فتعود البيئة «مثبَّتة» بعد أول فحص. الآن تُشغَّل إزالة حقيقية داخل
+     * الطرفية (`install_runtime --remove`) عبر apt، مع حذف العلامة والحالة.
+     *
+     * @return `false` إن لم يكن بالإمكان البدء (لا نشاط).
+     */
+    fun uninstall(activity: Activity?, spec: RuntimeSpec): Boolean {
+        if (activity == null) return false
+
+        markPending(spec.id)
+        val command =
+            "if [ -x \"\$LOCAL/bin/install_runtime\" ]; then " +
+                "bash \"\$LOCAL/bin/install_runtime\" --remove ${shellQuote(spec.id)} ${shellQuote(spec.packages)}; " +
+                "else rm -f ~/.mahdi/installed/${shellQuote(spec.id)}; fi"
+
+        TerminalLauncher.launch(
+            activity = activity,
+            exe = "/bin/bash",
+            args = arrayOf("-lc", command),
+            id = "remove-${spec.id}",
+            terminatePreviousSession = true,
+        )
+        startWatcher()
+        return true
+    }
+
+    /** يزيل علامة التثبيت فقط بلا حذف الحزم (يُستدعى عند حذف لغة). */
     fun forget(id: String) {
         runCatching { specMarkerFile(id).delete() }
         runCatching { specStatusFile(id).delete() }

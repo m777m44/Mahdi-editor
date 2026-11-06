@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
+import com.mahdi.activities.main.MainActivity
 import com.mahdi.settings.Settings
 import com.mahdi.theme.MahdiTheme
 
@@ -122,6 +124,25 @@ fun BrowserScreen(initialUrl: String, onClose: () -> Unit) {
                     }
                 },
                 actions = {
+                    // 6.1.0: زر «الرئيسية» — العودة إلى الشاشة الرئيسية من المعاينة مباشرة
+                    IconButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(context, MainActivity::class.java).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    }
+                                )
+                            }
+                            onClose()
+                        }
+                    ) {
+                        Icon(
+                            Icons.Filled.Home,
+                            contentDescription = if (isArabic) "الرئيسية" else "Home",
+                        )
+                    }
                     IconButton(onClick = { webView?.reload() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = if (isArabic) "إعادة تحميل" else "Reload")
                     }

@@ -30,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,12 +39,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,10 +61,14 @@ import com.mahdi.file.FileWrapper
 import com.mahdi.filetree.FileTreeTab
 import com.mahdi.filetree.getAppropriateName
 import com.mahdi.icons.MahdiIcon
-import com.mahdi.resources.drawables
+import com.mahdi.resources.strings
 import com.mahdi.session.RecentFile
 import com.mahdi.session.RecentFiles
 import com.mahdi.tabs.editor.EditorTab
+import com.mahdi.text.bidiNumbers
+import com.mahdi.ui.components.AppLogo
+import com.mahdi.update.AppUpdateChecker
+import com.mahdi.update.UpdateDownloader
 import com.mahdi.utils.toast
 import java.io.File
 import java.text.SimpleDateFormat
@@ -106,11 +113,13 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
             modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp).widthIn(max = 560.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                painter = painterResource(drawables.mahdi_editor),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(56.dp).padding(bottom = 12.dp),
+            // 6.1.0: بدل شعار النحلة/الثلج المتجه الرمادي، تظهر **أيقونة التطبيق
+            // الحقيقية** التي اختارها المستخدم (شخصية كرتونية ثلاثية الأبعاد بحرف M)
+            // بظلّ خفيف على شكل البطاقة — نفس ما يراه على الشاشة الرئيسية للهاتف.
+            AppLogo(
+                size = 74.dp,
+                cornerRadius = 20.dp,
+                modifier = Modifier.padding(bottom = 12.dp),
             )
 
             currentProject?.let { project ->
@@ -201,6 +210,143 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                         CommandProvider.SettingsCommand,
                     )
             )
+        }
+
+        // 6.1.0: شريط التحديث في أسفل الشاشة الرئيسية — بأيقونة التطبيق وزرّي
+        // «تحديث» و«إلغاء» بدل إشعار عابر في الأعلى.
+        HomeUpdateBar(modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp))
+    }
+}
+
+/**
+ * شريط «تحديث متاح» في أسفل الرئيسية (6.1.0).
+ *
+ * يظهر فقط عند وجود إصدار أحدث من GitHub (يقرأه [AppUpdateChecker] عند الإقلاع)،
+ * وفيه:
+ * - **أيقونة التطبيق** بجانب النص (نفس أيقونة المستخدم الحالية عبر [AppLogo]).
+ * - **تحديث** — ينزّل APK داخل التطبيق بنسبة تقدّم ثم يفتح المُثبّت.
+ * - **إلغاء** — يُخفي الشريط لهذا الإصدار بلا إزعاج.
+ */
+@Composable
+private fun HomeUpdateBar(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val update by AppUpdateChecker.pending.collectAsStateWithLifecycle()
+    val status by UpdateDownloader.status.collectAsStateWithLifecycle()
+    val progress by UpdateDownloader.progress.collectAsStateWithLifecycle()
+
+    val isArabic = LocalConfiguration.current.locales[0].language == "ar"
+    // يُخفى لكل إصدار على حدة: إصدار جديد = شريط جديد ("" = لم يُخفَ شيء)
+    var hiddenVersion by rememberSaveable { mutableStateOf("") }
+
+    // 6.1.0: لا نفتح المُثبّت تلقائيًا إلا إذا بدأ التنزيل من هذه الشاشة الآن.
+    // بدون هذا الشرط تُفتح حزمة قديمة نُزّلت في جلسة سابقة بمجرّد فتح الرئيسية.
+    var startedHere by remember { mutableStateOf(false) }
+
+    val info = update ?: return
+    if (hiddenVersion == info.version) return
+
+    val downloading = status is UpdateDownloader.Status.Downloading
+    val failed = status as? UpdateDownloader.Status.Failed
+
+    // عند اكتمال التنزيل: افتح مُثبّت الحزمة مباشرة (بلا متصفح)
+    LaunchedEffect(status) {
+        val done = status as? UpdateDownloader.Status.Done ?: return@LaunchedEffect
+        if (!startedHere) return@LaunchedEffect
+        startedHere = false
+        if (!UpdateDownloader.install(context, done.apk)) {
+            toast(
+                if (isArabic) "امنح الإذن «تثبيت تطبيقات من هذا المصدر» ثم أعد المحاولة"
+                else "Allow installing apps from this source, then try again"
+            )
+        }
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AppLogo(size = 34.dp)
+
+                Spacer(Modifier.width(10.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(strings.home_update_available),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text =
+                            when {
+                                downloading -> "${(progress * 100).toInt()}%".bidiNumbers()
+                                failed != null ->
+                                    if (isArabic) "تعذّر التنزيل — أعد المحاولة" else "Download failed — retry"
+                                else ->
+                                    if (isArabic) {
+                                        "الإصدار ${info.version} · ${info.sizeText} م.ب".bidiNumbers()
+                                    } else {
+                                        "Version ${info.version} · ${info.sizeText} MB".bidiNumbers()
+                                    }
+                            },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                Spacer(Modifier.width(6.dp))
+
+                Button(
+                    onClick = {
+                        if (downloading) {
+                            startedHere = false
+                            UpdateDownloader.reset()
+                        } else {
+                            startedHere = true
+                            scope.launch { UpdateDownloader.download(context, info) }
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        text =
+                            if (downloading) {
+                                if (isArabic) "إيقاف" else "Stop"
+                            } else {
+                                if (isArabic) "تحديث" else "Update"
+                            },
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+
+                TextButton(
+                    onClick = {
+                        hiddenVersion = info.version
+                        startedHere = false
+                        UpdateDownloader.reset()
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                ) {
+                    Text(if (isArabic) "إلغاء" else "Cancel", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            if (downloading) {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }

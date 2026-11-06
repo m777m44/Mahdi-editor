@@ -32,6 +32,23 @@ fi
 
 mahdi_have() { command -v "$1" >/dev/null 2>&1; }
 
+# —————————————————————— رسائل الفشل بلغة عربية هادئة (6.1.0) ——————————————————————
+# قبل 6.1.0 كان المستخدم يرى عشرات أسطر:
+#   WARNING: Retrying (Retry(total=4, ...)) after connection broken ...
+#   ...
+#   ModuleNotFoundError: No module named 'telegram'
+# الآن: سطر أو سطران، بلا English ولا traceback.
+
+mahdi_deps_offline() {
+  printf '\033[33m⚠ لا يوجد اتصال بالإنترنت — لم تُثبَّت المكتبات: %s\033[0m\n' "$1" >&2
+  printf '\033[2m  وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+}
+
+mahdi_deps_missing() {
+  printf '\033[31m✖ تعذّر تجهيز المكتبات: %s\033[0m\n' "$1" >&2
+  printf '\033[2m  تحقّق من الاتصال ثم أعد المحاولة، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+}
+
 # ————————————————————————————— أدوات مساعدة —————————————————————————————
 
 # تنزيل سريع: aria2c بثمانية اتصالات إن وُجد، وإلا curl مع استئناف وإعادة محاولة
@@ -200,28 +217,51 @@ mahdi_pip_run() {
   local script
   script="$(mahdi_pip_runner)"
   if [ -f "$script" ]; then
-    if python3 "$script" --name "$name" "$@"; then
-      return 0
-    fi
-    # خطة بديلة صامتة إن فشل المثبّت الذكي لأي سبب
+    local rc=0
+    # || rc=$? : المشغّل يعمل بـ set -e، فأي رمز فشل غير مُختبَر يُنهي الجلسة
+    python3 "$script" --name "$name" "$@" || rc=$?
+    [ "$rc" -eq 0 ] && return 0
+    # 6.1.0: رمز ٢ = لا يوجد اتصال. لا نكرّر المحاولة بعشر رسائل pip فاشلة.
+    [ "$rc" -eq 2 ] && return 2
+    # خطة بديلة صامتة إن فشل المثبّت الذكي لسبب آخر
   fi
   if declare -f mahdi_prog_start >/dev/null 2>&1; then
     mahdi_prog_start "$name" "تثبيت مباشر بـ pip…"
     mahdi_prog 40 "تثبيت المكتبة" "$name"
   fi
-  python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-    --quiet --no-input --retries 5 --timeout 30 "$@" || return 1
-  declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم التثبيت" "$name"
-  return 0
+  # 6.1.0: كل ضجيج pip إلى ملف مؤقت — الطرفية تعرض سطرًا واحدًا فقط عند الفشل
+  local log="${TMPDIR:-/tmp}/mahdi-pip-$$.log"
+  if python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+    --quiet --no-input --retries 3 --timeout 20 "$@" >"$log" 2>&1; then
+    rm -f "$log" 2>/dev/null || true
+    declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم التثبيت" "$name"
+    return 0
+  fi
+  rm -f "$log" 2>/dev/null || true
+  return 1
 }
 
 mahdi_pip_one() {
   local pkg="$1"
-  mahdi_pip_run "$pkg" "$pkg" && return 0
-  # إعادة محاولة عبر المصدر الرسمي
-  python3 -m pip install --upgrade --prefer-binary --no-input --retries 3 --timeout 30 "$pkg" && return 0
-  python3 -m pip install --upgrade --prefer-binary --no-input --retries 3 --timeout 30 \
-    -i "https://pypi.org/simple" "$pkg" && return 0
+  local log="${TMPDIR:-/tmp}/mahdi-pip-one-$$.log"
+  local rc=0
+  mahdi_pip_run "$pkg" "$pkg" || rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  # 6.1.0: لا اتصال → سطر واحد فقط، وبلا محاولات pip صاخبة
+  [ "$rc" -eq 2 ] && return 2
+  # إعادة محاولة صامتة عبر المصدر الرسمي
+  python3 -m pip install --upgrade --prefer-binary --no-input --quiet \
+    --disable-pip-version-check --retries 2 --timeout 20 "$pkg" >"$log" 2>&1 && {
+    rm -f "$log" 2>/dev/null || true
+    return 0
+  }
+  python3 -m pip install --upgrade --prefer-binary --no-input --quiet \
+    --disable-pip-version-check --retries 2 --timeout 20 \
+    -i "https://pypi.org/simple" "$pkg" >"$log" 2>&1 && {
+    rm -f "$log" 2>/dev/null || true
+    return 0
+  }
+  rm -f "$log" 2>/dev/null || true
   warn "تعذّر تثبيت $pkg"
   return 1
 }
@@ -237,8 +277,13 @@ mahdi_pip_install_many() {
     return 0
   fi
 
-  local p
-  for p in "${pkgs[@]}"; do mahdi_pip_one "$p" || true; done
+  local p rc
+  for p in "${pkgs[@]}"; do
+    rc=0
+    mahdi_pip_one "$p" || rc=$?
+    # 6.1.0: لا اتصال — لا فائدة من تجربة بقية الحزم حزمةً حزمة
+    [ "$rc" -eq 2 ] && return 2
+  done
   return 0
 }
 
@@ -528,7 +573,13 @@ mahdi_py_deps() {
   fi
 
   info "سيُثبَّت: ${missing[*]}"
-  mahdi_pip_install_many "${missing[@]}"
+  local pip_rc=0
+  mahdi_pip_install_many "${missing[@]}" || pip_rc=$?
+  # 6.1.0: لا اتصال — سطر واحد واضح بدل سلسلة محاولات فاشلة
+  if [ "$pip_rc" -eq 2 ]; then
+    # الرسالة العربية طُبعت بالفعل من مثبّت المكتبات (سطر واحد) — لا نكرّرها
+    return 2
+  fi
 
   local -a still=()
   while IFS= read -r line; do
@@ -538,7 +589,7 @@ mahdi_py_deps() {
   if [ ${#still[@]} -gt 0 ]; then
     info "إعادة المحاولة: ${still[*]}"
     mahdi_apt_install build-essential python3-dev >/dev/null 2>&1 || true
-    mahdi_pip_install_many "${still[@]}"
+    mahdi_pip_install_many "${still[@]}" || true
   fi
 
   local -a final=()
@@ -547,7 +598,9 @@ mahdi_py_deps() {
   done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
 
   if [ ${#final[@]} -gt 0 ]; then
-    warn "لم تُثبَّت: ${final[*]}"
+    # 6.1.0: رسالة عربية واحدة مفهومة، بلا آثار pip ولا أخطاء خام
+    mahdi_deps_missing "${final[*]}"
+    return 3
   elif declare -f success >/dev/null 2>&1; then
     success "المكتبات جاهزة — بدء التشغيل"
   else
@@ -643,7 +696,7 @@ mahdi_node_deps() {
     mahdi_node_installed "$name" "$dir" || left+=("$name")
   done
   if [ ${#left[@]} -gt 0 ]; then
-    warn "لم تُثبَّت: ${left[*]}"
+    mahdi_deps_missing "${left[*]}"
   elif declare -f success >/dev/null 2>&1; then
     success "مكتبات Node جاهزة — بدء التشغيل"
   fi
@@ -686,10 +739,12 @@ mahdi_php_deps() {
 mahdi_auto_deps() {
   local file="$1"
   [ "$MAHDI_AUTO_DEPS" = "0" ] && return 0
+  # ملاحظة: الفشل لا يُوقف التشغيل — سكربت قد يعمل بلا المكتبة الناقصة،
+  # والمشغّل يعرض رسالة عربية واحدة ويكمل (6.1.0).
   case "$file" in
-    *.py) mahdi_py_deps "$file" ;;
-    *.js | *.mjs | *.cjs | *.ts | *.tsx) mahdi_node_deps "$file" ;;
-    *.php) mahdi_php_deps "$file" ;;
+    *.py) mahdi_py_deps "$file" || true ;;
+    *.js | *.mjs | *.cjs | *.ts | *.tsx) mahdi_node_deps "$file" || true ;;
+    *.php) mahdi_php_deps "$file" || true ;;
   esac
   return 0
 }

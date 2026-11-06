@@ -7,7 +7,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -169,7 +168,27 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                     }
                 ) { paddingValues ->
                     Column(modifier = Modifier.padding(paddingValues)) {
-                        TerminalView(isDarkMode, currentTheme, surfaceColor, onSurfaceColor, terminalActivity)
+                        // 6.1.0: بطاقة التقدّم صارت صغيرة ومثبّتة **داخل** منطقة الطرفية
+                        // (كانت سابقًا شريطًا بعرض الشاشة يغطّي أسفلها وشريط المفاتيح).
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            TerminalView(
+                                isDarkMode = isDarkMode,
+                                currentTheme = currentTheme,
+                                surfaceColor = surfaceColor,
+                                onSurfaceColor = onSurfaceColor,
+                                terminalActivity = terminalActivity,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+
+                            val downloadProgress = rememberDownloadProgress()
+                            DownloadProgressDock(
+                                progress = downloadProgress,
+                                modifier =
+                                    Modifier.align(Alignment.BottomEnd)
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                        .zIndex(3f),
+                            )
+                        }
 
                         // شريط الأدوات السريع (2.6.0): أوامر جاهزة بلمسة واحدة
                         TerminalQuickBar()
@@ -250,23 +269,17 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                 }
             },
         )
-
-        // بطاقة تقدّم تنزيل/تثبيت المكتبات: تظهر تلقائيًا أعلى شريط المفاتيح
-        val downloadProgress = rememberDownloadProgress()
-        DownloadProgressOverlay(
-            progress = downloadProgress,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp).zIndex(3f),
-        )
     }
 }
 
 @Composable
-private fun ColumnScope.TerminalView(
+private fun TerminalView(
     isDarkMode: Boolean,
     currentTheme: ThemeHolder,
     surfaceColor: Int,
     onSurfaceColor: Int,
     terminalActivity: Terminal,
+    modifier: Modifier = Modifier,
 ) {
     AndroidView(
         factory = { context ->
@@ -359,7 +372,7 @@ private fun ColumnScope.TerminalView(
                 }
             }
         },
-        modifier = Modifier.fillMaxWidth().weight(1f),
+        modifier = modifier,
         update = { terminalView ->
             val terminalColors =
                 if (isDarkMode) {

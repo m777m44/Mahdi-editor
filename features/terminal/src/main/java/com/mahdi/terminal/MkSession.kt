@@ -98,6 +98,13 @@ object MkSession {
 
         setupTerminalFiles()
 
+        // 6.1.0: خوادم DNS الحقيقية للنظام في كل جلسة.
+        // كان resolv.conf يُكتب مرة واحدة عند فكّ الضغط فقط، فتبقى pip تفشل
+        // بـ «Temporary failure in name resolution» بعد أي تغيّر شبكة.
+        if (isExtraction.not()) {
+            TerminalDns.refresh(context)
+        }
+
         val sandboxSH = localBinDir(context).child("sandbox")
         val setupSH = localBinDir(context).child("setup")
 

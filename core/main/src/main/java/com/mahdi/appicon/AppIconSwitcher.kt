@@ -14,10 +14,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * لكل أيقونة: كل alias يحمل `icon` خاصًا وفلتر LAUNCHER. التبديل الحقيقي = تمكين
  * الـ alias المختار وتعطيل السابق عبر `PackageManager.setComponentEnabledSetting`.
  *
- * في 4.3.0 صارت الأيقونات **عشر صور أنمي ثلاثية الأبعاد** بحرف M مرسومة خصيصًا
- * (ثعلب، قط، روبوت، بومة، بطريق، تنين، أرنب، باندا، أكسولوتل، وهمستر) بدل الرموز
- * المتجهة الـ126. كل صورة أيقونة تكيّفية كاملة: خلفية + صورة أمامية بمقاس 108dp
- * مع منطقة آمنة 74dp فلا يُقصّ الرسم ولا حرف M على أي مشغّل.
+ * 6.1.0: أُعيد رسم كل الصور — **إحدى عشرة أيقونة كرتونية ثلاثية الأبعاد** بحرف M
+ * (روبوت مبرمج، والحرف M المجسّم، وثعلب، وقط، وباندا، وتنين، وبومة، وبطريق،
+ * وأرنب، وهمستر، وأكسولوتل). كل صورة أيقونة تكيّفية كاملة: خلفية لونها مستخرج من
+ * العمل الفني + صورة أمامية بمقاس 108dp مع منطقة آمنة (66٪) فلا يُقصّ الرسم على
+ * أي مشغّل. الافتراضية الآن **الروبوت المبرمج**، والمصغّرة الداخلية تتبعه.
  *
  * القائمة هنا مطابقة تمامًا لما هو معلن في `AndroidManifest.xml`. أي إضافة أيقونة
  * تحتاج: صورة في `mipmap-*` + صورة أمامية `_fg` + adaptive-icon.xml + alias في
@@ -49,20 +50,21 @@ object AppIconSwitcher {
     /** الأيقونات — ترتيبها هو ترتيب العرض. */
     val icons: List<AppIcon> =
         listOf(
-            AppIcon("anime_fox", "IconAnimeFox", "الثعلب المبرمج", "Coder Fox", R.mipmap.ic_launcher_anime_fox, 0xFF030E2F),
-            AppIcon("anime_cat", "IconAnimeCat", "القط العبقري", "Genius Cat", R.mipmap.ic_launcher_anime_cat, 0xFF1C073F),
-            AppIcon("anime_robot", "IconAnimeRobot", "الروبوت النشيط", "Busy Robot", R.mipmap.ic_launcher_anime_robot, 0xFF000A0D),
-            AppIcon("anime_owl", "IconAnimeOwl", "البومة الحكيمة", "Wise Owl", R.mipmap.ic_launcher_anime_owl, 0xFF170D0A),
-            AppIcon("anime_penguin", "IconAnimePenguin", "البطريق الطرفية", "Terminal Penguin", R.mipmap.ic_launcher_anime_penguin, 0xFF1D466E),
-            AppIcon("anime_dragon", "IconAnimeDragon", "التنين الصغير", "Little Dragon", R.mipmap.ic_launcher_anime_dragon, 0xFF040F19),
-            AppIcon("anime_bunny", "IconAnimeBunny", "الأرنب الوردي", "Pink Bunny", R.mipmap.ic_launcher_anime_bunny, 0xFF1E0E12),
-            AppIcon("anime_panda", "IconAnimePanda", "الباندا الفضائي", "Space Panda", R.mipmap.ic_launcher_anime_panda, 0xFF04091C),
-            AppIcon("anime_axolotl", "IconAnimeAxolotl", "الأكسولوتل الأخضر", "Green Axolotl", R.mipmap.ic_launcher_anime_axolotl, 0xFF010C01),
-            AppIcon("anime_hamster", "IconAnimeHamster", "الهمستر الذهبي", "Golden Hamster", R.mipmap.ic_launcher_anime_hamster, 0xFF130403),
+            AppIcon("anime_robot", "IconAnimeRobot", "الروبوت المبرمج", "Coder Robot", R.mipmap.ic_launcher_anime_robot, 0xFF0F2148),
+            AppIcon("anime_mark", "IconAnimeMark", "الحرف M المجسّم", "Glossy M", R.mipmap.ic_launcher_anime_mark, 0xFF060C1E),
+            AppIcon("anime_fox", "IconAnimeFox", "الثعلب المبرمج", "Coder Fox", R.mipmap.ic_launcher_anime_fox, 0xFF15213B),
+            AppIcon("anime_cat", "IconAnimeCat", "القط العبقري", "Genius Cat", R.mipmap.ic_launcher_anime_cat, 0xFF0E1947),
+            AppIcon("anime_panda", "IconAnimePanda", "الباندا الفضائي", "Space Panda", R.mipmap.ic_launcher_anime_panda, 0xFF214D58),
+            AppIcon("anime_dragon", "IconAnimeDragon", "التنين الصغير", "Little Dragon", R.mipmap.ic_launcher_anime_dragon, 0xFF0F1E3B),
+            AppIcon("anime_owl", "IconAnimeOwl", "البومة الحكيمة", "Wise Owl", R.mipmap.ic_launcher_anime_owl, 0xFF131E36),
+            AppIcon("anime_penguin", "IconAnimePenguin", "البطريق الطرفية", "Terminal Penguin", R.mipmap.ic_launcher_anime_penguin, 0xFF122349),
+            AppIcon("anime_bunny", "IconAnimeBunny", "الأرنب الوردي", "Pink Bunny", R.mipmap.ic_launcher_anime_bunny, 0xFF0E1842),
+            AppIcon("anime_hamster", "IconAnimeHamster", "الهمستر الذهبي", "Golden Hamster", R.mipmap.ic_launcher_anime_hamster, 0xFF0D1433),
+            AppIcon("anime_axolotl", "IconAnimeAxolotl", "الأكسولوتل الأخضر", "Green Axolotl", R.mipmap.ic_launcher_anime_axolotl, 0xFF0E1D41),
         )
 
     /** الأيقونة الافتراضية (المعلنة `enabled=true` في البيان). */
-    const val DEFAULT_ICON_ID = "anime_fox"
+    const val DEFAULT_ICON_ID = "anime_robot"
 
     /**
      * الأيقونة المختارة كما تظهر **داخل الواجهة** (5.0.0).

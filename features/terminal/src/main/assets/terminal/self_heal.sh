@@ -25,6 +25,49 @@ if ! declare -f mahdi_bar_start >/dev/null 2>&1; then
   mahdi_bar_abort() { :; }
 fi
 
+# —————————————————————— عرض الأخطاء بلغة عربية (6.1.0) ——————————————————————
+# قبل 6.1.0 كان stderr يُنسخ حرفيًا إلى الطرفية: عشرات أسطر pip
+# («WARNING: Retrying…») ثم Traceback كامل ينتهي بـ ModuleNotFoundError.
+# الآن: نُسقط الضجيج، ونحوّل أي أثر بايثون إلى سطر عربي واحد مفيد.
+
+# اسم أول وحدة بايثون ناقصة في ملف stderr (فارغ إن لم توجد)
+mahdi_heal_missing_module() {
+  grep -oE "No module named '[^']+'" "$1" 2>/dev/null | tail -n 1 | cut -d"'" -f2
+}
+
+# سطور لا تفيد المستخدم إطلاقًا (pip / urllib3 / npm)
+mahdi_heal_strip_noise() {
+  grep -viE '^(WARNING: Retrying|WARNING: The repository|WARNING: You are using pip|WARNING: Value for|WARNING: There was an error|Looking in indexes|Collecting |  Downloading |  Using cached|  Preparing metadata|  Getting requirements|  Building wheel|  Created wheel|  Stored in|Requirement already satisfied|  Attempting uninstall|  Found existing installation|Successfully installed|Successfully built|note:|hint:|  error: subprocess-exited-with-error|Traceback \(most recent call last\)|  File "|npm ERR!|npm WARN)' "$1" 2>/dev/null |
+    tr -d '\r' | grep -v '^[[:space:]]*$'
+}
+
+# يعرض خطأ التشغيل النهائي بشكل مفهوم ومختصر
+mahdi_heal_report() {
+  local lang="$1" errfile="$2"
+  [ -s "$errfile" ] || return 0
+
+  local mod
+  mod="$(mahdi_heal_missing_module "$errfile")"
+  if [ -n "$mod" ]; then
+    printf '\033[31m✖ لم تعمل الحزمة «%s» — مكتبة بايثون غير مثبّتة.\033[0m\n' "$mod" >&2
+    # لا نطبع «pip install <module>»: اسم الوحدة يختلف عن اسم الحزمة في PyPI
+    # (telegram ⇒ python-telegram-bot)، والطباعة الخاطئة تُثبّت مكتبة أخرى.
+    printf '\033[2m  وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+    return 0
+  fi
+
+  # خطأ بايثون آخر: سطر الخطأ الأخير فقط بدل الأثر الكامل
+  if grep -q '^Traceback (most recent call last)' "$errfile"; then
+    printf '\033[31m✖ توقّف السكربت بخطأ:\033[0m\n' >&2
+    grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception):' "$errfile" | tail -n 2 >&2
+    return 0
+  fi
+
+  # أخطاء أخرى (npm، composer…): بلا ضجيج، وبحدّ أقصى ١٢ سطرًا
+  mahdi_heal_strip_noise "$errfile" | tail -n 12 >&2
+  return 0
+}
+
 # مسار مساعد التحليل (بايثون)
 mahdi_heal_helper() {
   local candidate="${LOCAL:-/home}/bin/mahdi_heal.py"
@@ -56,8 +99,11 @@ mahdi_heal_install() {
       label="pip install $pkg"
       if declare -f mahdi_pip_run >/dev/null 2>&1; then
         # المثبّت الذكي يرسم النسبة الحقيقية بنفسه
-        mahdi_pip_run "$label" "$pkg"
-        return $?
+        local rc=0
+        mahdi_pip_run "$label" "$pkg" || rc=$?
+        # ٢ = لا يوجد اتصال (طُبعت الرسالة العربية من المثبّت) — لا نكرّرها
+        [ "$rc" -eq 2 ] && return 2
+        return "$rc"
       fi
       mahdi_bar_start "$label"
       python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
@@ -66,7 +112,7 @@ mahdi_heal_install() {
       if [ "$rc" -eq 0 ]; then
         mahdi_bar_done "$pkg ✓"
       else
-        mahdi_bar_abort
+        mahdi_bar_abort "تعذّر تثبيت $pkg"
       fi
       return "$rc"
       ;;
@@ -139,33 +185,43 @@ mahdi_run_heal() {
     rc=$?
     set -e
 
-    # أظهر ما كتبه السكربت على stderr كما هو (بلا تكرار ولا تلوين إضافي)
-    if [ -s "$errfile" ]; then
-      sed -e 's/\r$//' "$errfile" >&2 || true
-    fi
-
-    [ "$rc" -eq 0 ] && break
-    [ "$MAHDI_HEAL" = "0" ] && break
-    [ "$MAHDI_AUTO_DEPS" = "0" ] && break
+    [ "$rc" -eq 0 ] && { mahdi_heal_report "$lang" "$errfile"; break; }
+    [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile"; break; }
+    [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile"; break; }
 
     local pkgs
     pkgs="$(mahdi_heal_detect "$lang" "$errfile" "$script" || true)"
-    [ -z "$pkgs" ] && break
 
-    printf '\033[33m⟳ مكتبات ناقصة: %s\033[0m\n' "$(printf '%s' "$pkgs" | tr '\n' ' ')"
+    # 6.1.0: لا نعرض stderr خامًا. إن كانت هناك مكتبة محدّدة سنثبّتها الآن،
+    # نكتفي بسطر واحد؛ وإن لم نستطع الإصلاح نعرض تقريرًا عربيًا مختصرًا.
+    if [ -z "$pkgs" ]; then
+      mahdi_heal_report "$lang" "$errfile"
+      break
+    fi
+
+    printf '\033[33m⟳ مكتبة ناقصة — جاري تثبيتها: %s\033[0m\n' "$(printf '%s' "$pkgs" | tr '\n' ' ')"
 
     local failed=0
     local pkg
     while IFS= read -r pkg; do
       [ -z "$pkg" ] && continue
-      if ! mahdi_heal_install "$lang" "$pkg"; then
-        printf '\033[31m✖ تعذّر تثبيت %s\033[0m\n' "$pkg"
+      local install_rc=0
+      mahdi_heal_install "$lang" "$pkg" || install_rc=$?
+      if [ "$install_rc" -ne 0 ]; then
+        if [ "$install_rc" -eq 2 ]; then
+          printf '\033[33m⚠ لا يوجد اتصال بالإنترنت — تعذّر تجهيز المكتبة.\033[0m\n' >&2
+        else
+          printf '\033[31m✖ تعذّر تثبيت %s\033[0m\n' "$pkg" >&2
+        fi
         failed=1
         break
       fi
     done <<<"$pkgs"
 
-    [ "$failed" -eq 1 ] && break
+    if [ "$failed" -eq 1 ]; then
+      printf '\033[2m  تحقّق من الاتصال بالإنترنت ثم أعد المحاولة، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+      break
+    fi
 
     attempt=$((attempt + 1))
     if [ "$attempt" -le "$max_attempts" ]; then
