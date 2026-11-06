@@ -16,6 +16,7 @@
 
 import json
 import os
+import socket
 import shutil
 import subprocess
 import sys
@@ -74,8 +75,82 @@ STAGE_EN = {
 }
 
 
-def emit(percent, stage, detail="", done=False):
-    """يكتب حالة التقدّم بشكل ذرّي حتى لا يقرأ التطبيق ملفًا نصف مكتوب."""
+BAR_WIDTH = 20           # 6.1.0: شريط واحد داخل الطرفية، عشرون خلية
+BAR_LAST = [-1]          # آخر نسبة رُسمت — لا إعادة رسم إن لم تتغيّر
+BAR_ENABLED = os.environ.get("MAHDI_BAR", "1") != "0"
+
+
+def term_bar(percent, stage=""):
+    """يرسم شريط التقدّم **داخل الطرفية** في سطر واحد (6.1.0).
+
+    قبل 6.1.0 كانت النسبة تُكتب في ``progress.json`` فقط، فيعرضها التطبيق في
+    بطاقة عائمة فوق الطرفية. الآن تُرسم هنا أيضًا بنفس السطر: ``\r`` + شريط
+    ``▓/░`` بعشرين خلية، ولا يُعاد الرسم إلا عند تغيّر النسبة.
+    """
+    if not BAR_ENABLED:
+        return
+    pct = int(max(0, min(100, round(percent))))
+    if pct == BAR_LAST[0]:
+        return
+    BAR_LAST[0] = pct
+    filled = pct * BAR_WIDTH // 100
+    bar = "▓" * filled + "░" * (BAR_WIDTH - filled)
+    label = stage or NAME or ""
+    line = "\r\033[K\033[33m▸ %s\033[0m \033[36m[%s]\033[0m \033[33m%3d%%\033[0m" % (
+        label[:28], bar, pct,
+    )
+    try:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
+def term_bar_done(stage="تمّ التثبيت"):
+    if not BAR_ENABLED:
+        return
+    bar = "▓" * BAR_WIDTH
+    try:
+        sys.stdout.write("\r\033[K\033[32m[%s]\033[0m \033[32m100%%\033[0m  \033[32m✔ %s\033[0m\n" % (bar, stage))
+        sys.stdout.flush()
+    except Exception:
+        pass
+    BAR_LAST[0] = -1
+
+
+def term_bar_abort(stage="تعذّر التثبيت"):
+    if not BAR_ENABLED:
+        return
+    try:
+        sys.stdout.write("\r\033[K\033[31m✖ %s\033[0m\n" % stage)
+        sys.stdout.flush()
+    except Exception:
+        pass
+    BAR_LAST[0] = -1
+
+
+def net_ok(host="pypi.org", timeout=6.0):
+    """هل يوجد اتصال حقيقي (DNS + مسار) قبل إزعاج المستخدم بستّ محاولات pip فاشلة؟"""
+    if os.environ.get("MAHDI_NET_CHECK", "1") == "0":
+        return True
+    try:
+        socket.setdefaulttimeout(timeout)
+        infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
+        return bool(infos)
+    except Exception:
+        return False
+
+
+def emit(percent, stage, detail="", done=False, term=True):
+    """يكتب حالة التقدّم بشكل ذرّي + يرسم الشريط داخل الطرفية (term=False للصامت)."""
+    if term:
+        if done:
+            if "تعذّر" in stage or "فشل" in stage:
+                term_bar_abort(stage)
+            else:
+                term_bar_done(stage)
+        else:
+            term_bar(percent, stage)
     try:
         os.makedirs(PROG_DIR, exist_ok=True)
         payload = {
@@ -331,6 +406,17 @@ def main(argv):
     if try_offline(targets, NAME):
         emit(100, "مثبّتة مسبقًا — من المخزن", NAME, done=True)
         return 0
+
+    # ٠٫٥) لا شبكة؟ لا نطبع عشر محاولات pip فاشلة — سطر واحد واضح ونخرج
+    if not net_ok():
+        # سطر عربي واحد فقط، وبلا شريط آخر (حتى لا تتكرّر الرسالة في الطرفية)
+        sys.stdout.write(
+            "\r\033[K\033[33m⚠ لا يوجد اتصال بالإنترنت — لم تُثبَّت: %s\033[0m\n"
+            % (NAME or targets[0])
+        )
+        sys.stdout.flush()
+        emit(100, "تعذّر تثبيت المكتبة", NAME, done=True, term=False)
+        return 2
 
     emit(4, "التحقق من الإصدارات", NAME)
     items = resolve(targets)

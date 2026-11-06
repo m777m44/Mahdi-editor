@@ -1131,6 +1131,7 @@ Thank you for using Mahdi-Editor.</string>
     <string name="update_permission_needed">Allow installing apps from this source to finish the update.</string>
     <string name="update_open_permission">Open settings to allow</string>
     <string name="update_no_network">No internet connection</string>
+    <string name="home_update_available">Update available</string>
     <string name="update_new_available">New update available: %1$s</string>
     <string name="update_action">Update</string>
     <string name="update_install_opened">Package installer opened — finish the installation</string>

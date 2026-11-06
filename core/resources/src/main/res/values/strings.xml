@@ -1156,6 +1156,7 @@
     <string name="update_permission_needed">يلزم السماح بتثبيت التطبيقات من هذا المصدر لإكمال التحديث.</string>
     <string name="update_open_permission">فتح الإعدادات للسماح</string>
     <string name="update_no_network">لا يوجد اتصال بالإنترنت</string>
+    <string name="home_update_available">تحديث متاح</string>
     <string name="update_new_available">تحديث جديد متوفر: %1$s</string>
     <string name="update_action">تحديث</string>
     <string name="update_install_opened">فُتح مُثبّت الحزمة — أكمل التثبيت</string>

@@ -7,11 +7,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,12 +30,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mahdi.components.compose.preferences.base.PreferenceGroup
-import com.mahdi.components.compose.preferences.base.PreferenceLayout
 import com.mahdi.lang.LanguageInstallStore
 import com.mahdi.runtime.InstallState
 import com.mahdi.runtime.RuntimeCatalog
@@ -60,6 +66,7 @@ fun RuntimesContent() {
     val context = LocalContext.current
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     val statuses by RuntimeInstaller.status.collectAsState()
 
     // اقرأ الحالة الحقيقية عند فتح الشاشة، وأعد القراءة كل ثانية أثناء أي تثبيت جارٍ
@@ -121,21 +128,25 @@ fun RuntimesContent() {
                     RuntimeInstaller.cancel(status.id)
                     scope.launch { RuntimeInstaller.refresh() }
                 },
+                onDelete = {
+                    val activity = context as? android.app.Activity
+                    if (activity == null) {
+                        toast(if (isArabic) "افتح الشاشة من داخل التطبيق" else "Open this screen inside the app")
+                        return@RuntimeCard
+                    }
+                    val target = spec ?: return@RuntimeCard
+                    // 6.1.0: حذف فعلي (apt remove + مسح العلامة) بلا مربّع تأكيد
+                    if (RuntimeInstaller.uninstall(activity, target)) {
+                        toast(if (isArabic) "جارٍ حذف ${target.nameAr}" else "Removing ${target.nameEn}")
+                    }
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    scope.launch {
+                        delay(2500)
+                        RuntimeInstaller.refresh()
+                    }
+                },
             )
         }
-    }
-}
-
-/** غلاف مستقل — يُستخدم حين تُفتح «بيئات التشغيل» من مسار خارجي. */
-@Composable
-fun RuntimesScreen(modifier: Modifier = Modifier) {
-    val isArabic = LocalConfiguration.current.locales[0].language == "ar"
-    PreferenceLayout(
-        label = if (isArabic) "المشغلات" else "Runtimes",
-        modifier = modifier,
-        backArrowVisible = true,
-    ) {
-        RuntimesContent()
     }
 }
 
@@ -146,6 +157,7 @@ private fun RuntimeCard(
     isArabic: Boolean,
     onInstall: () -> Unit,
     onCancel: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val installState = status.state
     val progressTarget =
@@ -215,7 +227,20 @@ private fun RuntimeCard(
                 Spacer(Modifier.width(8.dp))
 
                 when (installState) {
-                    is InstallState.Installed -> SkyBadge(if (isArabic) "مثبت" else "Installed")
+                    is InstallState.Installed -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SkyBadge(if (isArabic) "مثبت" else "Installed")
+                            // 6.1.0: حذف البيئة من نفس الشاشة
+                            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = if (isArabic) "حذف" else "Delete",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    }
                     InstallState.Bundled -> SkyBadge(if (isArabic) "مضمّن" else "Bundled", showDot = false)
                     is InstallState.Failed -> {
                         Button(onClick = onInstall) { Text(if (isArabic) "إعادة" else "Retry") }

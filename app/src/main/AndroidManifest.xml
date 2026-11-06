@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 6.1.0: قراءة خوادم DNS من الشبكة الحقيقية قبل كل جلسة طرفية -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
@@ -96,7 +98,7 @@
          4.3.0 — عشر أيقونات أنمي ثلاثية الأبعاد بحرف M.
          كل أيقونة = activity-alias مفعّل/معطّل من:
          الإعدادات ‹ التطبيق ‹ أيقونة التطبيق.
-         الافتراضية = IconAnimeFox (enabled=true)، والباقي معطّل حتى يُختار.
+         الافتراضية = IconAnimeRobot (enabled=true)، والباقي معطّل حتى يُختار.
          الخلفيات في values/colors_app_icons.xml والصور في mipmap-*/.
          ═══════════════════════════════════════════════════════════════════════ -->
 
@@ -104,7 +106,7 @@
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeFox"
             android:theme="@style/Theme.Karbon.Icon.Fox"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_fox"
             android:label="@string/app_name"
@@ -130,11 +132,26 @@
             </intent-filter>
         </activity-alias>
 
-        <!-- الروبوت · نعناعي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <!-- الحرف M المجسّم — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeMark"
+            android:theme="@style/Theme.Karbon.Icon.Mark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_mark"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- الروبوت المبرمج · الافتراضية — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
             android:name="com.mahdi.application.icon.IconAnimeRobot"
             android:theme="@style/Theme.Karbon.Icon.Robot"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_anime_robot"
             android:label="@string/app_name"

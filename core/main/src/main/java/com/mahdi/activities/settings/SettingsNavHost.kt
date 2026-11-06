@@ -68,7 +68,6 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
         composable(SettingsRoutes.AppLogs.route) { AppLogs() }
         composable(SettingsRoutes.LanguageScreen.route) { LanguageScreen() }
         composable(SettingsRoutes.Languages.route) { LanguagesHub(navController = navController) }
-        composable(SettingsRoutes.Runtimes.route) { com.mahdi.settings.language.RuntimesScreen() }
         composable(SettingsRoutes.Formatters.route) { FormatterSettings(navController) }
         composable(SettingsRoutes.LspSettings.route) { LspSettings(navController) }
         composable(

@@ -45,7 +45,40 @@ mahdi_runtime_installed() {
   sh -c "$version_cmd >/dev/null 2>&1" 2>/dev/null
 }
 
+# ————————————————————————— حذف بيئة تشغيل (6.1.0) —————————————————————————
+# bash install_runtime --remove <id> <packages>
+# يحذف الحزم فعليًا من الجذر ويمسح علامة التثبيت، فلا تبقى البيئة «مثبَّتة» كذبًا.
+mahdi_runtime_remove() {
+  local id="${1:-}" packages="${2:-}"
+  [ -z "$id" ] && { echo "install_runtime: missing id" >&2; exit 2; }
+
+  mkdir -p "$MAHDI_STATUS_DIR" "$MAHDI_MARKER_DIR" 2>/dev/null
+  mahdi_runtime_status "$id" removing 20 "حذف البيئة"
+
+  local log="$MAHDI_LOG_DIR/remove-$id.log"
+  mkdir -p "$MAHDI_LOG_DIR" 2>/dev/null
+  : > "$log" 2>/dev/null
+
+  if [ -n "$packages" ] && command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    # shellcheck disable=SC2086
+    apt-get remove -y --purge $packages >>"$log" 2>&1 || true
+    # shellcheck disable=SC2086
+    apt-get autoremove -y >>"$log" 2>&1 || true
+  fi
+
+  rm -f "$MAHDI_MARKER_DIR/$id" 2>/dev/null
+  rm -f "$MAHDI_STATUS_DIR/$id" 2>/dev/null
+
+  printf '\033[32m✔ حُذفت البيئة: %s\033[0m\n' "$id"
+  exit 0
+}
+
 main() {
+  if [ "${1:-}" = "--remove" ]; then
+    mahdi_runtime_remove "${2:-}" "${3:-}"
+  fi
+
   local id="${1:-}" packages="${2:-}" post="${3:-}" version_cmd="${4:-}"
   [ -z "$id" ] && { echo "install_runtime: missing id" >&2; exit 2; }
 

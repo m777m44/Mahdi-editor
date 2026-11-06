@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  6.1.0: الأيقونة الافتراضية للتطبيق = الشخصية الكرتونية ثلاثية الأبعاد
+  «الروبوت المبرمج» التي تحمل حرف M (نفس فنّ أيقونات المشغّل العشر).
+  قبل 6.1.0 كانت الأيقونة رمز </> ذهبيًا مرسومًا بمتجهات.
+
+  الطبقات: خلفية لون مستخرج من العمل الفني + صورة أمامية كبيرة داخل المنطقة
+  الآمنة (66٪) فلا يُقصّ الرسم على أي مشغّل، + نسخة أحادية اللون لأندرويد 13+.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
-    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+    <background android:drawable="@color/ic_bg_mahdi" />
+    <foreground android:drawable="@mipmap/ic_launcher_anime_robot_fg" />
+    <monochrome android:drawable="@mipmap/ic_launcher_anime_robot_fg" />
 </adaptive-icon>
