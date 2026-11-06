@@ -92,24 +92,19 @@ object AppIconSwitcher {
         icons.firstOrNull { it.id == currentId(context) } ?: icons.first()
 
     /**
-     * يطبّق الأيقونة المختارة.
+     * يطبّق الأيقونة المختارة (6.0.0).
      *
-     * التبديل الذكي: نفعّل alias المختار **ونعطّل السابق فقط** بدل مسح كل المكوّنات
-     * في كل تبديل. المسح الشامل يحدث فقط عند `force = true` (بعد تحديث التطبيق أو
-     * عند اختلال الحالة).
+     * ✅ المختار يُفعَّل، وكل البدائل تُعطَّل **في كل نقرة** — لا اعتماد على تفضيل
+     * سابق ولا على حالة قد تكون اختلطت. `force` باقٍ للتوافق ولا يغيّر شيئًا الآن.
      *
-     * @return `true` إن نجح تفعيل الأيقونة المختارة.
+     * @return `true` إن صارت أيقونة واحدة مفعّلة فعلًا (المختارة).
      */
     fun apply(context: Context, id: String, force: Boolean = false): Boolean {
         val chosen = icons.firstOrNull { it.id == id } ?: return false
         val pm = context.packageManager
         val packageName = context.packageName
-        // عند أول تبديل لا يوجد معرّف محفوظ، والمعلَن افتراضيًا هو الافتراضية المفعّلة
-        // في البيان — نعتبره «السابق» وإلا بقيت أيقونتان على الشاشة الرئيسية.
-        val previousId = prefs(context).getString(KEY_CURRENT, null) ?: DEFAULT_ICON_ID
-        var ok = true
 
-        fun setState(icon: AppIcon, enabled: Boolean) {
+        fun setState(icon: AppIcon, enabled: Boolean): Boolean {
             val component = ComponentName(packageName, icon.aliasClassName)
             val state =
                 if (enabled) {
@@ -117,32 +112,41 @@ object AppIconSwitcher {
                 } else {
                     PackageManager.COMPONENT_ENABLED_STATE_DISABLED
                 }
-            runCatching { pm.setComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP) }
-                .onFailure {
-                    // alias غير معلن (نسخة قديمة من البيان) — لا نُفشل التبديل كله
-                    if (enabled) ok = false
-                    logError(it, "app icon alias ${icon.aliasClassName}")
+            return runCatching {
+                    pm.setComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP)
+                    true
                 }
+                .onFailure { logError(it, "app icon alias ${icon.aliasClassName}") }
+                .getOrDefault(false)
         }
 
-        // 1) أوقف السابق (إن كان مختلفًا) — استدعاء واحد
-        val previous = icons.firstOrNull { it.id == previousId }
-        if (previous != null && previous.id != chosen.id) setState(previous, false)
+        // 6.0.0: نفعّل المختار **أولًا**، ثم نعطّل كل البدائل دائمًا.
+        //
+        // قبل 6.0.0 كان التعطيل يقتصر على «السابق» المحفوظ في التفضيلات. إن اختلطت
+        // الحالة (تحديث للتطبيق، أو تبديل سابق فشل في منتصفه، أو ROM أوقف الـ alias)
+        // بقيت أيقونتان مفعّلتان — أو لم تتفعّل الجديدة إطلاقًا — فيظنّ المستخدم أن
+        // التبديل لا يعمل. الآن الحالة تُعاد بناءً بالكامل في كل نقرة: واحدة مفعّلة
+        // والباقي معطّل، ولا اعتماد على تفضيل قديم.
+        val enabled = setState(chosen, true)
 
-        // 2) فعّل المختار
-        setState(chosen, true)
-
-        // 3) مسح شامل عند الطلب فقط: يضمن ألّا تبقى أيقونتان ظاهرتين على الشاشة
-        if (force) {
-            icons.forEach { icon -> if (icon.id != chosen.id) setState(icon, false) }
+        icons.forEach { icon ->
+            if (icon.id != chosen.id) setState(icon, false)
         }
 
-        if (ok) {
+        // القراءة بعد الكتابة: نتأكّد أن النظام طبّق الفعّل فعلًا قبل إعلان النجاح
+        val applied =
+            runCatching {
+                    pm.getComponentEnabledSetting(ComponentName(packageName, chosen.aliasClassName)) ==
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                }
+                .getOrDefault(enabled)
+
+        if (applied || enabled) {
             prefs(context).edit().putString(KEY_CURRENT, chosen.id).apply()
             // 5.0.0: الشعار الداخلي (الشريط العلوي/شاشة البداية) يتبع نفس الاختيار
             selectedId.value = chosen.id
         }
-        return ok
+        return applied || enabled
     }
 
     /**

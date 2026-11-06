@@ -32,9 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mahdi.appicon.AppIconSwitcher
@@ -67,6 +69,7 @@ fun AppIconScreen(modifier: Modifier = Modifier) {
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val scope = rememberCoroutineScope()
 
+    val haptics = LocalHapticFeedback.current
     var currentId by remember { mutableStateOf(AppIconSwitcher.currentId(context)) }
     var busy by remember { mutableStateOf(false) }
 
@@ -90,7 +93,12 @@ fun AppIconScreen(modifier: Modifier = Modifier) {
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            if (icon.id == currentId || busy) return@IconTile
+                            // 6.0.0: حتى لو كانت هذه هي المختارة، النقر يُعيد تطبيقها.
+                            // سبب ذلك: حالة الـ activity-alias قد تختلّ في النظام (تحديث
+                            // التطبيق أو ROM أوقف المكوّن) فتبدو «مطبَّقة» في الواجهة
+                            // بينما أيقونة الشاشة الرئيسية لم تتغيّر. النقر يعالج ذلك.
+                            if (busy) return@IconTile
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             busy = true
                             scope.launch(Dispatchers.IO) {
                                 val ok = AppIconSwitcher.apply(context, icon.id)

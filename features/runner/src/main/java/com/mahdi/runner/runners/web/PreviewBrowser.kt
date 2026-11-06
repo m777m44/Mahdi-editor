@@ -232,6 +232,19 @@ fun BrowserScreen(initialUrl: String, onClose: () -> Unit) {
     }
 }
 
+/**
+ * إعدادات المعاينة (6.0.0) — العرض يجب أن يطابق عرض الشاشة دائمًا.
+ *
+ * كان الخلل الظاهري على الجهاز أن الصفحة تخرج من الحافة اليمنى ولا تنكمش. السبب
+ * الحقيقي كان **غياب وسم viewport** في الصفحة المخدومة، وقد عولج على الخادم في
+ * [HttpServer.injectResponsive]. هذه الإعدادات تُكمل الحل من جهة العرض:
+ *
+ * - `useWideViewPort` + `loadWithOverviewMode` ⇒ يستخدم وسم viewport إن وُجد،
+ *   ويصغّر الصفحة لتناسب العرض إن غاب.
+ * - `layoutAlgorithm = NORMAL` **لا** `TEXT_AUTOSIZING`: الأخير يعيد تدفّق النصّ
+ *   ويُفسد قياسات الصفحات التي فيها وسوم viewport، وهو مصدر تشوّه آخر.
+ * - تكبير المستخدم مدعوم بإيماءاته بلا أزرار عائمة تُغطّي المحتوى.
+ */
 @SuppressLint("SetJavaScriptEnabled")
 private fun setupPreviewWebView(webView: WebView) {
     webView.settings.apply {
@@ -240,9 +253,17 @@ private fun setupPreviewWebView(webView: WebView) {
         databaseEnabled = true
         loadWithOverviewMode = true
         useWideViewPort = true
+        builtInZoomControls = false
+        displayZoomControls = false
+        setSupportZoom(true)
+        textZoom = 100
+        defaultTextEncodingName = "UTF-8"
+        layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
         cacheMode = WebSettings.LOAD_DEFAULT
         mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
     }
+    // خلفية داكنة قبل رسم الصفحة: تمنع الوميض الأبيض المزعج في الوضع الداكن
+    webView.setBackgroundColor(android.graphics.Color.parseColor("#0B1114"))
 }
 
 private fun normalizeUrl(raw: String): String {

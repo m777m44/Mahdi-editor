@@ -1152,4 +1152,6 @@ Thank you for using Mahdi-Editor.</string>
 
     <string name="storage_clean_cache">Clean cache</string>
     <string name="storage_clean_temp">Clean temp files</string>
+
+    <string name="languages_tab_commands">Commands</string>
 </resources>
