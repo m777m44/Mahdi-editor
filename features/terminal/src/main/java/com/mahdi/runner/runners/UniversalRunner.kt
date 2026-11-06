@@ -9,8 +9,8 @@ import com.mahdi.exec.launchTerminal
 import com.mahdi.file.FileObject
 import com.mahdi.file.FileWrapper
 import com.mahdi.file.child
-import com.mahdi.file.sandboxHomeDir
 import com.mahdi.file.localBinDir
+import com.mahdi.file.sandboxHomeDir
 import com.mahdi.icons.Icon
 import com.mahdi.lang.LanguageRegistry
 import com.mahdi.resources.drawables
@@ -47,8 +47,12 @@ object UniversalRunner : FileRunner() {
         setupAssetFile("universal_runner")
         // محرّك التثبيت التلقائي للمكتبات (يفشل بصمت إن لم يوجد)
         setupAssetFile("auto_deps")
+        // 5.5.0: إصلاح ذاتي — يلتقط المكتبة الناقصة من stderr ويثبّتها ويعيد التشغيل
+        setupAssetFile("self_heal")
+        setupAssetFile("progress")
         // مثبّت بايثون الذكي + المخزن الدائم (يعمل حتى قبل إنشاء جلسة طرفية جديدة)
         setupPythonFile("mahdi_pip")
+        setupPythonFile("mahdi_heal")
 
         // 4.2.0: أي ملف من أي مكان — بما فيه مستندات فُتحت من تطبيق آخر (content://)
         if (fileObject !is FileWrapper) {

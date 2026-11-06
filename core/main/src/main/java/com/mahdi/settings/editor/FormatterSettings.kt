@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,11 +42,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.mohamedrejeb.compose.dnd.reorder.ReorderContainer
-import com.mohamedrejeb.compose.dnd.reorder.ReorderableItem
-import com.mohamedrejeb.compose.dnd.reorder.rememberReorderState
-import com.mahdi.activities.settings.SettingsRoutes
-import com.mahdi.app.AppFlavour
 import com.mahdi.components.InfoBlock
 import com.mahdi.components.compose.preferences.base.LocalIsExpandedScreen
 import com.mahdi.components.compose.preferences.base.NestedScrollStretch
@@ -57,13 +50,15 @@ import com.mahdi.components.compose.preferences.base.PreferenceTemplate
 import com.mahdi.editor.FormatterProvider
 import com.mahdi.editor.FormatterSource
 import com.mahdi.editor.Formatters
-import com.mahdi.feature.FeatureRegistry
 import com.mahdi.icons.Icon
 import com.mahdi.icons.MahdiIcon
 import com.mahdi.resources.drawables
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.utils.handleLazyListScroll
+import com.mohamedrejeb.compose.dnd.reorder.ReorderContainer
+import com.mohamedrejeb.compose.dnd.reorder.ReorderableItem
+import com.mohamedrejeb.compose.dnd.reorder.rememberReorderState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -81,16 +76,6 @@ fun FormatterSettings(navController: NavController, modifier: Modifier = Modifie
         label = stringResource(strings.manage_formatters),
         backArrowVisible = true,
         isExpandedScreen = LocalIsExpandedScreen.current,
-        fab = {
-            // The store exists only when this build bundles extensions and the user has not disabled them.
-            if (AppFlavour.current.bundlesExtensions && FeatureRegistry.isEnabled("enable_extension")) {
-                ExtendedFloatingActionButton(
-                    onClick = { navController.navigate("${SettingsRoutes.Extensions.route}?query=formatter") },
-                    icon = { Icon(painter = painterResource(drawables.extension), contentDescription = null) },
-                    text = { Text(stringResource(strings.browse_extensions)) },
-                )
-            }
-        },
     ) { paddingValues ->
         ReorderContainer(state = reorderState, modifier = modifier) {
             NestedScrollStretch {

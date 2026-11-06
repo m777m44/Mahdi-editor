@@ -30,7 +30,21 @@ fun setupTerminalFiles() {
     }
 
     // auto_deps: محرّك التعرّف التلقائي على مكتبات السكربتات وتثبيتها قبل التشغيل
-    val internalFiles = listOf("init", "sandbox", "setup", "utils", "auto_deps", "mahdi_dl", "progress", "install_runtime", "banner", "aliases")
+    val internalFiles =
+        listOf(
+            "init",
+            "sandbox",
+            "setup",
+            "utils",
+            "auto_deps",
+            "mahdi_dl",
+            "progress",
+            "install_runtime",
+            "banner",
+            "aliases",
+            // 5.5.0: محرّك «ثبّت المكتبة الناقصة وأعد التشغيل»
+            "self_heal",
+        )
     internalFiles.forEach { setupAssetFile(it) }
 
     // 3.0.0: شريط التقدّم الأحادي السطر + مثبّت بيئات التشغيل + شعار MAHDI
@@ -38,6 +52,9 @@ fun setupTerminalFiles() {
 
     // مثبّت حزم بايثون الذكي (يعرض نسبة تقدّم حقيقية في التطبيق)
     setupPythonFile("mahdi_pip")
+
+    // 5.5.0: محلّل stderr الذي يستخرج اسم المكتبة الناقصة
+    setupPythonFile("mahdi_heal")
 
     application!!.assets.list("terminal/lsp")?.forEach { setupLspFile(it.removeSuffix(".sh")) }
 }

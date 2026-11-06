@@ -9,8 +9,8 @@ import androidx.core.os.LocaleListCompat
 import com.github.anrwatchdog.ANRWatchDog
 import com.mahdi.activities.main.session.SessionManager
 import com.mahdi.commands.CommandProvider
-import com.mahdi.commands.ToolbarConfiguration
 import com.mahdi.commands.KeybindingsManager
+import com.mahdi.commands.ToolbarConfiguration
 import com.mahdi.crashhandler.CrashHandler
 import com.mahdi.editor.CodeHighlighter
 import com.mahdi.editor.FontCache
@@ -90,8 +90,6 @@ open class App : Application() {
         FileIconProvider.register()
 
         runCatching { CommandProvider.buildCommands() }.onFailure { logError(it, "buildCommands") }
-        // 4.2.0: إضافات النظام (11 قدرة + 24 أداة = 35) تُسجَّل في لوحة الأوامر منذ الإقلاع
-        runCatching { com.mahdi.ext.BuiltinExtensions.registerCommands() }
         runCatching { KeybindingsManager.loadKeybindings() }.onFailure { logError(it, "keybindings") }
         // 4.1.0: زرّ «الترميز» في شريط المحرّر (ترحيل لمرّة واحدة لمن لم يعدّل شريطه)
         runCatching { ToolbarConfiguration.migrateEncodingCommand() }

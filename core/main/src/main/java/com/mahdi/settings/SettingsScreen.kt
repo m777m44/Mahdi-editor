@@ -1,14 +1,10 @@
 package com.mahdi.settings
 
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.mahdi.activities.settings.SettingsRoutes
@@ -20,7 +16,7 @@ import com.mahdi.resources.drawables
 import com.mahdi.resources.getFilledString
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
-import com.mahdi.settings.about.MAHDI_COPYRIGHT
+import com.mahdi.resources.strings
 
 @Composable
 fun SettingsScreen(navController: NavController) {
@@ -52,10 +48,10 @@ private fun Categories(navController: NavController) {
         onNavigate = { navController.navigate(SettingsRoutes.EditorSettings.route) },
     )
 
-    // 4.2.0: كل ما يخصّ اللغة (لغة الواجهة + لغات البرمجة) في بوابة واحدة
+    // 5.5.0: مركز اللغات — أربعة تبويبات: الواجهة، لغات البرمجة، المشغلات، خوادم اللغة
     PreferenceCategory(
         label = stringResource(strings.languages_hub),
-        description = stringResource(strings.languages_hub_desc),
+        description = stringResource(strings.languages_hub_stats_only),
         iconResource = drawables.text,
         onNavigate = { navController.navigate(SettingsRoutes.Languages.route) },
     )
@@ -99,14 +95,5 @@ private fun Categories(navController: NavController) {
         description = stringResource(strings.guide_desc),
         iconResource = drawables.info,
         onNavigate = { navController.navigate(SettingsRoutes.Guide.route) },
-    )
-
-    // سطر الحقوق فقط — أُزيلت صفحات «حول» و«الدعم» بطلب من صاحب التطبيق
-    Text(
-        text = MAHDI_COPYRIGHT,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
     )
 }

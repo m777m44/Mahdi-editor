@@ -3,7 +3,6 @@ package com.mahdi.settings.language
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -47,15 +46,27 @@ import com.mahdi.utils.toast
 import kotlinx.coroutines.delay
 
 /**
- * شاشة «اللغات» (4.0.0) — إدارة كاملة بدل عرض للقراءة فقط.
- *
- * ثلاث حقائق تُعرض بوضوح:
- * 1. **مثبت مسبقًا** — ثلاث لغات مدمجة (بايثون، بي إتش بي، HTML) بلا زرّ حذف إطلاقًا.
- * 2. **مثبتة** — ما ثبّته المستخدم، مع **X** يفتح نافذة تأكيد ثم يحذف اللغة بالكامل.
- * 3. **متاحة** — زرّ تثبيت واحد، وحالة حقيقية أثناء التثبيت (من القرص لا من الواجهة).
+ * شاشة «لغات البرمجة» المستقلة — غلاف رقيق حول [SupportedLanguagesContent]
+ * (5.5.0). تُعرض عادةً داخل تبويب في [LanguagesHub].
  */
 @Composable
 fun SupportedLanguages(modifier: Modifier = Modifier) {
+    PreferenceLayout(
+        label = stringResource(strings.languages_supported),
+        modifier = modifier,
+        backArrowVisible = true,
+    ) {
+        SupportedLanguagesContent()
+    }
+}
+
+/**
+ * محتوى «لغات البرمجة» — ثلاث مجموعات فقط: مضمّنة، مثبّتة بواسطتك، متاحة.
+ *
+ * 5.5.0: أُزيلت كل الفقرات التمهيدية والإحصاءات وتلميح المشغّل — القائمة تبدأ مباشرة.
+ */
+@Composable
+fun SupportedLanguagesContent() {
     val installed by LanguageInstallStore.installed.collectAsStateWithLifecycle()
     val pending by LanguageInstaller.pending.collectAsStateWithLifecycle()
     val errors by LanguageInstaller.errors.collectAsStateWithLifecycle()
@@ -79,82 +90,60 @@ fun SupportedLanguages(modifier: Modifier = Modifier) {
     val available =
         LanguageRegistry.all.filter { lang -> !DefaultLanguages.isBundled(lang.id) && lang.id !in installed }
 
-    PreferenceLayout(label = stringResource(strings.languages_supported), modifier = modifier, backArrowVisible = true) {
-        Text(
-            text =
-                stringResource(strings.languages_supported_desc) +
-                    "\n\n" +
-                    stringResource(
-                        strings.languages_supported_stats,
-                        LanguageRegistry.supportedCount,
-                        LanguageRegistry.runnableCount,
-                    ),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-
-        // ————— 1) مثبتة مسبقًا: لا حذف —————
-        PreferenceGroup(heading = stringResource(strings.bundled_state)) {
-            bundled.forEach { lang ->
-                LanguageRow(
-                    lang = lang,
-                    isArabic = isArabic,
-                    state = RowState.Bundled,
-                )
-            }
+    // ————— 1) مثبتة مسبقًا: لا حذف —————
+    PreferenceGroup(heading = stringResource(strings.bundled_state)) {
+        bundled.forEach { lang ->
+            LanguageRow(
+                lang = lang,
+                isArabic = isArabic,
+                state = RowState.Bundled,
+            )
         }
+    }
 
-        // ————— 2) مثبتة بواسطة المستخدم: X ← تأكيد ← حذف كامل —————
-        PreferenceGroup(heading = "${stringResource(strings.installed_languages)} (${userInstalled.size})") {
-            if (userInstalled.isEmpty()) {
-                Text(
-                    text = stringResource(strings.no_extra_languages),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-            userInstalled.forEach { lang ->
-                LanguageRow(
-                    lang = lang,
-                    isArabic = isArabic,
-                    state = RowState.Installed(onRemove = { pendingDelete = lang }),
-                )
-            }
+    // ————— 2) مثبتة بواسطة المستخدم: X ← تأكيد ← حذف كامل —————
+    PreferenceGroup(heading = "${stringResource(strings.installed_languages)} (${userInstalled.size})") {
+        if (userInstalled.isEmpty()) {
+            Text(
+                text = stringResource(strings.no_extra_languages),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
         }
+        userInstalled.forEach { lang ->
+            LanguageRow(
+                lang = lang,
+                isArabic = isArabic,
+                state = RowState.Installed(onRemove = { pendingDelete = lang }),
+            )
+        }
+    }
 
-        // ————— 3) متاحة: تثبيت —————
-        PreferenceGroup(heading = "${stringResource(strings.available_languages)} (${available.size})") {
-            available.forEach { lang ->
-                val isPending = lang.id in pending
-                val failure = errors[lang.id]
-                LanguageRow(
-                    lang = lang,
-                    isArabic = isArabic,
-                    state =
-                        when {
-                            isPending -> RowState.Installing
-                            !failure.isNullOrBlank() -> RowState.Failed(message = failure)
-                            else ->
-                                RowState.Available(
-                                    onInstall = {
-                                        val started = LanguageInstaller.install(activity, lang)
-                                        if (!started) {
-                                            toast(if (isArabic) "الطرفية غير جاهزة — افتحها أولًا" else "Terminal not ready")
-                                        }
+    // ————— 3) متاحة: تثبيت —————
+    PreferenceGroup(heading = "${stringResource(strings.available_languages)} (${available.size})") {
+        available.forEach { lang ->
+            val isPending = lang.id in pending
+            val failure = errors[lang.id]
+            LanguageRow(
+                lang = lang,
+                isArabic = isArabic,
+                state =
+                    when {
+                        isPending -> RowState.Installing
+                        !failure.isNullOrBlank() -> RowState.Failed(message = failure)
+                        else ->
+                            RowState.Available(
+                                onInstall = {
+                                    val started = LanguageInstaller.install(activity, lang)
+                                    if (!started) {
+                                        toast(if (isArabic) "الطرفية غير جاهزة — افتحها أولًا" else "Terminal not ready")
                                     }
-                                )
-                        },
-                )
-            }
+                                }
+                            )
+                    },
+            )
         }
-
-        Text(
-            text = stringResource(strings.runner_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(16.dp),
-        )
     }
 
     // نافذة التأكيد — لا تُحذف لغة قبل «موافق»

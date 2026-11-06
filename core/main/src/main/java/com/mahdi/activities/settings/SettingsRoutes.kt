@@ -33,8 +33,6 @@ sealed class SettingsRoutes(val route: String) {
 
     data object ExcludeFiles : SettingsRoutes("exclude_files")
 
-    data object Extensions : SettingsRoutes("extensions")
-
     data object ExtensionDetail : SettingsRoutes("extension_detail")
 
     data object ExtensionSettings : SettingsRoutes("extension_settings")
@@ -80,9 +78,6 @@ sealed class SettingsRoutes(val route: String) {
 
     data object Guide : SettingsRoutes("guide")
 
-    data object BuiltinTool : SettingsRoutes("builtin_tool")
-
     data object Runtimes : SettingsRoutes("runtimes")
 
-    data object BuiltinExtensions : SettingsRoutes("builtin_extensions")
 }

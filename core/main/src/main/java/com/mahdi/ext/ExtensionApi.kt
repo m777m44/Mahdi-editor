@@ -45,8 +45,6 @@ data class ManifestReport(
  * 1. **الأوامر** [registerCommand] — تظهر في لوحة الأوامر وتُستدعى بتنقّل أو إجراء.
  * 2. **شريط الحالة** [addStatusBarItem] — نصّ قصير يظهر أسفل المحرّر.
  * 3. **فحص البيان** [validateManifest] — التحقّق من `manifest.json` وفق المخطّط [manifestSchema].
- *
- * الإضافات المدمجة [BuiltinExtensions] تسجّل نفسها تلقائيًا عند أول قراءة، وتعمل بلا إنترنت.
  */
 object ExtensionApi {
     const val SCHEMA_VERSION: Int = 3

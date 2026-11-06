@@ -91,7 +91,7 @@ object GuideContent {
 
         HTML · CSS · JSON · TypeScript · Markdown · ESLint · Python (Pyright) · Bash · XML · Emmet.
 
-        - التثبيت من **الإعدادات ‹ تصفح الإضافات ‹ خوادم ومشغّلات**.
+        - التثبيت من **الإعدادات ‹ اللغات ‹ المشغلات** (أو تبويب **خوادم اللغة**).
         - كل خادم يعمل داخل بيئة التطبيق نفسها، ويُدار تشغيله وإيقافه من الشاشة نفسها.
 
         ## ٩ · اللغات والتشغيل
@@ -132,10 +132,6 @@ object GuideContent {
 
         - لا إعلانات، لا تتبّع، لا حسابات، ولا رفع لأي ملف.
         - العمليات الشبكية الوحيدة تحدث عند طلبك: تثبيت حزمة أو خادم، أو استنساخ مستودع.
-
-        ---
-
-        **Mahdi-Editor-Code © 2026 — جميع الحقوق محفوظة**
         """.trimIndent()
 
     private fun english(): String =
@@ -243,9 +239,5 @@ object GuideContent {
         - No ads, no tracking, no accounts, and no file uploads.
         - Network access happens only when you ask for it: installing a package or server,
           or cloning a repository.
-
-        ---
-
-        **Mahdi-Editor-Code © 2026 — All rights reserved**
         """.trimIndent()
 }

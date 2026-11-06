@@ -273,7 +273,6 @@
     <string name="use_tabs_desc">استخدام محرف Tab حقيقي (\t) بدلًا من المسافات للإزاحة</string>
     <string name="language_server">خادم اللغة</string>
     <string name="manage_language_servers">إدارة خوادم اللغة</string>
-    <string name="manage_language_servers_desc">تثبيت خوادم اللغة وربطها وإعدادها</string>
     <string name="format_on_save">تنسيق عند الحفظ</string>
     <string name="format_on_save_desc">تنسيق الملف تلقائيًا عند حفظه</string>
     <string name="developer">المطور</string>
@@ -288,7 +287,6 @@
     <string name="api_error">خطأ في API</string>
     <string name="unknown">غير معروف</string>
     <string name="cant_write">لا يمكن الكتابة إلى الملف (لا توجد أذونات كتابة)</string>
-    <string name="info_lsp">خوادم اللغة هي عمليات منفصلة توفر مزايا ذكية مثل إكمال الشيفرة وإبراز الأخطاء والتوثيق المضمن.</string>
     <string name="storage">التخزين</string>
     <string name="translate">الترجمة</string>
     <string name="terminal_feature">الطرفية والمشغّلات</string>
@@ -335,7 +333,6 @@
     <string name="desktop_mode">وضع سطح المكتب (تجريبي)</string>
     <string name="desktop_mode_desc">يجعل التطبيق أسهل استخدامًا على الأجهزة اللوحية والشاشات الكبيرة</string>
     <string name="built_in">مدمج</string>
-    <string name="change_lang_warn">سيُعاد تشغيل هذه الشاشة لتطبيق اللغة الجديدة فورًا. قد يظهر شاشة فارغة للحظة، وهذا قد يسبب انزعاجًا لمن يعانون من حساسية الضوء.</string>
     <string name="address">العنوان</string>
     <string name="invalid_address">عنوان غير صالح</string>
     <string name="select_all">تحديد الكل</string>
@@ -703,7 +700,6 @@
     <string name="document_highlight">إبراز التكرارات</string>
     <string name="document_highlight_desc">إبراز تكرارات الرمز عند المؤشر</string>
     <string name="formatter_lsp_desc">استخدام خادم اللغة الحالي</string>
-    <string name="browse_extensions">تصفح الإضافات</string>
     <string name="clipboard_keybindings">اختصارات الحافظة</string>
     <string name="clipboard_keybindings_desc">تمكين اختصارات النسخ واللصق للوحات المفاتيح الخارجية</string>
     <string name="terminal_health">سلامة الطرفية</string>
@@ -766,8 +762,6 @@
     <string name="compression_ratio">نسبة الضغط</string>
     <string name="compression_method">طريقة الضغط</string>
     <string name="comment">تعليق</string>
-    <string name="browse_themes">تصفح الثيمات</string>
-    <string name="browse_icon_packs">تصفح حزم الأيقونات</string>
     <string name="theme_not_found">لم يتم العثور على الثيم</string>
     <string name="icon_pack_not_found">لم يتم العثور على حزمة الأيقونات</string>
     <string name="uninstall_theme_dialog">إزالة تثبيت الثيم؟</string>
@@ -1035,12 +1029,10 @@
 
     <!-- ===== Mahdi-Editor 2.0: اللغات والتشغيل ===== -->
     <string name="languages_supported">اللغات المدعومة</string>
-    <string name="languages_supported_desc">تلوين نحوي لأكثر من 30 لغة، وتشغيل مباشر داخل طرفية Ubuntu</string>
     <string name="language_highlight">تلوين نحوي</string>
     <string name="language_runnable">تشغيل مباشر</string>
     <string name="language_files">الامتدادات</string>
     <string name="run_in_terminal">تشغيل في الطرفية</string>
-    <string name="runner_hint">أول تشغيل قد يثبّت المفسّر تلقائيًا داخل Ubuntu (يحتاج إنترنت).</string>
     <string name="install_terminal_first">ثبّت مكوّن الطرفية من الإعدادات أولًا لتشغيل الأكواد.</string>
 
     <string name="app_name">Mahdi-Editor</string>
@@ -1051,10 +1043,8 @@
     <string name="indexer_error">خطأ في الفهرسة: %s</string>
     <string name="terminal_unavailable">الطرفية غير متوفرة في هذا الإصدار</string>
     <string name="terminal_service_error">خطأ: لا يوجد اتصال بخدمة الطرفية</string>
-    <string name="languages_supported_stats">التلوين النحوي: %1$d لغة — التشغيل المباشر: %2$d لغة</string>
     <string name="theme_suggestions">اقتراحات ثيمات</string>
     <string name="run_direct">تشغيل مباشر</string>
-    <string name="browse_extensions_desc">خوادم لغات ومشغّلات وثيمات وحزم أيقونات — بضغطة واحدة</string>
     <string name="servers_runners">خوادم ومشغّلات</string>
     <string name="search_servers">ابحث في الخوادم والمشغّلات</string>
     <string name="lsp_servers">خوادم اللغات (LSP)</string>
@@ -1072,7 +1062,6 @@
     <string name="terminal_tool_zoom_out">تصغير</string>
     <string name="terminal_tool_zoom_reset">إعادة ضبط الخط</string>
     <string name="terminal_font_size_label">حجم الخط</string>
-    <string name="open_store">تصفح الإضافات</string>
     <string name="ready_state">جاهز</string>
     <string name="installing_state">قيد التثبيت…</string>
     <string name="install_inventory">المخزون</string>
@@ -1081,9 +1070,6 @@
     <string name="guide_title">دليل Mahdi-Editor</string>
     <string name="guide_desc">التوثيق الكامل: المحرّر، الطرفية، Git، الثيمات، الحزم، الخوادم، اللغات</string>
     <string name="runtimes_title">بيئات التشغيل</string>
-    <string name="runtimes_desc">حالة تثبيت حقيقية: Python · Node · PHP · Ruby · Go · Rust…</string>
-    <string name="builtin_ext_title">الإضافات المدمجة</string>
-    <string name="builtin_ext_desc">٣٦ إضافة جاهزة: ١٢ قدرة نظام و٢٤ أداة نصّية تعمل بلا إنترنت</string>
     <string name="autocomplete_bar">شريط الاقتراحات</string>
     <string name="autocomplete_bar_desc">اقتراحات الدوال والكلمات أثناء الكتابة، تعمل بلا إنترنت — أطفئها إن أزعجتك</string>
     <string name="autocomplete_hint">اضغط اقتراحًا لإدراجه</string>
@@ -1124,14 +1110,8 @@
     <string name="encoding_fallback_saved">الترميز %1$s لا يمثّل بعض الأحرف — حُفظ الملف بـ %2$s</string>
     <string name="readonly_saving_as">الملف للقراءة فقط — اختر مكانًا جديدًا للحفظ</string>
     <string name="languages_hub">اللغات</string>
-    <string name="languages_hub_desc">كل ما يخصّ اللغة في مكان واحد: لغة الواجهة، وتثبيت لغات البرمجة أو حذفها بـ ✖️.</string>
     <string name="app_language_section">لغة الواجهة</string>
     <string name="programming_languages">لغات البرمجة</string>
-    <string name="languages_hub_stats">المتوفّر: %1$d · مثبّت مسبقًا: %2$d · مثبّت بواسطتك: %3$d</string>
-    <string name="app_icon_desc_v2">%1$d أيقونة مدمجة: 14 رمزًا × 9 لوحات ألوان. اختر أيقونتك وستتغيّر على الشاشة الرئيسية فورًا بلا إعادة تثبيت.</string>
-    <string name="app_icon_search">ابحث باسم الأيقونة أو لونها</string>
-    <string name="app_icon_all">الكل</string>
-    <string name="app_icon_empty">لا توجد أيقونة تطابق البحث</string>
     <string name="unreadable_file">تعذّر قراءة هذا الملف من مزوّده. جرّب نسخه إلى مجلد على الجهاز ثم تشغيله.</string>
     <string name="all_files_access">الوصول إلى كل ملفات الهاتف</string>
     <string name="all_files_access_on">مفعّل: تستطيع الطرفية قراءة وتشغيل الملفات من أي مجلد في الهاتف.</string>
@@ -1160,10 +1140,6 @@
     <string name="storage_cleaned">حُرِّر %1$s</string>
     <string name="storage_nothing">لا يوجد ما يُنظَّف</string>
     <string name="storage_entry_desc">اعرف أين تذهب مساحة التطبيق ونظّفها بأمان</string>
-    <string name="app_icon_desc_v3">%1$d أيقونات أنمي ثلاثية الأبعاد — كل واحدة بحرف M مجسّم</string>
-    <string name="app_icon_pick">اختر أيقونتك</string>
-    <string name="app_icon_note_title">لماذا لا يوجد اختيار من المعرض؟</string>
-    <string name="app_icon_note_body">أندرويد لا يسمح بتغيير أيقونة التطبيق من صورة خارجية إلا عبر اختصار على الشاشة الرئيسية، لذلك كانت الميزة القديمة مضلّلة. هذه العشر أيقونات حقيقية 100% وتُطبَّق فورًا.</string>
     <string name="update_center_title">مركز التحديثات</string>
     <string name="update_entry_desc">تحديث داخلي مباشر من GitHub بلا متصفح</string>
     <string name="update_check_now">فحص التحديثات الآن</string>
@@ -1190,8 +1166,6 @@
     <string name="update_install_opened">فُتح مُثبّت الحزمة — أكمل التثبيت</string>
     <string name="update_notes_empty">لا توجد ملاحظات لهذا الإصدار.</string>
     <string name="update_percent">%1$d٪</string>
-    <string name="app_icon_internal_note_title">الأيقونة الداخلية تتغيّر أيضًا</string>
-    <string name="app_icon_internal_note_body">الشريط العلوي في الإعدادات وشاشة البداية يعرضان الأيقونة المختارة نفسها، لا أيقونة ثابتة.</string>
     <string name="home_action">الرئيسية</string>
     <string name="back_to_home">العودة إلى المحرّر</string>
     <string name="storage_calculating">جارٍ حساب الحجم…</string>
@@ -1201,4 +1175,11 @@
     <string name="storage_scan_failed">تعذّر حساب الحجم</string>
     <string name="storage_retry">إعادة المحاولة</string>
     <string name="storage_clean_partial">نُظِّف جزئيًا: حُرِّر %1$s — انتهت مهلة تنظيف أوبنتو</string>
+
+    <string name="languages_tab_runtimes">المشغلات</string>
+    <string name="languages_tab_lsp">خوادم اللغة</string>
+    <string name="languages_hub_stats_only">لغة الواجهة · لغات البرمجة · المشغلات · خوادم اللغة</string>
+
+    <string name="storage_clean_cache">تنظيف الذاكرة المؤقتة</string>
+    <string name="storage_clean_temp">تنظيف الملفات المؤقتة</string>
 </resources>

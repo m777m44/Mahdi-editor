@@ -37,14 +37,8 @@ fun SettingsEditorScreen(navController: NavController) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
 
-        PreferenceGroup(heading = stringResource(strings.language_server)) {
-            NextScreenCard(
-                navController = navController,
-                label = stringResource(strings.manage_language_servers),
-                description = stringResource(strings.manage_language_servers_desc),
-                route = SettingsRoutes.LspSettings,
-            )
-
+        // 5.5.0: انتقلت «خوادم اللغة» إلى مركز اللغات — لا مدخل لها هنا.
+        PreferenceGroup {
             EditorSettingsItem(
                 label = stringResource(strings.insert_final_newline),
                 description = stringResource(strings.insert_final_newline_desc),
