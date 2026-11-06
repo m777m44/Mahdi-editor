@@ -16,7 +16,6 @@ import com.mahdi.resources.drawables
 import com.mahdi.resources.getFilledString
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
-import com.mahdi.resources.strings
 
 @Composable
 fun SettingsScreen(navController: NavController) {
