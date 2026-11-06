@@ -20,6 +20,9 @@ sealed interface InstallState {
     /** جارٍ فك الضغط أو إعداد الأذونات. */
     data object Extracting : InstallState
 
+    /** جارٍ حذف البيئة (6.2.0) — تشغل `apt purge` في الخلفية بلا فتح الطرفية. */
+    data object Removing : InstallState
+
     /** مثبَّتة ومتحقَّق منها فعليًا. */
     data class Installed(val version: String? = null) : InstallState
 
@@ -49,6 +52,14 @@ data class RuntimeStatus(
     /** هل يمكن للمستخدم الضغط على «تثبيت» الآن؟ */
     val canInstall: Boolean
         get() = state is InstallState.NotInstalled || state is InstallState.Failed
+
+    /** هل هناك عملية جارية الآن (تثبيت أو حذف) تستحقّ إعادة قراءة الحالة؟ */
+    val isBusy: Boolean
+        get() =
+            state is InstallState.Queued ||
+                state is InstallState.Downloading ||
+                state is InstallState.Extracting ||
+                state is InstallState.Removing
 }
 
 /**
@@ -175,7 +186,7 @@ object RuntimeCatalog {
                 binaries = listOf("perl"),
                 packages = "perl",
                 sizeMb = 6.0,
-                versionCommand = "perl -v",
+                versionCommand = "perl -e 'print \$^V'",
             ),
             RuntimeSpec(
                 id = "sqlite",
