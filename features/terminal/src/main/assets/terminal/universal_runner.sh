@@ -21,6 +21,24 @@ if ! declare -f mahdi_auto_deps >/dev/null 2>&1; then
   mahdi_auto_deps() { return 0; }
 fi
 
+# 5.5.0: شريط التقدّم أحادي السطر + محرّك «ثبّت المكتبة الناقصة وأعد التشغيل»
+if [ -f "$LOCAL/bin/progress" ]; then
+  # shellcheck disable=SC1091
+  source "$LOCAL/bin/progress"
+fi
+if [ -f "$LOCAL/bin/self_heal" ]; then
+  # shellcheck disable=SC1091
+  source "$LOCAL/bin/self_heal"
+fi
+# بديل بسيط: تشغيل مباشر بلا إصلاح ذاتي (تثبيت قديم للتطبيق)
+if ! declare -f mahdi_run_heal >/dev/null 2>&1; then
+  mahdi_run_heal() {
+    local _lang="$1"
+    shift 2
+    "$@"
+  }
+fi
+
 if [ ! -f "$file" ]; then
   error "File not found -> $file"
   exit 1
@@ -217,7 +235,7 @@ case "$file" in
     fi
     # 1) يكتشف كل import في الملف + أوامر pip المكتوبة داخله، 2) يثبّت الناقص بآخر إصدار، 3) يشغّل
     mahdi_auto_deps "$file"
-    python3 "$file"
+    mahdi_run_heal python "$file" python3 "$file"
     ;;
 
   *.js|*.mjs|*.cjs)
@@ -225,7 +243,7 @@ case "$file" in
       install_nodejs
     fi
     mahdi_auto_deps "$file"
-    node "$file"
+    mahdi_run_heal node "$file" node "$file"
     ;;
 
   *.ts|*.tsx)
@@ -297,7 +315,7 @@ case "$file" in
       install_package "php-cli"
     fi
     mahdi_auto_deps "$file"
-    php "$file"
+    mahdi_run_heal php "$file" php "$file"
     ;;
 
   *.c)
@@ -652,7 +670,7 @@ PYEOF
       install_package "python3"
     fi
     mahdi_auto_deps "$file"
-    python3 "$file"
+    mahdi_run_heal python "$file" python3 "$file"
     ;;
 
   *.jar)

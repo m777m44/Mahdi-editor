@@ -2,15 +2,11 @@ package com.mahdi
 
 import android.app.Application
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
 import com.mahdi.App.Companion.iconPackManager
 import com.mahdi.App.Companion.themeManager
 import com.mahdi.activities.main.MainActivity
 import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.common.MahdiPackage
-import com.mahdi.commands.CommandProvider
-import com.mahdi.commands.global.StoreCommand
 import com.mahdi.components.DialogProvider
 import com.mahdi.components.DialogRegistry
 import com.mahdi.extension.ActivityProvider
@@ -32,14 +28,9 @@ import com.mahdi.icons.Icon
 import com.mahdi.resources.drawables
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
-import com.mahdi.settings.SettingsCategory
 import com.mahdi.settings.SettingsRegistry
 import com.mahdi.settings.extension.ExtensionSettings
-import com.mahdi.settings.extension.BuiltinExtensionsScreen
-import com.mahdi.settings.extension.BuiltinToolScreen
-import com.mahdi.settings.extension.RuntimesScreen
 import com.mahdi.settings.extension.PackageDetail
-import com.mahdi.settings.extension.StoreScreen
 import java.io.File
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -58,9 +49,6 @@ class ExtensionFeature : Feature {
 
     private var intentHandler: IntentHandler? = null
     private var dialogProvider: DialogProvider? = null
-    private var settingsCategory: SettingsCategory? = null
-    private var runtimesCategory: SettingsCategory? = null
-    private var bundledCategory: SettingsCategory? = null
     private val routes = mutableListOf<DynamicRoute>()
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -122,72 +110,9 @@ class ExtensionFeature : Feature {
             extensionManager.indexStoreExtensions()
         }
 
-        // 2.6.0: عاد «تصفح الإضافات» بصيغة Mahdi-Editor — إضافات وثيمات وحزم أيقونات
-        // وخوادم لغات ومشغّلات، كلها في شاشة واحدة.
-        settingsCategory =
-            SettingsCategory(
-                    label = strings.browse_extensions.getString(),
-                    description = strings.browse_extensions_desc.getString(),
-                    icon = Icon.ResourceIcon(drawables.store),
-                    route = SettingsRoutes.Extensions.route,
-                )
-                .also { SettingsRegistry.registerCategory(it) }
-
-        // 3.0.0: «بيئات التشغيل» — حالة تثبيت حقيقية لكل مفسّر/مشغّل
-        runtimesCategory =
-            SettingsCategory(
-                    label = strings.runtimes_title.getString(),
-                    description = strings.runtimes_desc.getString(),
-                    icon = Icon.ResourceIcon(drawables.run),
-                    route = SettingsRoutes.Runtimes.route,
-                )
-                .also { SettingsRegistry.registerCategory(it) }
-
-        // 3.0.0: «الإضافات المدمجة» — ٣٦ إضافة جاهزة (قدرات نظام + أدوات)
-        bundledCategory =
-            SettingsCategory(
-                    label = strings.builtin_ext_title.getString(),
-                    description = strings.builtin_ext_desc.getString(),
-                    icon = Icon.ResourceIcon(drawables.widgets),
-                    route = SettingsRoutes.BuiltinExtensions.route,
-                )
-                .also { SettingsRegistry.registerCategory(it) }
-
-        // Register settings routes
-        routes.add(
-            DynamicRoute(SettingsRoutes.Runtimes.route) { _, _ -> RuntimesScreen() }
-        )
-        routes.add(
-            DynamicRoute(SettingsRoutes.BuiltinExtensions.route) { navController, _ ->
-                BuiltinExtensionsScreen(navController)
-            }
-        )
-        routes.add(
-            DynamicRoute(
-                "${SettingsRoutes.Extensions.route}?query={query}&category={category}",
-                arguments =
-                    listOf(
-                        navArgument("query") {
-                            nullable = true
-                            type = NavType.StringType
-                        },
-                        navArgument("category") {
-                            nullable = true
-                            type = NavType.StringType
-                        },
-                    ),
-            ) { navController, backStackEntry ->
-                val query = backStackEntry.arguments?.getString("query")
-                val category = backStackEntry.arguments?.getString("category")
-                StoreScreen(navController = navController, query = query, category = category)
-            }
-        )
-        routes.add(
-            DynamicRoute("${SettingsRoutes.BuiltinTool.route}/{toolId}") { _, backStackEntry ->
-                val toolId = backStackEntry.arguments?.getString("toolId").orEmpty()
-                BuiltinToolScreen(toolId)
-            }
-        )
+        // 5.5.0: حُذف «تصفح الإضافات» و«الإضافات المدمجة» بالكامل (شاشات + مسارات + أوامر).
+        // تبقى فقط شاشات تفاصيل الحزم المثبّتة (ثيم/إضافة/حزمة أيقونات) الموصولة بالمحرّر،
+        // وشاشة «بيئات التشغيل» التي انتقلت إلى مركز اللغات (تبويب «المشغلات»).
         routes.add(
             DynamicRoute("${SettingsRoutes.ExtensionDetail.route}/{extensionId}") { navController, backStackEntry ->
                 val extensionId = backStackEntry.arguments?.getString("extensionId")
@@ -218,9 +143,6 @@ class ExtensionFeature : Feature {
         )
 
         routes.forEach { SettingsRegistry.registerRoute(it) }
-
-        // أمر عام: «تصفح الإضافات» من لوحة الأوامر ومن الشاشة الرئيسية
-        runCatching { CommandProvider.registerCommand(StoreCommand()) }
     }
 
     override fun dispose(application: Application) {
@@ -230,10 +152,6 @@ class ExtensionFeature : Feature {
 
         intentHandler?.let { IntentHandleRegistry.unregister(it) }
         dialogProvider?.let { DialogRegistry.unregister(it) }
-        settingsCategory?.let { SettingsRegistry.unregisterCategory(it) }
-        runtimesCategory?.let { SettingsRegistry.unregisterCategory(it) }
-        bundledCategory?.let { SettingsRegistry.unregisterCategory(it) }
-        runCatching { CommandProvider.commandList.value.filterIsInstance<StoreCommand>().forEach { CommandProvider.unregisterCommand(it) } }
         routes.forEach { SettingsRegistry.unregisterRoute(it) }
         routes.clear()
     }

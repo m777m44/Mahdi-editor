@@ -10,7 +10,7 @@
 # الفرعية، لا في الجلسة التفاعلية وحدها.
 # ——————————————————————————————————————————————————————————————————————————————
 
-MAHDI_ALIASES_VERSION="3.1.0"
+MAHDI_ALIASES_VERSION="5.5.0"
 MAHDI_ALIASES_MARKER="$LOCAL/.mahdi_aliases_version"
 
 _mahdi_write_alias() {
@@ -125,6 +125,12 @@ exit 0'
   if ! command -v python >/dev/null 2>&1; then
     _mahdi_write_alias python '#!/bin/bash
 exec python3 "$@"'
+  fi
+  # الأسماء القصيرة تُحلّ داخليًا: py · python · pip — والسجلّ يبقى كما كتبه المستخدم
+  if ! command -v pip >/dev/null 2>&1; then
+    _mahdi_write_alias pip '#!/bin/bash
+if command -v pip3 >/dev/null 2>&1; then exec pip3 "$@"; fi
+exec python3 -m pip "$@"'
   fi
 
   printf '%s' "$MAHDI_ALIASES_VERSION" >"$MAHDI_ALIASES_MARKER"

@@ -22,8 +22,8 @@ import com.mahdi.settings.editor.EditorFontScreen
 import com.mahdi.settings.editor.ExcludeFiles
 import com.mahdi.settings.editor.FormatterSettings
 import com.mahdi.settings.editor.SettingsEditorScreen
-import com.mahdi.settings.keybinds.KeybindingsScreen
 import com.mahdi.settings.guide.GuideScreen
+import com.mahdi.settings.keybinds.KeybindingsScreen
 import com.mahdi.settings.language.LanguageScreen
 import com.mahdi.settings.language.LanguagesHub
 import com.mahdi.settings.language.SupportedLanguages
@@ -67,7 +67,8 @@ fun SettingsNavHost(navController: NavHostController, activity: SettingsActivity
         composable(SettingsRoutes.DeveloperOptions.route) { DeveloperOptions(navController = navController) }
         composable(SettingsRoutes.AppLogs.route) { AppLogs() }
         composable(SettingsRoutes.LanguageScreen.route) { LanguageScreen() }
-        composable(SettingsRoutes.Languages.route) { LanguagesHub() }
+        composable(SettingsRoutes.Languages.route) { LanguagesHub(navController = navController) }
+        composable(SettingsRoutes.Runtimes.route) { com.mahdi.settings.language.RuntimesScreen() }
         composable(SettingsRoutes.Formatters.route) { FormatterSettings(navController) }
         composable(SettingsRoutes.LspSettings.route) { LspSettings(navController) }
         composable(

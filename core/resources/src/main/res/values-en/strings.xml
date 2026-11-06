@@ -270,7 +270,6 @@
     <string name="use_tabs_desc">Use a real tab (\\t) instead of spaces for indentation</string>
     <string name="language_server">Language server</string>
     <string name="manage_language_servers">Manage language servers</string>
-    <string name="manage_language_servers_desc">Install, connect and configure language servers</string>
     <string name="format_on_save">Format on save</string>
     <string name="format_on_save_desc">Format the file automatically when saved</string>
     <string name="developer">Developer</string>
@@ -285,7 +284,6 @@
     <string name="api_error">API Error</string>
     <string name="unknown">Unknown</string>
     <string name="cant_write">Cannot write to the file (no write permissions)</string>
-    <string name="info_lsp">Language servers are separate processes that provide intelligent features, such as code completion, error highlighting and inline documentation.</string>
     <string name="storage">Storage</string>
     <string name="translate">Translate</string>
     <string name="terminal_feature">Terminal and runners</string>
@@ -332,9 +330,6 @@
     <string name="desktop_mode">Desktop Mode (Experimental)</string>
     <string name="desktop_mode_desc">Makes the app easier to use on tablets and desktop-sized screens</string>
     <string name="built_in">Built-in</string>
-    <string name="change_lang_warn">Changing the language will restart this screen to apply the new language immediately.
-    This may briefly show a blank screen, which could potentially trigger discomfort
-    in people with photosensitive epilepsy.</string>
     <string name="address">Address</string>
     <string name="invalid_address">Invalid address</string>
     <string name="select_all">Select all</string>
@@ -691,7 +686,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="document_highlight">Highlight occurrences</string>
     <string name="document_highlight_desc">Highlight occurrences of the symbol at the cursor</string>
     <string name="formatter_lsp_desc">Use current language server</string>
-    <string name="browse_extensions">Browse extensions</string>
     <string name="clipboard_keybindings">Clipboard keybindings</string>
     <string name="clipboard_keybindings_desc">Enable copy and paste keybindings for hardware keyboards</string>
     <string name="terminal_health">Terminal health</string>
@@ -756,8 +750,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="compression_method">Compression method</string>
     <string name="crc_32">CRC-32</string>
     <string name="comment">Comment</string>
-    <string name="browse_themes">Browse themes</string>
-    <string name="browse_icon_packs">Browse icon packs</string>
     <string name="theme_not_found">Theme not found</string>
     <string name="icon_pack_not_found">Icon pack not found</string>
     <string name="uninstall_theme_dialog">Uninstall theme?</string>
@@ -1013,20 +1005,16 @@ Thank you for using Mahdi-Editor.</string>
     <string name="encoding_detect_title">Detect encoding automatically</string>
     <string name="encoding_detect_desc">The encoding is detected from the file&#8217;s byte-order mark (BOM), then validated as UTF-8, then guessed as Arabic</string>
     <string name="languages_supported">Supported languages</string>
-    <string name="languages_supported_desc">Syntax highlighting for 30+ languages, with direct execution inside the Ubuntu terminal</string>
     <string name="language_highlight">Syntax highlighting</string>
     <string name="language_runnable">Direct execution</string>
     <string name="language_files">Extensions</string>
     <string name="run_in_terminal">Run in terminal</string>
-    <string name="runner_hint">The first run may install the interpreter automatically inside Ubuntu (requires internet).</string>
     <string name="install_terminal_first">Install the terminal component from Settings first to run code.</string>
     <string name="indexer_error">Indexing error: %s</string>
     <string name="terminal_unavailable">The terminal is not available in this build</string>
     <string name="terminal_service_error">Error: no connection to the terminal service</string>
-    <string name="languages_supported_stats">Syntax highlighting: %1$d languages — direct running: %2$d languages</string>
     <string name="theme_suggestions">Theme suggestions</string>
     <string name="run_direct">Run</string>
-    <string name="browse_extensions_desc">Language servers, runners, themes and icon packs — one tap away</string>
     <string name="servers_runners">Servers &amp; runners</string>
     <string name="search_servers">Search servers and runners</string>
     <string name="lsp_servers">Language servers (LSP)</string>
@@ -1044,7 +1032,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="terminal_tool_zoom_out">Zoom out</string>
     <string name="terminal_tool_zoom_reset">Reset font</string>
     <string name="terminal_font_size_label">Font size</string>
-    <string name="open_store">Browse extensions</string>
     <string name="ready_state">Ready</string>
     <string name="installing_state">Installing…</string>
     <string name="install_inventory">Inventory</string>
@@ -1053,9 +1040,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="guide_title">Mahdi-Editor guide</string>
     <string name="guide_desc">Complete docs: editor, terminal, Git, themes, packages, servers, languages</string>
     <string name="runtimes_title">Runtimes</string>
-    <string name="runtimes_desc">Real install state: Python · Node · PHP · Ruby · Go · Rust…</string>
-    <string name="builtin_ext_title">Bundled extensions</string>
-    <string name="builtin_ext_desc">36 ready extensions: 12 system capabilities and 24 text tools, all offline</string>
     <string name="autocomplete_bar">Autocomplete bar</string>
     <string name="autocomplete_bar_desc">Function and word suggestions while typing, fully offline — turn it off if it gets in the way</string>
     <string name="autocomplete_hint">Tap a suggestion to insert it</string>
@@ -1096,14 +1080,8 @@ Thank you for using Mahdi-Editor.</string>
     <string name="encoding_fallback_saved">%1$s cannot represent some characters — saved as %2$s</string>
     <string name="readonly_saving_as">File is read-only — choose a new location to save</string>
     <string name="languages_hub">Languages</string>
-    <string name="languages_hub_desc">Everything language-related in one place: UI language, plus install/remove programming languages with ✖️.</string>
     <string name="app_language_section">App language</string>
     <string name="programming_languages">Programming languages</string>
-    <string name="languages_hub_stats">Available: %1$d · bundled: %2$d · installed by you: %3$d</string>
-    <string name="app_icon_desc_v2">%1$d built-in icons: 14 symbols × 9 palettes. Pick one and your launcher icon changes instantly — no reinstall.</string>
-    <string name="app_icon_search">Search by name or color</string>
-    <string name="app_icon_all">All</string>
-    <string name="app_icon_empty">No icon matches your search</string>
     <string name="unreadable_file">This file could not be read from its provider. Try copying it to a folder on the device, then run it.</string>
     <string name="all_files_access">Access all phone files</string>
     <string name="all_files_access_on">Enabled: the terminal can read and run files from any folder on the device.</string>
@@ -1132,10 +1110,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="storage_cleaned">Freed %1$s</string>
     <string name="storage_nothing">Nothing to clean</string>
     <string name="storage_entry_desc">See where app storage goes and clean it safely</string>
-    <string name="app_icon_desc_v3">%1$d three-dimensional anime icons — each with an embossed M</string>
-    <string name="app_icon_pick">Pick your icon</string>
-    <string name="app_icon_note_title">Why is there no gallery picker?</string>
-    <string name="app_icon_note_body">Android does not allow changing the app icon from an external image except through a home-screen shortcut, which made the old feature misleading. These ten icons are 100%% real and apply instantly.</string>
     <string name="update_center_title">Update center</string>
     <string name="update_entry_desc">In-app update straight from GitHub, no browser</string>
     <string name="update_check_now">Check for updates now</string>
@@ -1162,8 +1136,6 @@ Thank you for using Mahdi-Editor.</string>
     <string name="update_install_opened">Package installer opened — finish the installation</string>
     <string name="update_notes_empty">No notes for this release.</string>
     <string name="update_percent">%1$d%%</string>
-    <string name="app_icon_internal_note_title">The in-app icon changes too</string>
-    <string name="app_icon_internal_note_body">The settings top bar and the splash screen show the same chosen icon, not a fixed one.</string>
     <string name="home_action">Home</string>
     <string name="back_to_home">Back to editor</string>
     <string name="storage_calculating">Calculating size…</string>
@@ -1173,4 +1145,11 @@ Thank you for using Mahdi-Editor.</string>
     <string name="storage_scan_failed">Could not calculate the size</string>
     <string name="storage_retry">Retry</string>
     <string name="storage_clean_partial">Partly cleaned: %1$s freed — the Ubuntu cleanup timed out</string>
+
+    <string name="languages_tab_runtimes">Runtimes</string>
+    <string name="languages_tab_lsp">Language servers</string>
+    <string name="languages_hub_stats_only">Interface · programming languages · runtimes · language servers</string>
+
+    <string name="storage_clean_cache">Clean cache</string>
+    <string name="storage_clean_temp">Clean temp files</string>
 </resources>

@@ -1,18 +1,10 @@
 package com.mahdi.settings.language
 
 import android.content.Context
-import android.content.Intent
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -22,12 +14,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mahdi.DefaultScope
-import com.mahdi.components.InfoBlock
 import com.mahdi.components.SettingsItem
 import com.mahdi.components.compose.preferences.base.PreferenceGroup
 import com.mahdi.components.compose.preferences.base.PreferenceLayout
@@ -48,9 +38,27 @@ data class LocaleInfo(val locale: Locale, val isInstalled: Boolean, val displayN
 /** اللغات التي تُشحن ترجماتها كاملة داخل التطبيق (values/ = العربية و values-en/ = الإنجليزية). */
 private val BUNDLED_LANGUAGES = setOf("ar", "en")
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * شاشة «لغة الواجهة» — قائمة اللغات فقط (5.5.0).
+ *
+ * أُزيلت فقرة التحذير (`change_lang_warn`) وزرّ «ساهم بالترجمة»: الشاشة تبدأ
+ * باللغات مباشرةً. هذا الغلاف يبقى للمسار المستقل، والمحتوى نفسه يُعاد استخدامه
+ * داخل مركز اللغات ([LanguagesHub]).
+ */
 @Composable
 fun LanguageScreen(modifier: Modifier = Modifier) {
+    PreferenceLayout(
+        label = stringResource(strings.lang),
+        modifier = modifier,
+        backArrowVisible = true,
+    ) {
+        LanguageContent()
+    }
+}
+
+/** محتوى «لغة الواجهة» بلا غلاف — قائمة راديو واحدة لكل لغة متوفّرة. */
+@Composable
+fun LanguageContent() {
     val context = LocalContext.current
 
     // Single state for processed locale data
@@ -79,70 +87,48 @@ fun LanguageScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    PreferenceLayout(
-        label = stringResource(strings.lang),
-        backArrowVisible = true,
-        fab = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, "https://github.com/m777m44/Mahdi-editor".toUri())
-                    )
-                },
-                text = { Text(stringResource(strings.translate)) },
-                icon = { Icon(imageVector = Icons.Default.Add, contentDescription = null) },
-            )
-        },
-    ) {
-        InfoBlock(
-            icon = { Icon(imageVector = Icons.Outlined.Warning, contentDescription = null) },
-            text = stringResource(strings.change_lang_warn),
-            warning = true,
-        )
-
-        PreferenceGroup {
-            val locales = localeInfoList.value
-            val selectedLocaleInfo =
-                remember(currentLocale, locales) {
-                    locales?.let { list ->
-                        // Exact match (e.g. "en-US")
-                        list.find { it.locale.toLanguageTag() == currentLocale.toLanguageTag() }
-                            // Fallback to language match (e.g. "en")
-                            ?: list.find { it.locale.language == currentLocale.language }
-                    }
+    PreferenceGroup {
+        val locales = localeInfoList.value
+        val selectedLocaleInfo =
+            remember(currentLocale, locales) {
+                locales?.let { list ->
+                    // Exact match (e.g. "en-US")
+                    list.find { it.locale.toLanguageTag() == currentLocale.toLanguageTag() }
+                        // Fallback to language match (e.g. "en")
+                        ?: list.find { it.locale.language == currentLocale.language }
                 }
+            }
 
-            if (locales != null) {
-                locales.forEach { localeInfo ->
-                    SettingsItem(
-                        modifier = Modifier,
-                        label = localeInfo.displayName,
-                        default = false,
-                        sideEffect = { setAppLanguage(localeInfo.locale, currentLocale) },
-                        showSwitch = false,
-                        isEnabled = localeInfo.isInstalled,
-                        startWidget = {
-                            RadioButton(
-                                selected = selectedLocaleInfo == localeInfo,
-                                onClick = { setAppLanguage(localeInfo.locale, currentLocale) },
-                            )
-                        },
-                    )
-                }
-            } else {
+        if (locales != null) {
+            locales.forEach { localeInfo ->
                 SettingsItem(
                     modifier = Modifier,
-                    label = stringResource(strings.loading),
+                    label = localeInfo.displayName,
                     default = false,
-                    sideEffect = {},
+                    sideEffect = { setAppLanguage(localeInfo.locale, currentLocale) },
                     showSwitch = false,
-                    startWidget = {},
+                    isEnabled = localeInfo.isInstalled,
+                    startWidget = {
+                        RadioButton(
+                            selected = selectedLocaleInfo == localeInfo,
+                            onClick = { setAppLanguage(localeInfo.locale, currentLocale) },
+                        )
+                    },
                 )
             }
+        } else {
+            SettingsItem(
+                modifier = Modifier,
+                label = stringResource(strings.loading),
+                default = false,
+                sideEffect = {},
+                showSwitch = false,
+                startWidget = {},
+            )
         }
-
-        Spacer(modifier = Modifier.height(60.dp))
     }
+
+    Spacer(modifier = Modifier.height(24.dp))
 }
 
 // Extract function outside composable to avoid recreation

@@ -16,6 +16,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,6 +41,7 @@ import com.mahdi.resources.getFilledString
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.storage.AppStorage
+import com.mahdi.storage.StorageManager
 import com.mahdi.theme.SkyAccent
 import com.mahdi.theme.SkyBadge
 import com.mahdi.utils.logError
@@ -215,15 +217,19 @@ fun StorageScreen() {
         // ——————————————— التفصيل ———————————————
         val r = report
         if (r != null && r.groups.isNotEmpty()) {
-            val max = r.groups.maxOfOrNull { it.size }?.coerceAtLeast(1) ?: 1
-
-            PreferenceGroup(heading = stringResource(strings.storage_where)) {
-                r.groups.filter { it.size > 0 }.forEach { entry ->
-                    StorageRow(
-                        label = entry.label(isArabic),
-                        size = entry.size,
-                        fraction = entry.size.toFloat() / max,
-                    )
+            // 5.5.0: التفصيل حسب النوع من StorageManager — نفس الفحص الواحد، بلا مشي إضافي
+            val breakdown = StorageManager.fromReport(r, context)
+            val rows = breakdown.items.filter { it.size > 0 }
+            if (rows.isNotEmpty()) {
+                val max = rows.maxOf { it.size }.coerceAtLeast(1)
+                PreferenceGroup(heading = stringResource(strings.storage_where)) {
+                    rows.forEach { item ->
+                        StorageRow(
+                            label = item.category.label(isArabic),
+                            size = item.size,
+                            fraction = item.size.toFloat() / max,
+                        )
+                    }
                 }
             }
 
@@ -267,6 +273,64 @@ fun StorageScreen() {
                 )
 
                 Spacer(Modifier.height(12.dp))
+
+                // 5.5.0: تنظيف مخصّص — كل زرّ يمسّ منطقته فقط ولا يقترب من بياناتك
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (cleaning) return@OutlinedButton
+                            cleaning = true
+                            scope.launch {
+                                val freed =
+                                    withContext(Dispatchers.IO) { StorageManager.cleanCache() }
+                                toast(
+                                    if (freed > 0L) {
+                                        strings.storage_cleaned.getFilledString(AppStorage.format(freed))
+                                    } else {
+                                        strings.storage_nothing.getString()
+                                    },
+                                )
+                                withContext(Dispatchers.IO) {
+                                    runCatching { AppStorage.report(budgetMs = 2_500L) }.getOrNull()
+                                }?.let { report = it }
+                                cleaning = false
+                            }
+                        },
+                        enabled = !cleaning,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(strings.storage_clean_cache), style = MaterialTheme.typography.labelMedium)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            if (cleaning) return@OutlinedButton
+                            cleaning = true
+                            scope.launch {
+                                val freed =
+                                    withContext(Dispatchers.IO) { StorageManager.cleanTempFiles() }
+                                toast(
+                                    if (freed > 0L) {
+                                        strings.storage_cleaned.getFilledString(AppStorage.format(freed))
+                                    } else {
+                                        strings.storage_nothing.getString()
+                                    },
+                                )
+                                withContext(Dispatchers.IO) {
+                                    runCatching { AppStorage.report(budgetMs = 2_500L) }.getOrNull()
+                                }?.let { report = it }
+                                cleaning = false
+                            }
+                        },
+                        enabled = !cleaning,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(strings.storage_clean_temp), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
 
                 FilledTonalButton(
                     onClick = {

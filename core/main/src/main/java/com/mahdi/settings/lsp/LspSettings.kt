@@ -12,12 +12,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SegmentedButton
@@ -49,7 +47,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import androidx.navigation.NavController
 import com.mahdi.activities.settings.SettingsRoutes
-import com.mahdi.components.InfoBlock
 import com.mahdi.components.SettingsItem
 import com.mahdi.components.compose.preferences.base.PreferenceGroup
 import com.mahdi.components.compose.preferences.base.PreferenceLayout
@@ -65,7 +62,6 @@ import com.mahdi.resources.drawables
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Preference
-import com.mahdi.utils.openDocs
 import com.mahdi.utils.parseExtensions
 import com.mahdi.utils.toast
 import kotlinx.coroutines.CoroutineScope
@@ -73,8 +69,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * «خوادم اللغة» (5.5.0) — انتقلت من الإعدادات وإعدادات المحرّر إلى مركز اللغات،
+ * التبويب الرابع. أُزيلت فقرة الشرح (`info_lsp`) وزرّ الإضافة العائم؛ الإضافة صارت
+ * سطرًا في آخر القائمة نفسها حتى تعمل الشاشة مدمجةً بلا تعارض مع زرّ عائم.
+ */
 @Composable
-fun LspSettings(navController: NavController) {
+fun LspContent(navController: NavController) {
     var showDialog by remember { mutableStateOf(false) }
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
@@ -158,57 +159,64 @@ fun LspSettings(navController: NavController) {
         }
     }
 
+    if (builtInServers.isNotEmpty()) {
+        BuiltInServersSection(builtInServers)
+    }
+
+    if (extensionServers.isNotEmpty()) {
+        ExtensionServersSection(extensionServers)
+    }
+
+    if (externalServers.isNotEmpty()) {
+        ExternalServersSection()
+    }
+
+    PreferenceGroup {
+        SettingsItem(
+            label = stringResource(strings.external_lsp),
+            description = stringResource(strings.manage_language_servers),
+            singleLineDescription = true,
+            showSwitch = false,
+            onClick = { showDialog = true },
+            startWidget = { Icon(imageVector = Icons.Outlined.Add, contentDescription = null) },
+        )
+    }
+
+    Spacer(modifier = Modifier.height(24.dp))
+
+    if (showDialog) {
+        ExternalLSPDialog(
+            onDismiss = {
+                showDialog = false
+                editingIndex = null
+            },
+            onConfirm = { newServer, replaceIndex ->
+                if (replaceIndex == -1) {
+                    LspRegistry.addExternalServer(newServer)
+                    scope.launch { newServer.connectAllSuitableEditors() }
+                } else {
+                    val oldServer = externalServers[replaceIndex]
+                    scope.launch { oldServer.disconnectAllInstances() }
+
+                    LspRegistry.replaceExternalServer(replaceIndex, newServer)
+                    scope.launch { newServer.connectAllSuitableEditors() }
+                }
+                LspPersistence.saveServers()
+            },
+            editingIndex = editingIndex,
+        )
+    }
+}
+
+/** غلاف مستقل لمسار «خوادم اللغة» القائم — نفس المحتوى بلا تكرار. */
+@Composable
+fun LspSettings(navController: NavController, modifier: Modifier = Modifier) {
     PreferenceLayout(
         label = stringResource(strings.manage_language_servers),
-        fab = {
-            ExtendedFloatingActionButton(onClick = { showDialog = true }) {
-                Icon(imageVector = Icons.Outlined.Add, null)
-                Text(stringResource(strings.external_lsp))
-            }
-        },
+        modifier = modifier,
+        backArrowVisible = true,
     ) {
-        InfoBlock(
-            onClick = { context.openDocs("lsp") },
-            icon = { Icon(imageVector = Icons.Outlined.Info, contentDescription = null) },
-            text = stringResource(strings.info_lsp),
-        )
-
-        if (builtInServers.isNotEmpty()) {
-            BuiltInServersSection(builtInServers)
-        }
-
-        if (extensionServers.isNotEmpty()) {
-            ExtensionServersSection(extensionServers)
-        }
-
-        if (externalServers.isNotEmpty()) {
-            ExternalServersSection()
-        }
-
-        Spacer(modifier = Modifier.height(60.dp))
-
-        if (showDialog) {
-            ExternalLSPDialog(
-                onDismiss = {
-                    showDialog = false
-                    editingIndex = null
-                },
-                onConfirm = { newServer, replaceIndex ->
-                    if (replaceIndex == -1) {
-                        LspRegistry.addExternalServer(newServer)
-                        scope.launch { newServer.connectAllSuitableEditors() }
-                    } else {
-                        val oldServer = externalServers[replaceIndex]
-                        scope.launch { oldServer.disconnectAllInstances() }
-
-                        LspRegistry.replaceExternalServer(replaceIndex, newServer)
-                        scope.launch { newServer.connectAllSuitableEditors() }
-                    }
-                    LspPersistence.saveServers()
-                },
-                editingIndex = editingIndex,
-            )
-        }
+        LspContent(navController)
     }
 }
 

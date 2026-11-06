@@ -64,6 +64,8 @@ object AppStorage {
         val scanned: Int = 0,
         /** زمن القياس (ميلي ثانية منذ الحقبة). */
         val measuredAt: Long = 0L,
+        /** 5.5.0: أحجام مصنّفة بالمفتاح: cache/temp/tools/themes/extensions/languages/image/home/other/external. */
+        val categories: Map<String, Long> = emptyMap(),
     )
 
     /** نتيجة التنظيف — تُعرض للمستخدم كما هي، نجحت أو بعضها فقط. */
@@ -88,6 +90,14 @@ object AppStorage {
     private const val B_CACHE = 5
     private const val B_TEMP = 6
     private const val B_SANDBOX_SUB = 7
+
+    // 5.5.0: تفصيل حسب النوع (يُستخدم في StorageManager)
+    private const val B_THEMES = 8
+    private const val B_EXTENSIONS = 9
+    private const val B_LANGUAGES = 10
+    private const val B_EXTERNAL = 11
+    private const val B_LOGS = 12
+    private const val BUCKET_COUNT = 13
 
     private const val MAX_ENTRIES = 200_000
     private const val DEFAULT_BUDGET_MS = 4_000L
@@ -118,7 +128,7 @@ object AppStorage {
             val cache = app.cacheDir
 
             val deadline = System.nanoTime() + budgetMs * 1_000_000L
-            val sizes = LongArray(8)
+            val sizes = LongArray(BUCKET_COUNT)
             val sandboxSubs = LinkedHashMap<String, Long>()
             var scanned = 0
             var partial = false
@@ -146,9 +156,13 @@ object AppStorage {
                                                                 stack.addLast(Node(l, B_HOME, null))
                                                             (l.name == "bin" || l.name == "lib") && l.isDirectory ->
                                                                 stack.addLast(Node(l, B_TOOLS, null))
-                                                            (l.name == "icon_pack" || l.name == "themes" || l.name == "extensions") &&
+                                                            l.name == "themes" && l.isDirectory ->
+                                                                stack.addLast(Node(l, B_THEMES, null))
+                                                            (l.name == "icon_pack" || l.name == "extensions") &&
                                                                 l.isDirectory ->
-                                                                stack.addLast(Node(l, B_ASSETS, null))
+                                                                stack.addLast(Node(l, B_EXTENSIONS, null))
+                                                            l.name.contains("lang") && l.isDirectory ->
+                                                                stack.addLast(Node(l, B_LANGUAGES, null))
                                                             else -> stack.addLast(Node(l, B_OTHER, null))
                                                         }
                                                     }
@@ -156,6 +170,7 @@ object AppStorage {
                                             }
                                         }
                                         "tmp" -> stack.addLast(Node(f, B_TEMP, null))
+                                        "crash" -> stack.addLast(Node(f, B_LOGS, null))
                                         else -> stack.addLast(Node(f, B_OTHER, null))
                                     }
                                 }
@@ -174,6 +189,14 @@ object AppStorage {
             }
             if (temp.absolutePath.startsWith(dataDir.absolutePath).not()) {
                 stack.addLast(Node(temp, B_TEMP, null))
+            }
+            // 5.5.0: مجلد التطبيق على التخزين الخارجي (تنزيل التحديثات…) يُقاس منفصلًا
+            runCatching {
+                app.getExternalFilesDir(null)?.takeIf { it.isDirectory }?.let { ext ->
+                    if (ext.absolutePath.startsWith(dataDir.absolutePath).not()) {
+                        stack.addLast(Node(ext, B_EXTERNAL, null))
+                    }
+                }
             }
 
             val checkpoint = 2048
@@ -201,6 +224,8 @@ object AppStorage {
                     }
 
                     if (isSymlink(child)) continue
+                    // 5.5.0: ملفات وقفل مؤقتة — لا تُحسب ولا تُمسّ أثناء المشي
+                    if (isTransient(child.name)) continue
 
                     if (child.isDirectory) {
                         when {
@@ -212,7 +237,12 @@ object AppStorage {
                             else -> stack.addLast(Node(child, node.bucket, node.sub))
                         }
                     } else {
-                        sizes[node.bucket] += child.length()
+                        // 5.5.0: أي ملف سجلّ يُحسب في تصنيف «السجلات» مهما كان مكانه
+                        if (child.name.endsWith(".log")) {
+                            sizes[B_LOGS] += child.length()
+                        } else {
+                            sizes[node.bucket] += child.length()
+                        }
                         val sub = node.sub
                         if (node.bucket == B_SANDBOX_SUB && sub != null) {
                             sandboxSubs[sub] = (sandboxSubs[sub] ?: 0L) + child.length()
@@ -230,7 +260,11 @@ object AppStorage {
                     Entry("صورة أوبنتو (النظام)", "Ubuntu image (system)", sizes[B_SANDBOX]),
                     Entry("ملفاتك داخل الطرفية", "Your terminal files", sizes[B_HOME]),
                     Entry("بيئات التشغيل والأدوات", "Runtimes & tools", sizes[B_TOOLS]),
-                    Entry("حزم الأيقونات والثيمات", "Icon packs & themes", sizes[B_ASSETS]),
+                    Entry(
+                        "الثيمات وحزم الأيقونات واللغات",
+                        "Themes, icon packs & languages",
+                        sizes[B_THEMES] + sizes[B_EXTENSIONS] + sizes[B_LANGUAGES],
+                    ),
                     Entry("ذاكرة التخزين المؤقتة", "App cache", sizes[B_CACHE]),
                     Entry("ملفات مؤقتة", "Temporary files", sizes[B_TEMP]),
                     Entry("بقية البيانات", "Everything else", sizes[B_OTHER]),
@@ -245,6 +279,21 @@ object AppStorage {
                     .take(7)
                     .map { Entry("${it.key}/", "${it.key}/", it.value) }
 
+            val categories =
+                linkedMapOf(
+                    "cache" to sizes[B_CACHE],
+                    "temp" to sizes[B_TEMP],
+                    "tools" to sizes[B_TOOLS],
+                    "themes" to sizes[B_THEMES],
+                    "extensions" to sizes[B_EXTENSIONS],
+                    "languages" to sizes[B_LANGUAGES],
+                    "image" to sizes[B_SANDBOX],
+                    "home" to sizes[B_HOME],
+                    "other" to sizes[B_OTHER],
+                    "external" to sizes[B_EXTERNAL],
+                    "logs" to sizes[B_LOGS],
+                )
+
             onStep("done")
 
             Report(
@@ -257,6 +306,7 @@ object AppStorage {
                 partial = partial,
                 scanned = scanned,
                 measuredAt = System.currentTimeMillis(),
+                categories = categories,
             )
                 .also { if (!partial) saveCache(app, it) }
         }
@@ -475,6 +525,13 @@ object AppStorage {
 
     /** حجم ملف أو مجلد بالبايت، متجاهلًا الروابط الرمزية لتجنّب الدوران اللانهائي. */
     fun sizeOf(file: File): Long = measureQuick(file, budgetMs = 3_000L)
+
+    /**
+     * ملفات عابرة لا تُحسب ولا تُنظَّف من المسار العادي:
+     * `.tmp…` و`*.lock` — تكتبها أدوات التثبيت ثم تختفي، وقد تكون مفتوحة الآن.
+     */
+    fun isTransient(name: String): Boolean =
+        name.startsWith(".tmp") || name.endsWith(".lock") || name == "lock"
 
     private fun isSymlink(file: File): Boolean =
         runCatching { java.nio.file.Files.isSymbolicLink(file.toPath()) }.getOrDefault(false)
