@@ -84,12 +84,10 @@ fun LanguagesHub(modifier: Modifier = Modifier, navController: NavController? = 
         backArrowVisible = true,
     ) { paddingValues ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding =
-                PaddingValues(
-                    top = paddingValues.calculateTopPadding(),
-                    bottom = paddingValues.calculateBottomPadding() + 32.dp,
-                ),
+            // 6.2.0: الهامش العلوي على المُلحق لا على المحتوى، وإلّا لصق شريط التبويبات
+            // بأعلى الشاشة فاختفى نصفه تحت الشريط العلوي عند التمرير (خطأ ظاهر في الجهاز)
+            modifier = Modifier.fillMaxSize().padding(top = paddingValues.calculateTopPadding()),
+            contentPadding = PaddingValues(bottom = paddingValues.calculateBottomPadding() + 32.dp),
         ) {
             stickyHeader(key = "language-tabs") {
                 // خلفية معتمة بلون الشاشة نفسه حتى لا يظهر المحتوى تحت الشريط أثناء التمرير

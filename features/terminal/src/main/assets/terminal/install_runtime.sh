@@ -45,38 +45,71 @@ mahdi_runtime_installed() {
   sh -c "$version_cmd >/dev/null 2>&1" 2>/dev/null
 }
 
-# ————————————————————————— حذف بيئة تشغيل (6.1.0) —————————————————————————
-# bash install_runtime --remove <id> <packages>
-# يحذف الحزم فعليًا من الجذر ويمسح علامة التثبيت، فلا تبقى البيئة «مثبَّتة» كذبًا.
+# ————————————————————————— حذف بيئة تشغيل (6.2.0) —————————————————————————
+# bash install_runtime --remove <id> <packages> <binaries> <name>
+#
+# يحذف الحزم فعليًا من الجذر، ثم يقول الحقيقة: إن بقي الثنائي بعد الحذف فالحزمة
+# أساسية في أوبنتو (`perl-base` توفّر /usr/bin/perl مثلًا) ولا يمكن حذفها، فيُكتب
+# `survived=1` ويظهر في التطبيق «مضمّن» لا «مثبَّت» — فيختفي زرّ الحذف بدل أن
+# يعود بعد ثانية ويحيّر المستخدم.
 mahdi_runtime_remove() {
-  local id="${1:-}" packages="${2:-}"
+  local id="${1:-}" packages="${2:-}" binaries="${3:-}" label="${4:-${1:-}}"
   [ -z "$id" ] && { echo "install_runtime: missing id" >&2; exit 2; }
 
-  mkdir -p "$MAHDI_STATUS_DIR" "$MAHDI_MARKER_DIR" 2>/dev/null
+  mkdir -p "$MAHDI_STATE_DIR" "$MAHDI_STATUS_DIR" "$MAHDI_MARKER_DIR" "$MAHDI_LOG_DIR" 2>/dev/null
   mahdi_runtime_status "$id" removing 20 "حذف البيئة"
 
   local log="$MAHDI_LOG_DIR/remove-$id.log"
-  mkdir -p "$MAHDI_LOG_DIR" 2>/dev/null
   : > "$log" 2>/dev/null
 
+  local apt_rc=0
   if [ -n "$packages" ] && command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
     # shellcheck disable=SC2086
-    apt-get remove -y --purge $packages >>"$log" 2>&1 || true
+    apt-get remove -y --purge $packages >>"$log" 2>&1 || apt_rc=$?
     # shellcheck disable=SC2086
     apt-get autoremove -y >>"$log" 2>&1 || true
   fi
 
-  rm -f "$MAHDI_MARKER_DIR/$id" 2>/dev/null
-  rm -f "$MAHDI_STATUS_DIR/$id" 2>/dev/null
+  # هل بقي الثنائي؟ أي واحد يكفي: معنى ذلك أنّ البيئة ما زالت تعمل.
+  local survived=0 bin
+  for bin in $binaries; do
+    if command -v "$bin" >/dev/null 2>&1; then
+      survived=1
+      break
+    fi
+  done
 
-  printf '\033[32m✔ حُذفت البيئة: %s\033[0m\n' "$id"
+  # فشل حقيقي (قفل apt أو انقطاع شبكة) والثنائي ما زال موجودًا ⇒ لا ندّعي الحذف،
+  # ونُعيد الحالة «مثبّتة» كما كانت ليستطيع المستخدم إعادة المحاولة.
+  # الرمز 100 من apt يعني «لا شيء ليفعله» لا خطأً، ولا يُعدّ فشلًا.
+  if [ "$survived" = "1" ] && [ "$apt_rc" -ne 0 ] && [ "$apt_rc" -ne 100 ]; then
+    mahdi_runtime_status "$id" installed 100 ""
+    printf '\033[31m✖ تعذّر حذف %s — راجع الملف: ~/.mahdi/logs/remove-%s.log\033[0m\n' "$label" "$id"
+    exit 1
+  fi
+
+  rm -f "$MAHDI_MARKER_DIR/$id" 2>/dev/null
+
+  {
+    printf 'state=removed\n'
+    printf 'progress=100\n'
+    printf 'survived=%s\n' "$survived"
+    printf 'msg=\n'
+    printf 'time=%s\n' "$(date +%s 2>/dev/null || echo 0)"
+  } > "$MAHDI_STATUS_DIR/$id" 2>/dev/null
+
+  if [ "$survived" = "1" ]; then
+    printf '\033[33mℹ %s مضمّن في نظام أوبنتو ولا يمكن حذفه — أُزيلت الحزم الإضافية فقط.\033[0m\n' "$label"
+  else
+    printf '\033[32m✔ حُذفت البيئة: %s\033[0m\n' "$label"
+  fi
   exit 0
 }
 
 main() {
   if [ "${1:-}" = "--remove" ]; then
-    mahdi_runtime_remove "${2:-}" "${3:-}"
+    mahdi_runtime_remove "${2:-}" "${3:-}" "${4:-}" "${5:-}"
   fi
 
   local id="${1:-}" packages="${2:-}" post="${3:-}" version_cmd="${4:-}"

@@ -3,6 +3,7 @@ package com.mahdi.runtime
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
+import com.mahdi.SandboxedProcessRegistry
 import com.mahdi.TerminalLauncher
 import com.mahdi.file.child
 import com.mahdi.file.sandboxDir
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 /**
  * مُدار تثبيت بيئات التشغيل (3.0.0) — الحالة الحقيقية لا الوهمية.
@@ -37,6 +39,18 @@ object RuntimeInstaller {
 
     private const val PREFS = "mahdi_runtime_installs"
     private const val KEY_STATE_PREFIX = "state_"
+
+    /** حالة ملفّ الحالة التي يكتبها الحذف الناجح. */
+    private const val STATE_REMOVED = "removed"
+
+    /** أقصى زمن لانتظار `apt purge` قبل إيقافه (٥ دقائق). */
+    private const val REMOVE_TIMEOUT_MS = 5 * 60 * 1000L
+
+    /** صلاحية ملفّ الحالة الحيّة (ساعة) قبل اعتباره أثرًا قديمًا. */
+    private const val STATUS_TTL_SECONDS = 60 * 60
+
+    /** «جارٍ الحذف» أثر قصير العمر: إن انقطعت العملية لا تبقى البطاقة معلّقة. */
+    private const val REMOVING_TTL_SECONDS = 120
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var watcher: Job? = null
@@ -83,6 +97,26 @@ object RuntimeInstaller {
         val marker = specMarkerFile(spec.id)
         val markerVersion = readValue(marker, "version")
         val live = readKeyValues(specStatusFile(spec.id))
+        val liveState = live["state"].orEmpty()
+        val liveTime = live["time"]?.toLongOrNull() ?: 0L
+        val fresh = liveTime == 0L || (System.currentTimeMillis() / 1000 - liveTime) < STATUS_TTL_SECONDS
+
+        // 0) حذف جارٍ الآن: البطاقة تُظهر «جارٍ الحذف…» حتى لو كان الثنائي موجودًا
+        val removingFresh = liveTime == 0L || (System.currentTimeMillis() / 1000 - liveTime) < REMOVING_TTL_SECONDS
+        if (liveState == "removing" && removingFresh) {
+            return RuntimeStatus(spec.id, spec.nameAr, spec.nameEn, InstallState.Removing, null, spec.sizeMb, spec.packages)
+        }
+
+        // 0.1) قرار الحذف يعلو على فحص الثنائي (6.2.0)
+        //
+        // بعض الحزم أساسية في أوبنتو (perl-base توفّر /usr/bin/perl) فلا يمحوها
+        // `apt purge`، فيعود الفحص ليقول «مثبَّت» بعد الحذف ويبقى زرّ الحذف الأحمر
+        // ظاهرًا إلى الأبد — وهو ما شكا منه المستخدم. السكربت يكتب بعد الحذف
+        // `state=removed` مع `survived=1|0`، فنصدّقه بدلًا من تخمين حالة القرص.
+        if (!marker.exists() && live["state"] == STATE_REMOVED) {
+            val state = if (live["survived"] == "1") InstallState.Bundled else InstallState.NotInstalled
+            return RuntimeStatus(spec.id, spec.nameAr, spec.nameEn, state, null, spec.sizeMb, spec.packages)
+        }
 
         // 1) مثبَّت ومتحقَّق منه فعليًا
         if (binary != null || marker.exists()) {
@@ -100,10 +134,6 @@ object RuntimeInstaller {
         }
 
         // 2) حالة حيّة من الطرفية (تثبيت جارٍ أو فشل مسجَّل)
-        val liveState = live["state"].orEmpty()
-        val liveTime = live["time"]?.toLongOrNull() ?: 0L
-        val fresh = liveTime == 0L || (System.currentTimeMillis() / 1000 - liveTime) < 60 * 60
-
         if (fresh) {
             when (liveState) {
                 "installing", "queued", "verifying" -> {
@@ -172,32 +202,92 @@ object RuntimeInstaller {
     }
 
     /**
-     * يحذف بيئة تشغيل فعليًا (6.1.0).
+     * يحذف بيئة تشغيل فعليًا (6.1.0، وأُعيدت كتابته في 6.2.0).
      *
      * قبل 6.1.0 كانت الإزالة «نسيانًا» فقط: تُمسح علامة التثبيت وتبقى الحزم في
-     * الجذر، فتعود البيئة «مثبَّتة» بعد أول فحص. الآن تُشغَّل إزالة حقيقية داخل
-     * الطرفية (`install_runtime --remove`) عبر apt، مع حذف العلامة والحالة.
+     * الجذر، فتعود البيئة «مثبَّتة» بعد أول فحص.
      *
-     * @return `false` إن لم يكن بالإمكان البدء (لا نشاط).
+     * في 6.2.0 صار الحذف:
+     * - **في الخلفية** عبر `SandboxedProcessRegistry` بلا فتح الطرفية وقفل الشاشة
+     *   أمام المستخدم، ثم تتحدّث البطاقة نفسها إلى «غير مثبَّت» أو «مضمّن».
+     * - **صادقًا** في الحالتين: إن كانت الحزمة أساسية في أوبنتو (مثل `perl-base`
+     *   التي توفّر `/usr/bin/perl`) فالنتيجة «مضمّن» لا «مثبَّت»، فيختفي زرّ
+     *   الحذف بدل أن يبقى أحمر إلى الأبد.
+     *
+     * @return `false` إن لم يكن بالإمكان البدء (لا نشاط ولا مزوّد عمليات).
      */
     fun uninstall(activity: Activity?, spec: RuntimeSpec): Boolean {
-        if (activity == null) return false
+        // حالة فورية: البطاقة تتحوّل إلى «جارٍ الحذف…» قبل أن يبدأ apt
+        markRemoving(spec.id)
 
-        markPending(spec.id)
-        val command =
-            "if [ -x \"\$LOCAL/bin/install_runtime\" ]; then " +
-                "bash \"\$LOCAL/bin/install_runtime\" --remove ${shellQuote(spec.id)} ${shellQuote(spec.packages)}; " +
-                "else rm -f ~/.mahdi/installed/${shellQuote(spec.id)}; fi"
+        val provider = SandboxedProcessRegistry.provider
+        if (provider != null) {
+            val command = buildRemoveCommand(spec)
+            scope.launch {
+                val exitCode =
+                    runCatching {
+                            val process = provider(listOf("/bin/bash", "-lc", command), null, emptyList())
+                                ?: return@runCatching -1
+                            // لا أحد يقرأ المخرجات: أغلِق المدخل حتى لا ينتظر أي أمر إدخالًا
+                            runCatching { process.outputStream.close() }
+                            // waitFor(مهلة) لا withTimeout: الثانية لا تقطع نداءً حاجزًا
+                            val finished =
+                                runCatching { process.waitFor(REMOVE_TIMEOUT_MS, TimeUnit.MILLISECONDS) }
+                                    .getOrDefault(false)
+                            if (finished) {
+                                process.exitValue()
+                            } else {
+                                runCatching { process.destroyForcibly() }
+                                -1
+                            }
+                        }
+                        .onFailure { logError(it, "RuntimeInstaller.uninstall(${spec.id})") }
+                        .getOrDefault(-1)
 
+                if (exitCode == 0) {
+                    // الحقيقة تُقرأ من القرص بعد انتهاء الأمر، لا من نجاح الضغط
+                    finalizeRemoval(spec)
+                } else {
+                    // لم يبدأ الحذف أو فشل فشلًا صريحًا: لا ندّعي شيئًا ونعيد الحالة الحقيقية
+                    runCatching { specStatusFile(spec.id).delete() }
+                    markNotInstalled(spec.id)
+                }
+                refresh()
+            }
+            return true
+        }
+
+        // احتياط: إن لم يكن مزوّد العمليات مسجّلًا (نسخة قديمة من الطرفية) نفتح جلسة
+        if (activity == null) {
+            cancel(spec.id)
+            return false
+        }
         TerminalLauncher.launch(
             activity = activity,
             exe = "/bin/bash",
-            args = arrayOf("-lc", command),
+            args = arrayOf("-lc", buildRemoveCommand(spec)),
             id = "remove-${spec.id}",
             terminatePreviousSession = true,
         )
         startWatcher()
         return true
+    }
+
+    /** أمر الحذف الكامل: السكربت إن وُجد، وإلا إزالة مباشرة بـ apt. */
+    fun buildRemoveCommand(spec: RuntimeSpec): String {
+        val script = "\$LOCAL/bin/install_runtime"
+        val args =
+            listOf(spec.id, spec.packages, spec.binaries.joinToString(" "), spec.nameAr)
+                .joinToString(" ") { shellQuote(it) }
+        val safeId = shellQuote(spec.id)
+        val fallback =
+            "set -e; export DEBIAN_FRONTEND=noninteractive; " +
+                "mkdir -p ~/.mahdi/installed ~/.mahdi/install-status; " +
+                "apt-get remove -y --purge ${spec.packages} >/dev/null 2>&1 || true; " +
+                "rm -f ~/.mahdi/installed/$safeId; " +
+                "printf 'state=removed\\nprogress=100\\nsurvived=0\\nmsg=\\ntime=%s\\n' \"\$(date +%s)\" " +
+                "> ~/.mahdi/install-status/$safeId"
+        return "if [ -x \"$script\" ]; then bash \"$script\" --remove $args; else $fallback; fi"
     }
 
     /** يزيل علامة التثبيت فقط بلا حذف الحزم (يُستدعى عند حذف لغة). */
@@ -237,7 +327,7 @@ object RuntimeInstaller {
             scope.launch {
                 repeat(450) { // ١٥ دقيقة كحد أقصى
                     refresh()
-                    val busy = _status.value.values.any { it.state is InstallState.Downloading || it.state is InstallState.Extracting }
+                    val busy = _status.value.values.any { it.isBusy }
                     if (!busy) return@launch
                     delay(1000)
                 }
@@ -285,6 +375,62 @@ object RuntimeInstaller {
         _status.value = current + (id to entry.copy(state = InstallState.NotInstalled, version = null))
     }
 
+    /** حالة فورية عند بدء الحذف: البطاقة تعرض «جارٍ الحذف…» قبل أن يبدأ apt. */
+    private fun markRemoving(id: String) {
+        val spec = RuntimeCatalog.byId(id) ?: return
+        val entry =
+            _status.value[id]
+                ?: RuntimeStatus(
+                    id = spec.id,
+                    nameAr = spec.nameAr,
+                    nameEn = spec.nameEn,
+                    state = InstallState.NotInstalled,
+                    version = null,
+                    sizeMb = spec.sizeMb,
+                    packages = spec.packages,
+                )
+        _status.value = _status.value + (id to entry.copy(state = InstallState.Removing))
+        persistState(id, "removing")
+        writeStatusFile(id, "removing", "survived" to "")
+    }
+
+    /**
+     * يُثبّت نتيجة الحذف بعد انتهاء الأمر (6.2.0).
+     *
+     * العلامة تُمسح دائمًا، والحالة النهائية تُشتق من القرص: إن بقي الثنائي بعد
+     * `apt purge` فالحزمة أساسية في أوبنتو ⇒ «مضمّن» لا «مثبَّت»، فيختفي زرّ
+     * الحذف بدل أن يعود بعد ثانية.
+     */
+    private fun finalizeRemoval(spec: RuntimeSpec) {
+        val live = readKeyValues(specStatusFile(spec.id))
+        // السكربت يكتب state=installed حين يفشل الحذف (قفل apt أو انقطاع شبكة):
+        // عندها لا نمسح العلامة ولا ندّعي أن شيئًا حُذف.
+        if (live["state"] == "installed" && specMarkerFile(spec.id).exists()) return
+
+        runCatching { specMarkerFile(spec.id).delete() }
+        val survived = firstExistingBinary(spec) != null
+        writeStatusFile(spec.id, STATE_REMOVED, "survived" to if (survived) "1" else "0")
+        persistState(spec.id, if (survived) "bundled" else "not_installed")
+    }
+
+    /** يكتب ملفّ الحالة الحيّة الذي يقرأه [readStatus] (`state=…· survived=…· time=…`). */
+    private fun writeStatusFile(id: String, state: String, vararg extra: Pair<String, String>) {
+        runCatching {
+                val values =
+                    buildList {
+                        add("state" to state)
+                        extra.forEach { add(it) }
+                        add("msg" to "")
+                        add("time" to (System.currentTimeMillis() / 1000L).toString())
+                    }
+                specStatusFile(id).apply {
+                    parentFile?.mkdirs()
+                    writeText(values.joinToString(separator = "\n", postfix = "\n") { "${it.first}=${it.second}" })
+                }
+            }
+            .onFailure { logError(it, "RuntimeInstaller.writeStatusFile($id)") }
+    }
+
     private fun persist(map: Map<String, RuntimeStatus>) {
         runCatching {
             val editor = prefs?.edit() ?: return
@@ -296,6 +442,7 @@ object RuntimeInstaller {
                         InstallState.Bundled -> "bundled"
                         is InstallState.Downloading -> "downloading:${s.progress}"
                         InstallState.Extracting -> "extracting"
+                        InstallState.Removing -> "removing"
                         InstallState.Queued -> "queued"
                         is InstallState.Failed -> "failed:${s.error}"
                         InstallState.NotInstalled -> "not_installed"

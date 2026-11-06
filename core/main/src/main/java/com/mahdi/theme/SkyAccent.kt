@@ -38,26 +38,27 @@ fun SkyBadge(
     text: String,
     modifier: Modifier = Modifier,
     showDot: Boolean = true,
+    accent: Color = SkyAccent,
 ) {
     Row(
         modifier =
             modifier
                 .clip(RoundedCornerShape(50))
-                .background(SkyAccent.copy(alpha = 0.14f))
-                .border(1.dp, SkyAccent.copy(alpha = 0.45f), RoundedCornerShape(50))
+                .background(accent.copy(alpha = 0.14f))
+                .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(50))
                 .padding(horizontal = 10.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         if (showDot) {
-            Box(Modifier.size(6.dp).clip(RoundedCornerShape(50)).background(SkyAccent))
+            Box(Modifier.size(6.dp).clip(RoundedCornerShape(50)).background(accent))
         }
         // 3.0.0: الأرقام داخل الشارة معزولة LTR فلا تنعكس داخل واجهة RTL
         Text(
             text = text.bidiNumbers(),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            color = SkyAccent,
+            color = accent,
         )
     }
 }
