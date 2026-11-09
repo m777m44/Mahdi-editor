@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -109,7 +109,7 @@ fun ResumeBanner(mainViewModel: MainViewModel, modifier: Modifier = Modifier) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Outlined.Description,
+                        imageVector = Icons.Outlined.Edit,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp),
