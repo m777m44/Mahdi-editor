@@ -45,6 +45,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.mahdi.app.AppFlavour
 import com.mahdi.exec.isTerminalInstalled
+import com.mahdi.exec.pendingCommand
 import com.mahdi.file.child
 import com.mahdi.file.localBinDir
 import com.mahdi.file.sandboxDir
@@ -113,6 +114,24 @@ class Terminal : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+
+        // 8.1.0 — إصلاح «الزرّ ▶ لا يشغّل شيئًا»:
+        //
+        // هذه الشاشة تعمل بـ`launchMode=singleTask`، فتشغيل سكربت جديد بينما
+        // الطرفية مفتوحة **لا يعيد إنشاءها**: تصل `onNewIntent` فقط، ولا يقرأ
+        // أحد `pendingCommand` (يُقرأ مرّة واحدة داخل مصنع AndroidView)، فيبقى
+        // الأمر معلّقًا إلى الأبد وتبدو الطرفية كأنها لا تستجيب.
+        //
+        // الآن: نُنهي الجلسة القديمة بنفس المعرّف ثم نُنشئها من جديد، فيُنفَّذ
+        // الأمر الجديد فورًا ويظهر مخرجه في نفس الشاشة.
+        val command = pendingCommand
+        val binder = sessionBinder?.get()
+        if (command != null && binder != null && terminalView.get() != null) {
+            binder.terminateSession(command.id)
+            changeSession(command.id)
+            return
+        }
+
         handleIntent(intent)
     }
 

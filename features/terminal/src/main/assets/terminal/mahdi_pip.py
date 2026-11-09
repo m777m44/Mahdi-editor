@@ -191,6 +191,11 @@ class Tracker:
         else:
             pct = PHASE_RANGES["download"][0]
             detail = human(got)
+        # السرعة والوقت المتبقي: معلومتان تخفّفان الإحساس بالانتظار (8.1.0)
+        if self._rate > 2048:
+            detail += " · %s/s" % human(self._rate)
+            if total > got:
+                detail += " · %ds" % int((total - got) / self._rate)
         self.real(pct, "تنزيل الحزم", detail)
 
     def finish(self, stage="تم التثبيت بنجاح", detail="", ok=True):
@@ -359,23 +364,79 @@ def content_length(url):
 
 
 class Counter:
-    """عدّاد بايتات مشترك بين خيوط التنزيل (يُجمع فيه كل ما نُزّل حتى الآن)."""
+    """عدّاد بايتات مشترك بين خيوط التنزيل.
+
+    كل ملف يساهم بمقدار مستقل (``set_file`` للملفات التي نقيسها من حجمها على
+    القرص، و``add`` للملفات التي نستقبل بايتاتها مباشرة) — فتبقى النسبة صحيحة
+    حتى لو نُزّلت بعض الملفات بـaria2 بثمانية اتصالات.
+    """
 
     def __init__(self, total):
         self.lock = threading.Lock()
-        self.got = 0
         self.total = total
+        self.contrib = {}
 
-    def add(self, size):
+    def add(self, key, size):
         with self.lock:
-            self.got += size
-            got, total = self.got, self.total
+            self.contrib[key] = self.contrib.get(key, 0) + size
+            got, total = sum(self.contrib.values()), self.total
+        tracker().bytes(got, total)
+
+    def set_file(self, key, size):
+        with self.lock:
+            self.contrib[key] = max(self.contrib.get(key, 0), size)
+            got, total = sum(self.contrib.values()), self.total
         tracker().bytes(got, total)
 
 
-def download_one(url, dest_dir, counter, attempts=3):
-    """ينزّل ملفًا واحدًا مع إعادة محاولة، ويحدّث العدّاد مع كل قطعة (128KB)."""
+# الملفات الأكبر من هذا الحجم تُنزَّل بـaria2 (ثمانية اتصالات) — أسرع بكثير على
+# شبكات الهاتف التي تُحدّد سرعة كل اتصال على حدة. الأصغر تبقى بـurllib (أخفّ).
+ARIA_MIN_BYTES = 4 * 1024 * 1024
+
+
+def aria2_available():
+    try:
+        return subprocess.run(["which", "aria2c"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except Exception:
+        return False
+
+
+def aria2_download(url, dest, counter, key):
+    """تنزيل متعدد الاتصالات مع متابعة الحجم على القرص (نسبة حقيقية)."""
+    name = os.path.basename(dest)
+    directory = os.path.dirname(dest)
+    try:
+        proc = subprocess.Popen(
+            ["aria2c", "-x8", "-s8", "-k1M", "--allow-overwrite=true",
+             "--auto-file-renaming=false", "--console-log-level=error",
+             "--summary-interval=0", "-d", directory, "-o", name, url],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return False
+    while proc.poll() is None:
+        try:
+            counter.set_file(key, os.path.getsize(dest))
+        except Exception:
+            pass
+        time.sleep(0.35)
+    try:
+        if proc.returncode == 0 and os.path.getsize(dest) > 0:
+            counter.set_file(key, os.path.getsize(dest))
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def download_one(url, dest_dir, counter, key, expected=0, attempts=3):
+    """ينزّل ملفًا واحدًا مع إعادة محاولة، ويحدّث العدّاد (بايتات حقيقية)."""
     dest = os.path.join(dest_dir, file_name(url))
+
+    if (expected or 0) >= ARIA_MIN_BYTES and aria2_available():
+        if aria2_download(url, dest, counter, key):
+            return dest
+
     for attempt in range(attempts):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "pip/24"})
@@ -386,17 +447,22 @@ def download_one(url, dest_dir, counter, attempts=3):
                         if not chunk:
                             break
                         out.write(chunk)
-                        counter.add(len(chunk))
+                        counter.add(key, len(chunk))
             if os.path.getsize(dest) > 0:
                 return dest
         except Exception:
+            # لا نضاعف العدّاد عند إعادة المحاولة: نعيد ضبط مساهمة هذا الملف
+            counter.set_file(key, 0)
             if attempt + 1 < attempts:
                 time.sleep(1.2 * (attempt + 1))
     return None
 
 
 def plan_downloads(items, counter):
-    """يحسب الحجم الكلي قبل بدء التنزيل حتى تكون النسبة صادقة من أول بايت."""
+    """يحسب الحجم الكلي قبل بدء التنزيل حتى تكون النسبة صادقة من أول بايت.
+
+    يعيد [(url, size)] للملفات الناقصة فقط (المخزن الداخلي لا يُنزَّل مرّتين).
+    """
     pending = [item for item in items if not cached_path(item[2])]
     if not pending:
         return []
@@ -404,9 +470,10 @@ def plan_downloads(items, counter):
         sizes = list(pool.map(lambda item: content_length(item[2]), pending))
     known = [s for s in sizes if s > 0]
     fallback = int(sum(known) / len(known)) if known else 2 * 1024 * 1024
-    counter.total = sum(s if s > 0 else fallback for s in sizes)
+    resolved = [(item[2], s if s > 0 else fallback) for item, s in zip(pending, sizes)]
+    counter.total = sum(size for _, size in resolved)
     tracker().bytes(0, counter.total)
-    return pending
+    return resolved
 
 
 def resolve(targets, index=None):
@@ -536,7 +603,12 @@ def main(argv):
         pending = plan_downloads(items, counter)
         if pending:
             with ThreadPoolExecutor(max_workers=6) as pool:
-                results = list(pool.map(lambda item: download_one(item[2], CACHE_DIR, counter), pending))
+                results = list(
+                    pool.map(
+                        lambda job: download_one(job[0], CACHE_DIR, counter, job[0], job[1]),
+                        pending,
+                    )
+                )
             ok = all(results)
         else:
             ok = True

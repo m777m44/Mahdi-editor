@@ -11,6 +11,8 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -18,11 +20,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.activities.main.MainViewModel
 import com.mahdi.components.GlobalToolbarActions
 import com.mahdi.components.isPermanentDrawer
 import com.mahdi.drawer.DrawerViewModel
+import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.utils.toast
 import kotlinx.coroutines.launch
@@ -51,7 +56,18 @@ fun MahdiTopBar(
                         onDragCancel = { onDragEnd() },
                     )
                 },
-            title = {},
+            // 8.1.0: اسم الملف الحالي ظاهر دائمًا في الشريط العلوي.
+            // كان `title = {}` فارغًا، فلا يعرف المستخدم أي ملف مفتوح (شكوى اللقطة).
+            title = {
+                val tab = viewModel.visibleTabs.getOrNull(viewModel.visibleCurrentTabIndex)
+                Text(
+                    text = tab?.title ?: strings.app_name.getString(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            },
             navigationIcon = {
                 if (!isPermanentDrawer) {
                     IconButton(

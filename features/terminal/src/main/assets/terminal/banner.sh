@@ -23,7 +23,7 @@ if [ -z "${MAHDI_VERSION:-}" ]; then
     MAHDI_VERSION="$(cat "$LOCAL/bin/.mahdi_version" 2>/dev/null)"
   fi
 fi
-MAHDI_VERSION="${MAHDI_VERSION:-8.0.0}"
+MAHDI_VERSION="${MAHDI_VERSION:-8.1.0}"
 
 mahdi_banner() {
   [ "$MAHDI_BANNER_ENABLED" = "0" ] && return 0
