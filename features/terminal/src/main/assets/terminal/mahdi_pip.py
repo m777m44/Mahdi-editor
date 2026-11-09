@@ -1,38 +1,46 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""تثبيت حزم بايثون مع نسبة تقدّم حقيقية من 0 إلى 100.
+"""تثبيت حزم بايثون مع نسبة تقدّم حقيقية من 0 إلى 100 — بلا تجمّد أبدًا (8.0.0).
 
-الطريقة:
-  1. ``pip install --dry-run --report`` لحلّ الاعتماديات فقط (بلا تنزيل).
-  2. تنزيل كل ملف (wheel/sdist) بالتوازي، ونحن نعرف حجم كل ملف من ترويسة
-     ``Content-Length``، فتصبح النسبة نسبة بايتات حقيقية لا تخمينًا.
-  3. ``pip install --find-links`` من الملفات المنزَّلة (تثبيت فوري بلا شبكة).
+لماذا كان الشريط يتوقّف عند 40٪؟
 
-إن فشل أي طور (إصدار pip قديم، اعتمادية VCS، شبكة…) نرجع إلى ``pip install``
-العادي مع رسائل أطوار، فلا يتعطّل شيء.
+  ``pip`` لا يرسل أي نسبة أثناء فكّ الضغط أو بناء الـ wheel: يُنزّل الحزمة (فيصل
+  إلى رقم ما) ثم يصمت دقائق وهو يبني، فنظنّ أنّ التنزيل توقّف. وكانت هناك مشكلة
+  ثانية أسوأ: عند فشل الطريق الذكي كان السكربت يكتب **ثابتًا 40٪** وينتظر pip،
+  فيبقى الشريط جامدًا على 40 حتى ينتهي التثبيت — وهو بالضبط ما ظهر في اللقطة.
 
-يكتب الحالة في ``~/.mahdi/progress.json`` ليقرأها التطبيق ويعرضها في بطاقة أنيقة.
+الحلّ في هذه النسخة:
+
+  1. **مراحل بأوزان صريحة**: فحص المخزن 0‑3، حلّ الإصدارات 4‑12، التنزيل 12‑82
+     (بايتات حقيقية)، البناء والتثبيت 82‑99، النهاية 100.
+  2. **نبضة (heartbeat)**: خيط خلفي يحرّك النسبة كل ٠٫٤ ثانية عندما تصمت الطور
+     الحالي، لكن بحدّ أقصى «آخر نسبة حقيقية + ١٥» — فالرقم يتحرّك دائمًا ولا يكذب.
+  3. **النسبة لا تعود للخلف أبدًا** (monotonic).
+  4. **اكتشاف التوقّف**: إن مرّت ٦ ثوانٍ بلا بايت جديد تُعلَّم الحالة ``stalled``
+     فتعرض البطاقة «شبكة بطيئة…» بدل أن تبدو ميّتة.
+  5. **مرايا**: إن فشل حلّ الإصدارات من المصدر الأساسي نعيد المحاولة على مرايا
+     PyPI (تُجرَّب بالترتيب، لا تُفرض).
+
+يكتب الحالة في ``~/.mahdi/progress.json`` لتقرأها بطاقة التطبيق.
 """
 
 import json
 import os
 import socket
-import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import time
-import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-# يتجاوز حماية PEP 668 (Ubuntu الحديثة) حتى يعمل التثبيت داخل الطرفية كما في السابق
+# يتجاوز حماية PEP 668 (Ubuntu الحديثة) حتى يعمل التثبيت داخل الطرفية
 os.environ.setdefault("PIP_BREAK_SYSTEM_PACKAGES", "1")
 os.environ.setdefault("PIP_DISABLE_PIP_VERSION_CHECK", "1")
 os.environ.setdefault("PIP_NO_INPUT", "1")
+os.environ.setdefault("PIP_PROGRESS_BAR", "off")
 os.environ.setdefault("PYTHONUNBUFFERED", "1")
-# إخفاء تحذير «Running pip as the 'root' user» الذي يزحم الطرفية بلا فائدة
 os.environ.setdefault("PIP_ROOT_USER_ACTION", "ignore")
 
 HOME = os.path.expanduser("~")
@@ -47,129 +55,29 @@ os.environ.setdefault("PIP_CACHE_DIR", os.path.join(HOME, ".mahdi", "cache", "pi
 SESSION_ID = "%d-%d" % (int(time.time()), os.getpid())
 NAME = ""
 
-_lock = threading.Lock()
-_state = {
-    "total": 0,      # مجموع أحجام ملفات التنزيل (بايت)
-    "downloaded": 0,  # ما نُزّل حتى الآن
-    "files": 0,
-    "files_done": 0,
-    "sized": False,   # هل عُرفت الأحجام مسبقًا (طلب HEAD)؟
-}
-_last_emit = [0.0]
+# مرايا تُجرَّب فقط عند فشل المصدر الأساسي — لا تُفرض على المستخدم
+MIRRORS = [
+    "https://pypi.org/simple",
+    "https://pypi.tuna.tsinghua.edu.cn/simple",
+    "https://mirrors.aliyun.com/pypi/simple",
+]
 
-# ترجمة أسماء الأطوار للتطبيق ثنائي اللغة
+# ————————————————————————————— الترجمة الإنجليزية —————————————————————————————
+
 STAGE_EN = {
     "جارٍ البدء…": "Starting…",
-    "التحقق من الإصدارات": "Resolving versions",
-    "تنزيل الحزم": "Downloading packages",
-    "تنزيل الحزمة": "Downloading package",
-    "تثبيت المكتبة": "Installing library",
-    "تثبيت مباشر بـ pip…": "Installing with pip…",
-    "تم التثبيت بنجاح": "Installed successfully",
-    "تعذّر تثبيت المكتبة": "Installation failed",
-    "إعادة المحاولة بمصدر بديل": "Retrying with a mirror",
-    "%d ملف": "files",
-    "تثبيت مباشر": "Direct install",
     "التحقق من المخزن": "Checking local cache",
     "مثبّتة مسبقًا — من المخزن": "Already installed — from cache",
+    "التحقق من الإصدارات": "Resolving versions",
+    "تنزيل الحزم": "Downloading packages",
+    "تثبيت المكتبة": "Installing library",
+    "بناء المكتبة": "Building package",
+    "تثبيت مباشر بـ pip…": "Installing with pip…",
+    "تجربة مرآة أسرع": "Trying a mirror",
+    "تم التثبيت بنجاح": "Installed successfully",
+    "تعذّر تثبيت المكتبة": "Installation failed",
+    "شبكة بطيئة…": "Slow network…",
 }
-
-
-BAR_WIDTH = 20           # 6.1.0: شريط واحد داخل الطرفية، عشرون خلية
-BAR_LAST = [-1]          # آخر نسبة رُسمت — لا إعادة رسم إن لم تتغيّر
-BAR_ENABLED = os.environ.get("MAHDI_BAR", "1") != "0"
-
-
-def term_bar(percent, stage=""):
-    """يرسم شريط التقدّم **داخل الطرفية** في سطر واحد (6.1.0).
-
-    قبل 6.1.0 كانت النسبة تُكتب في ``progress.json`` فقط، فيعرضها التطبيق في
-    بطاقة عائمة فوق الطرفية. الآن تُرسم هنا أيضًا بنفس السطر: ``\r`` + شريط
-    ``▓/░`` بعشرين خلية، ولا يُعاد الرسم إلا عند تغيّر النسبة.
-    """
-    if not BAR_ENABLED:
-        return
-    pct = int(max(0, min(100, round(percent))))
-    if pct == BAR_LAST[0]:
-        return
-    BAR_LAST[0] = pct
-    filled = pct * BAR_WIDTH // 100
-    bar = "▓" * filled + "░" * (BAR_WIDTH - filled)
-    label = stage or NAME or ""
-    line = "\r\033[K\033[33m▸ %s\033[0m \033[36m[%s]\033[0m \033[33m%3d%%\033[0m" % (
-        label[:28], bar, pct,
-    )
-    try:
-        sys.stdout.write(line)
-        sys.stdout.flush()
-    except Exception:
-        pass
-
-
-def term_bar_done(stage="تمّ التثبيت"):
-    if not BAR_ENABLED:
-        return
-    bar = "▓" * BAR_WIDTH
-    try:
-        sys.stdout.write("\r\033[K\033[32m[%s]\033[0m \033[32m100%%\033[0m  \033[32m✔ %s\033[0m\n" % (bar, stage))
-        sys.stdout.flush()
-    except Exception:
-        pass
-    BAR_LAST[0] = -1
-
-
-def term_bar_abort(stage="تعذّر التثبيت"):
-    if not BAR_ENABLED:
-        return
-    try:
-        sys.stdout.write("\r\033[K\033[31m✖ %s\033[0m\n" % stage)
-        sys.stdout.flush()
-    except Exception:
-        pass
-    BAR_LAST[0] = -1
-
-
-def net_ok(host="pypi.org", timeout=6.0):
-    """هل يوجد اتصال حقيقي (DNS + مسار) قبل إزعاج المستخدم بستّ محاولات pip فاشلة؟"""
-    if os.environ.get("MAHDI_NET_CHECK", "1") == "0":
-        return True
-    try:
-        socket.setdefaulttimeout(timeout)
-        infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
-        return bool(infos)
-    except Exception:
-        return False
-
-
-def emit(percent, stage, detail="", done=False, term=True):
-    """يكتب حالة التقدّم بشكل ذرّي + يرسم الشريط داخل الطرفية (term=False للصامت)."""
-    if term:
-        if done:
-            if "تعذّر" in stage or "فشل" in stage:
-                term_bar_abort(stage)
-            else:
-                term_bar_done(stage)
-        else:
-            term_bar(percent, stage)
-    try:
-        os.makedirs(PROG_DIR, exist_ok=True)
-        payload = {
-            "id": SESSION_ID,
-            "name": NAME,
-            "stage": stage,
-            "stage_en": STAGE_EN.get(stage, stage),
-            "detail": detail,
-            "percent": int(max(0, min(100, round(percent)))),
-            "done": bool(done),
-            "pid": os.getpid(),
-            "ts": int(time.time()),
-        }
-        tmp = "%s.tmp%d" % (PROG_FILE, os.getpid())
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, ensure_ascii=False)
-        os.replace(tmp, PROG_FILE)
-    except Exception:
-        pass
 
 
 def human(size):
@@ -184,68 +92,201 @@ def human(size):
     return ""
 
 
-def _report_download(force=False):
-    now = time.time()
-    with _lock:
-        total = _state["total"]
-        got = _state["downloaded"]
-        files = _state["files"]
-        done_files = _state["files_done"]
-    if not force and now - _last_emit[0] < 0.25:
-        return
-    _last_emit[0] = now
-    if total > 0:
-        ratio = min(1.0, got / float(total))
-        percent = 5 + 80 * ratio
-        detail = "%s / %s · %d/%d ملف" % (human(got), human(total), done_files, files)
-    else:
-        percent = 5
-        detail = "%d/%d ملف" % (done_files, files)
-    emit(percent, "تنزيل الحزم", detail)
+# ———————————————————————————————— متتبّع التقدّم ————————————————————————————————
+
+# حدود كل طور: (أرضية، سقف)
+PHASE_RANGES = {
+    "cache": (0, 3),
+    "resolve": (4, 12),
+    "download": (12, 82),
+    "install": (82, 99),
+}
 
 
-def _content_length(url):
-    """حجم الملف من ترويسة HEAD (يُستخدم لجمع المقام الكلي قبل التنزيل)."""
+class Tracker:
+    """نسبة تقدّم واحدة لا تتوقّف ولا ترتدّ.
+
+    - ``real(percent, stage)`` تحديث حقيقي مبني على بايتات/خطوات فعلية.
+    - نبضة خلفية تحرّك النسبة بين التحديثات الحقيقية بحدّ ``CREEP_AHEAD`` فقط.
+    """
+
+    CREEP_AHEAD = 15      # أقصى تقدّم «تخميني» فوق آخر نسبة حقيقية
+    CREEP_INTERVAL = 0.9  # شريحة التخمين: ١٪ كل ٠٫٩ ثانية
+    TICK = 0.4            # دقّة النبضة
+    STALL_AFTER = 6.0     # ثوانٍ بلا تقدّم حقيقي ⇒ «شبكة بطيئة»
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._percent = 0.0
+        self._floor = 0
+        self._ceiling = 3
+        self._stage = "جارٍ البدء…"
+        self._detail = ""
+        self._started = time.time()
+        self._real_ts = time.time()
+        self._real_percent = 0.0
+        self._last_creep = time.time()
+        self._bytes = 0
+        self._total = 0
+        self._done = False
+        self._last_flush = 0.0
+        self._last_pct = -1
+        self._rate_ts = time.time()
+        self._rate_bytes = 0
+        self._rate = 0.0
+        self._thread = threading.Thread(target=self._beat, daemon=True)
+        self._thread.start()
+
+    # —— واجهة الاستخدام ——
+
+    def phase(self, name, stage=None, detail=None):
+        with self._lock:
+            floor, ceiling = PHASE_RANGES.get(name, (self._floor, self._ceiling))
+            self._floor, self._ceiling = floor, ceiling
+            if stage:
+                self._stage = stage
+            if detail is not None:
+                self._detail = detail
+            if self._percent < floor:
+                self._percent = floor
+            if self._real_percent < floor:
+                self._real_percent = floor
+        self._flush()
+
+    def real(self, percent, stage=None, detail=None, floor=None, ceiling=None):
+        now = time.time()
+        with self._lock:
+            if floor is not None:
+                self._floor = floor
+            if ceiling is not None:
+                self._ceiling = ceiling
+            if stage:
+                self._stage = stage
+            if detail is not None:
+                self._detail = detail
+            target = max(self._floor, min(self._ceiling, float(percent)))
+            if target > self._percent:
+                self._percent = target
+            if target > self._real_percent:
+                self._real_percent = target
+            self._real_ts = now
+            self._last_creep = now
+        self._flush()
+
+    def bytes(self, got, total):
+        """يحدّث عدّاد البايتات ويحوّله إلى نسبة داخل طور التنزيل."""
+        now = time.time()
+        with self._lock:
+            self._bytes, self._total = got, total
+            elapsed = now - self._rate_ts
+            if elapsed >= 1.0:
+                delta = got - self._rate_bytes
+                if delta >= 0:
+                    self._rate = 0.7 * self._rate + 0.3 * (delta / elapsed)
+                self._rate_ts, self._rate_bytes = now, got
+        if total > 0:
+            floor, ceiling = PHASE_RANGES["download"]
+            pct = floor + (ceiling - floor) * min(1.0, got / float(total))
+            detail = "%s / %s" % (human(got), human(total))
+        else:
+            pct = PHASE_RANGES["download"][0]
+            detail = human(got)
+        self.real(pct, "تنزيل الحزم", detail)
+
+    def finish(self, stage="تم التثبيت بنجاح", detail="", ok=True):
+        with self._lock:
+            self._done = True
+            self._percent = 100.0
+            self._floor, self._ceiling = 100, 100
+            self._stage = stage
+            if detail:
+                self._detail = detail
+        self._flush(force=True, ok=ok)
+
+    # —— الداخل ——
+
+    def _beat(self):
+        while True:
+            time.sleep(self.TICK)
+            with self._lock:
+                if self._done:
+                    return
+                now = time.time()
+                if now - self._real_ts < self.CREEP_INTERVAL:
+                    continue
+                # السقف محسوب على آخر نسبة **حقيقية** لا على الحالية، وإلا لتسلّق
+                # التخمين نفسه إلى ما لا نهاية وصار الرقم كذبًا صريحًا.
+                cap = min(self._ceiling - 1, self._real_percent + self.CREEP_AHEAD)
+                if self._percent >= cap:
+                    continue
+                steps = max(1, int((now - self._last_creep) / self.CREEP_INTERVAL))
+                self._percent = min(cap, self._percent + steps)
+                self._last_creep = now
+            self._flush()
+
+    def _flush(self, force=False, ok=True):
+        # لا نكتب الملف مع كل قطعة 128KB: عشر مرات في الثانية تكفي، والبطاقة
+        # تقرأ كل ٢٦٠ مللي ثانية أصلًا.
+        now = time.time()
+        pct_now = int(round(self._percent))
+        if not force and now - self._last_flush < 0.2 and pct_now == self._last_pct:
+            return
+        self._last_flush, self._last_pct = now, pct_now
+        try:
+            os.makedirs(PROG_DIR, exist_ok=True)
+            with self._lock:
+                percent = int(max(0, min(100, round(self._percent))))
+                stalled = (not self._done) and (time.time() - self._real_ts) > self.STALL_AFTER
+                stage = "شبكة بطيئة…" if (stalled and self._stage in ("تنزيل الحزم", "التحقق من الإصدارات")) else self._stage
+                payload = {
+                    "id": SESSION_ID,
+                    "name": NAME,
+                    "stage": stage,
+                    "stage_en": STAGE_EN.get(stage, stage),
+                    "detail": self._detail,
+                    "percent": percent,
+                    "done": bool(self._done),
+                    "pid": os.getpid(),
+                    "ts": int(time.time()),
+                    "phase": self._stage,
+                    "bytes": self._bytes,
+                    "total_bytes": self._total,
+                    "stalled": bool(stalled),
+                    "eta": int((self._total - self._bytes) / self._rate) if (self._rate > 1024 and self._total > self._bytes) else 0,
+                }
+            tmp = "%s.tmp%d" % (PROG_FILE, os.getpid())
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, ensure_ascii=False)
+            os.replace(tmp, PROG_FILE)
+        except Exception:
+            pass
+
+
+TRACKER = None
+
+
+def tracker():
+    global TRACKER
+    if TRACKER is None:
+        TRACKER = Tracker()
+    return TRACKER
+
+
+# ————————————————————————————— أدوات مساعدة —————————————————————————————
+
+
+def net_ok(host="pypi.org", timeout=6.0):
+    """هل يوجد اتصال حقيقي (DNS) قبل إزعاج المستخدم بمحاولات pip فاشلة؟"""
+    if os.environ.get("MAHDI_NET_CHECK", "1") == "0":
+        return True
     try:
-        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "pip/24"})
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            return int(resp.headers.get("Content-Length") or 0)
+        socket.setdefaulttimeout(timeout)
+        return bool(socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP))
     except Exception:
-        return 0
-
-
-def _download_one(url, dest_dir):
-    name = os.path.basename(url.split("?")[0]) or "package"
-    dest = os.path.join(dest_dir, name)
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "pip/24"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            length = int(resp.headers.get("Content-Length") or 0)
-            with _lock:
-                if length and not _state["sized"]:
-                    # احتياط: لم تُعرف الأحجام مسبقًا
-                    _state["total"] += length
-            with open(dest, "wb") as out:
-                while True:
-                    chunk = resp.read(262144)
-                    if not chunk:
-                        break
-                    out.write(chunk)
-                    with _lock:
-                        _state["downloaded"] += len(chunk)
-                    _report_download()
-        with _lock:
-            _state["files_done"] += 1
-        _report_download(force=True)
-        return dest
-    except Exception:
-        with _lock:
-            _state["files_done"] += 1
-        return None
+        return False
 
 
 def file_name(url):
-    """اسم ملف الحزمة من رابط التنزيل (يُستخدم مفتاحًا في المخزن)."""
     return os.path.basename(url.split("?")[0]) or "package"
 
 
@@ -282,7 +323,7 @@ _ROOT_FLAG = None
 
 
 def root_flag():
-    """‏pip الأقدم من 22.1 لا يعرف --root-user-action، فنفحص الإصدار مرة واحدة."""
+    """pip الأقدم من 22.1 لا يعرف --root-user-action، فنفحص الإصدار مرة واحدة."""
     global _ROOT_FLAG
     if _ROOT_FLAG is None:
         _ROOT_FLAG = []
@@ -304,13 +345,76 @@ def pip_cmd(*args):
     return [sys.executable, "-m", "pip", "--disable-pip-version-check", "--no-input"] + list(args)
 
 
-def resolve(targets):
-    """يعيد قائمة (اسم، إصدار، رابط) لكل ما ينبغي تثبيته، أو None عند الفشل."""
+# ————————————————————————————— التنزيل المعروض —————————————————————————————
+
+
+def content_length(url):
+    """حجم الملف من ترويسة HEAD (0 إن مُنع)."""
+    try:
+        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "pip/24"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return int(resp.headers.get("Content-Length") or 0)
+    except Exception:
+        return 0
+
+
+class Counter:
+    """عدّاد بايتات مشترك بين خيوط التنزيل (يُجمع فيه كل ما نُزّل حتى الآن)."""
+
+    def __init__(self, total):
+        self.lock = threading.Lock()
+        self.got = 0
+        self.total = total
+
+    def add(self, size):
+        with self.lock:
+            self.got += size
+            got, total = self.got, self.total
+        tracker().bytes(got, total)
+
+
+def download_one(url, dest_dir, counter, attempts=3):
+    """ينزّل ملفًا واحدًا مع إعادة محاولة، ويحدّث العدّاد مع كل قطعة (128KB)."""
+    dest = os.path.join(dest_dir, file_name(url))
+    for attempt in range(attempts):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "pip/24"})
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                with open(dest, "wb") as out:
+                    while True:
+                        chunk = resp.read(131072)
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                        counter.add(len(chunk))
+            if os.path.getsize(dest) > 0:
+                return dest
+        except Exception:
+            if attempt + 1 < attempts:
+                time.sleep(1.2 * (attempt + 1))
+    return None
+
+
+def plan_downloads(items, counter):
+    """يحسب الحجم الكلي قبل بدء التنزيل حتى تكون النسبة صادقة من أول بايت."""
+    pending = [item for item in items if not cached_path(item[2])]
+    if not pending:
+        return []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        sizes = list(pool.map(lambda item: content_length(item[2]), pending))
+    known = [s for s in sizes if s > 0]
+    fallback = int(sum(known) / len(known)) if known else 2 * 1024 * 1024
+    counter.total = sum(s if s > 0 else fallback for s in sizes)
+    tracker().bytes(0, counter.total)
+    return pending
+
+
+def resolve(targets, index=None):
+    """يعيد [(اسم، إصدار، رابط)] لكل ما ينبغي تثبيته، أو None عند الفشل."""
     report = os.path.join(tempfile.mkdtemp(prefix="mahdi-report-"), "report.json")
-    cmd = pip_cmd(
-        "install", "--dry-run", "--ignore-installed", "--quiet",
-        "--report", report, *targets,
-    )
+    cmd = pip_cmd("install", "--dry-run", "--ignore-installed", "--quiet", "--report", report, *targets)
+    if index:
+        cmd += ["-i", index]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
     except Exception:
@@ -334,54 +438,45 @@ def resolve(targets):
 
 
 def install_from_dir(directory, items):
+    """تثبيت من الملفات المنزَّلة فقط: بلا شبكة، وسريع (هنا يحدث البناء/فكّ الضغط)."""
     specs = ["%s==%s" % (n, v) if v else n for n, v, _ in items]
     cmd = pip_cmd(
         "install", "--upgrade", "--no-deps", "--find-links", directory,
-        "--prefer-binary", "--retries", "3", "--timeout", "30",
-        "--quiet", *root_flag(), *specs,
+        "--prefer-binary", "--retries", "3", "--timeout", "30", "--quiet",
+        *root_flag(), *specs,
     )
-    try:
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        return False
-    return proc.returncode == 0
-
-
-def plain_install(targets):
-    """الطريق التقليدي: pip يتولّى كل شيء (تقدّم بالمراحل)."""
-    emit(10, "تثبيت المكتبة", NAME)
-    cmd = pip_cmd("install", "--upgrade", "--prefer-binary", "--progress-bar", "off",
-                  "--retries", "5", "--timeout", "30", *targets)
-    try:
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        return False
-    if proc.returncode == 0:
-        return True
-    emit(60, "إعادة المحاولة بمصدر بديل", NAME)
-    cmd = pip_cmd("install", "--upgrade", "--prefer-binary", "--progress-bar", "off",
-                  "--retries", "3", "--timeout", "30", "-i", "https://pypi.org/simple", *targets)
     try:
         return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
     except Exception:
         return False
 
 
-def try_offline(targets, label):
+def plain_install(targets, index=None):
+    """الطريق التقليدي — والنبضة تُحرّك النسبة أثناءه فلا تتوقّف عند رقم ثابت."""
+    tracker().phase("install", "تثبيت المكتبة", NAME)
+    cmd = pip_cmd("install", "--upgrade", "--prefer-binary", "--progress-bar", "off",
+                  "--retries", "5", "--timeout", "30", *targets)
+    if index:
+        cmd += ["-i", index]
+    try:
+        return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except Exception:
+        return False
+
+
+def try_offline(targets):
     """تثبيت من المخزن الداخلي فقط: بلا شبكة، وبلا تنزيل، وسريع جدًا."""
     os.makedirs(CACHE_DIR, exist_ok=True)
     if not os.listdir(CACHE_DIR):
         return False
     cmd = pip_cmd(
         "install", "--upgrade", "--no-index", "--find-links", CACHE_DIR,
-        "--disable-pip-version-check",
         "--retries", "1", "--timeout", "10", "--quiet", *root_flag(), *targets,
     )
     try:
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+        return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600).returncode == 0
     except Exception:
         return False
-    return proc.returncode == 0
 
 
 def main(argv):
@@ -401,25 +496,34 @@ def main(argv):
     if not NAME:
         NAME = targets[0].replace("-r", "").strip() or "Python"
 
+    t = tracker()
+
     # ٠) المخزن الداخلي أولًا: المكتبة المثبّتة سابقًا لا تُنزَّل مرة أخرى
-    emit(2, "التحقق من المخزن", NAME)
-    if try_offline(targets, NAME):
-        emit(100, "مثبّتة مسبقًا — من المخزن", NAME, done=True)
+    t.phase("cache", "التحقق من المخزن", NAME)
+    if try_offline(targets):
+        t.finish("مثبّتة مسبقًا — من المخزن")
         return 0
 
-    # ٠٫٥) لا شبكة؟ لا نطبع عشر محاولات pip فاشلة — سطر واحد واضح ونخرج
+    # ٠٫٥) لا شبكة؟ سطر عربي واحد واضح، بلا عشر محاولات pip فاشلة
     if not net_ok():
-        # سطر عربي واحد فقط، وبلا شريط آخر (حتى لا تتكرّر الرسالة في الطرفية)
-        sys.stdout.write(
-            "\r\033[K\033[33m⚠ لا يوجد اتصال بالإنترنت — لم تُثبَّت: %s\033[0m\n"
-            % (NAME or targets[0])
-        )
+        sys.stdout.write("⚠ لا يوجد اتصال بالإنترنت — لم تُثبَّت: %s\n" % (NAME or targets[0]))
         sys.stdout.flush()
-        emit(100, "تعذّر تثبيت المكتبة", NAME, done=True, term=False)
+        t.finish("تعذّر تثبيت المكتبة")
         return 2
 
-    emit(4, "التحقق من الإصدارات", NAME)
+    # ١) حلّ الإصدارات — ثم مرايا عند الفشل
+    t.phase("resolve", "التحقق من الإصدارات", NAME)
     items = resolve(targets)
+    index_used = None
+    if not items:
+        for mirror in MIRRORS[1:]:
+            if not net_ok(mirror.split("//")[-1].split("/")[0]):
+                continue
+            t.phase("resolve", "تجربة مرآة أسرع", mirror.split("//")[-1].split("/")[0])
+            items = resolve(targets, mirror)
+            if items:
+                index_used = mirror
+                break
 
     if items:
         try:
@@ -427,46 +531,36 @@ def main(argv):
         except Exception:
             pass
 
-        with _lock:
-            _state.update(
-                {"total": 0, "downloaded": 0, "files": len(items), "files_done": 0, "sized": False}
-            )
-
-        pending = [item for item in items if not cached_path(item[2])]
-        cached_count = len(items) - len(pending)
-        emit(
-            5,
-            "تنزيل الحزم",
-            "%d ملف · %d من المخزن" % (len(items), cached_count) if cached_count else "%d ملف" % len(items),
-        )
-
+        t.phase("download", "تنزيل الحزم", "%d ملف" % len(items))
+        counter = Counter(0)
+        pending = plan_downloads(items, counter)
         if pending:
-            with ThreadPoolExecutor(max_workers=8) as pool:
-                sizes = list(pool.map(lambda item: _content_length(item[2]), pending))
-            with _lock:
-                _state["total"] = sum(sizes)
-                _state["sized"] = True
-
             with ThreadPoolExecutor(max_workers=6) as pool:
-                results = list(pool.map(lambda item: _download_one(item[2], CACHE_DIR), pending))
-            downloaded_ok = all(results)
+                results = list(pool.map(lambda item: download_one(item[2], CACHE_DIR, counter), pending))
+            ok = all(results)
         else:
-            downloaded_ok = True
+            ok = True
+            t.real(80, "تنزيل الحزم", "من المخزن")
 
-        if downloaded_ok:
-            emit(97, "تثبيت المكتبة", NAME)
+        if ok:
+            # ٢) البناء والتثبيت: النبضة تُحرّك 82→99 أثناء بناء الـ wheel
+            t.phase("install", "بناء المكتبة", NAME)
             if install_from_dir(CACHE_DIR, items):
                 remember_installed(items)
-                emit(100, "تم التثبيت بنجاح", NAME, done=True)
+                t.finish("تم التثبيت بنجاح")
                 return 0
 
-    if plain_install(targets):
-        emit(100, "تم التثبيت بنجاح", NAME, done=True)
+    # ٣) الطريق التقليدي (أو مرآة إن نجحت)
+    if plain_install(targets, index_used):
+        t.finish("تم التثبيت بنجاح")
         return 0
 
-    emit(100, "تعذّر تثبيت المكتبة", NAME, done=True)
+    t.finish("تعذّر تثبيت المكتبة")
     return 1
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except KeyboardInterrupt:
+        sys.exit(130)

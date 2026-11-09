@@ -96,21 +96,39 @@ ensure_packages_once() {
 ensure_packages_once
 unset -f ensure_packages_once
 
-if [ -x /usr/lib/command-not-found -o -x /usr/share/command-not-found/command-not-found ]; then
-	function command_not_found_handle {
-	        # check because c-n-f could've been removed in the meantime
-                if [ -x /usr/lib/command-not-found ]; then
-		   /usr/lib/command-not-found -- "$1"
-                   return $?
-                elif [ -x /usr/share/command-not-found/command-not-found ]; then
-		   /usr/share/command-not-found/command-not-found -- "$1"
-                   return $?
-		else
-		   printf "%s: command not found\n" "$1" >&2
-		   return 127
-		fi
-	}
-fi
+# 8.0.0: أمر غير موجود ⇒ سطر عربي واحد + اسم الحزمة، بلا نصّ إنجليزي طويل.
+#
+# كان يظهر نصّ command-not-found الإنجليزي كاملًا (خمسة أسطر) في تطبيق عربي.
+# الآن: سبب مختصر بالعربية، ثم سطر واحد يقول الحزمة المطلوبة. ولمن يريد
+# التثبيت التلقائي: MAHDI_AUTO_INSTALL=1 (يُثبَّت الأمر ثم يٌعاد تشغيله).
+function command_not_found_handle {
+  local cmd="$1"
+  shift || true
+  local hint=""
+
+  if [ -x /usr/lib/command-not-found ]; then
+    hint=$(/usr/lib/command-not-found -- "$cmd" 2>&1 | sed -n 's/.*apt install \(.*\)/\1/p' | head -1)
+  elif [ -x /usr/share/command-not-found/command-not-found ]; then
+    hint=$(/usr/share/command-not-found/command-not-found -- "$cmd" 2>&1 | sed -n 's/.*apt install \(.*\)/\1/p' | head -1)
+  fi
+
+  printf '\033[31m✖\033[0m الأمر غير موجود: \033[1m%s\033[0m\n' "$cmd" >&2
+
+  if [ -n "$hint" ]; then
+    if [ "${MAHDI_AUTO_INSTALL:-0}" = "1" ] && declare -f apt_fast >/dev/null 2>&1; then
+      printf '\033[36m↳\033[0m تثبيت \033[1m%s\033[0m تلقائيًا…\n' "$hint" >&2
+      if apt_fast $hint >/dev/null 2>&1; then
+        hash -r 2>/dev/null || true
+        "$cmd" "$@"
+        return $?
+      fi
+    fi
+    printf '\033[36m↳\033[0m يمكن تثبيته: \033[1mapt install %s\033[0m\n' "$hint" >&2
+  else
+    printf '\033[2m  تحقّق من الاسم أو ثبّته من: اللغات ← المشغّرات\033[0m\n' >&2
+  fi
+  return 127
+}
 
 
 alias ls='ls --color=auto'

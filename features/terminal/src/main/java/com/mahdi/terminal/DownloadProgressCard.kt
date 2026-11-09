@@ -1,6 +1,7 @@
 package com.mahdi.terminal
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -13,8 +14,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,13 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalConfiguration
@@ -76,6 +74,7 @@ data class DownloadProgress(
     val percent: Int,
     val done: Boolean,
     val failed: Boolean,
+    val stalled: Boolean,
     val timestamp: Long,
 )
 
@@ -101,6 +100,7 @@ fun readDownloadProgress(): DownloadProgress? {
             failed =
                 json.optString("stage").contains("تعذّر") ||
                     json.optString("stage").contains("فشل"),
+            stalled = json.optBoolean("stalled"),
             timestamp = json.optLong("ts"),
         )
     }
@@ -162,37 +162,52 @@ fun DownloadProgressDock(progress: DownloadProgress?, modifier: Modifier = Modif
 private fun DockCard(progress: DownloadProgress) {
     val scheme = MaterialTheme.colorScheme
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
-    val stageText = if (isArabic || progress.stageEn.isBlank()) progress.stage else progress.stageEn
     val done = progress.done
     val failed = progress.failed
+    val stalled = progress.stalled && !done && !failed
+    val stageText = if (isArabic || progress.stageEn.isBlank()) progress.stage else progress.stageEn
     val accentStart =
         when {
             failed -> Color(0xFFEF4444)
             done -> Color(0xFF10B981)
+            stalled -> Color(0xFFF59E0B)
             else -> scheme.primary
         }
     val accentEnd =
         when {
             failed -> Color(0xFFF97316)
             done -> Color(0xFF34D399)
+            stalled -> Color(0xFFFBBF24)
             else -> scheme.tertiary
         }
 
+    // سطر واحد ثابت: الشريط يتلاحق بسلاسة ولا يقفز (كان يقفز بسبب تحديثات pip المتقطّعة)
     val animatedPercent by
         animateFloatAsState(
             targetValue = progress.percent.toFloat(),
-            animationSpec = tween(durationMillis = 400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
             label = "dockPercent",
         )
 
-    val shape = RoundedCornerShape(14.dp)
+    // 8.0.0: لا نكرّر اسم الحزمة في سطرين (كان يظهر مرّتين: فوق وتحت الشريط،
+    // والسطر السفلي كان يفيض خارج حدود البطاقة). السطر الثالث يظهر فقط إذا
+    // أضاف معلومة جديدة فعلًا.
+    val caption =
+        when {
+            progress.detail.isNotBlank() && progress.detail != progress.name -> progress.detail
+            stageText.isNotBlank() && stageText != progress.name -> stageText
+            else -> ""
+        }
+
+    val shape = RoundedCornerShape(16.dp)
 
     Surface(
         shape = shape,
         color = scheme.surfaceContainerHigh.copy(alpha = 0.97f),
-        shadowElevation = 6.dp,
+        shadowElevation = 8.dp,
+        // عرض ثابت: بطاقة بعرض متغيّر كانت تجعل النصّ يفيض ويتراكب مع الطرفية
         modifier =
-            Modifier.widthIn(max = 196.dp)
+            Modifier.width(212.dp)
                 .border(
                     width = 1.dp,
                     brush =
@@ -203,38 +218,36 @@ private fun DockCard(progress: DownloadProgress) {
                 ),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector =
-                        when {
-                            failed -> Icons.Filled.Warning
-                            done -> Icons.Filled.CheckCircle
-                            else -> Icons.Filled.KeyboardArrowDown
-                        },
-                    contentDescription = null,
-                    tint = accentStart,
-                    modifier = Modifier.size(14.dp),
+                Box(
+                    modifier =
+                        Modifier.size(6.dp)
+                            .clip(CircleShape)
+                            .background(accentStart),
                 )
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(
                     text = progress.name,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
+                    softWrap = false,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "${animatedPercent.toInt()}%",
+                    text = if (done && !failed) "100%" else "${animatedPercent.toInt()}%",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Black,
                     color = accentStart,
+                    maxLines = 1,
                 )
             }
+
+            Spacer(Modifier.height(6.dp))
 
             GradientProgress(
                 progress = (animatedPercent / 100f).coerceIn(0f, 1f),
@@ -242,16 +255,21 @@ private fun DockCard(progress: DownloadProgress) {
                 end = accentEnd,
                 track = scheme.surfaceContainerHighest,
                 animated = !done && !failed,
-                height = 5.dp,
+                height = 4.dp,
             )
 
-            Text(
-                text = if (progress.detail.isNotBlank() && !done && !failed) progress.detail else stageText,
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (caption.isNotBlank()) {
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    text = caption,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (stalled) accentStart else scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

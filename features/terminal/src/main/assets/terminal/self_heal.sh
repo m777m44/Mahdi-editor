@@ -120,6 +120,12 @@ mahdi_heal_install() {
     node)
       label="npm install $pkg"
       mahdi_bar_start "$label"
+      # 8.0.0: البطاقة وحدها تعرض التقدّم — نبدأ عملية ونُشغّل النبضة
+      if declare -f mahdi_prog_start >/dev/null 2>&1; then
+        mahdi_prog_start "$pkg" "تنزيل الحزمة…"
+        mahdi_prog 8 "تنزيل الحزمة من npm" "$pkg"
+        mahdi_prog_creep_start 94
+      fi
       if command -v npm >/dev/null 2>&1; then
         npm install --no-fund --no-audit --loglevel=error "$pkg" >/dev/null 2>&1
         local rc=$?
@@ -127,13 +133,17 @@ mahdi_heal_install() {
           npm install -g --no-fund --no-audit --loglevel=error "$pkg" >/dev/null 2>&1
           rc=$?
         fi
+        declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
         if [ "$rc" -eq 0 ]; then
           mahdi_bar_done "$pkg ✓"
+          declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم تثبيت الحزمة" "$pkg"
         else
           mahdi_bar_abort
+          declare -f mahdi_prog_fail >/dev/null 2>&1 && mahdi_prog_fail "تعذّر تثبيت المكتبة" "$pkg"
         fi
         return "$rc"
       fi
+      declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
       mahdi_bar_abort
       return 1
       ;;
@@ -144,12 +154,20 @@ mahdi_heal_install() {
         return 1
       fi
       mahdi_bar_start "$label"
+      if declare -f mahdi_prog_start >/dev/null 2>&1; then
+        mahdi_prog_start "$pkg" "تنزيل الحزمة…"
+        mahdi_prog 8 "تنزيل الحزمة من Composer" "$pkg"
+        mahdi_prog_creep_start 94
+      fi
       COMPOSER_ALLOW_SUPERUSER=1 composer require --no-interaction --quiet "$pkg" >/dev/null 2>&1
       local rc=$?
+      declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
       if [ "$rc" -eq 0 ]; then
         mahdi_bar_done "$pkg ✓"
+        declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم تثبيت الحزمة" "$pkg"
       else
         mahdi_bar_abort
+        declare -f mahdi_prog_fail >/dev/null 2>&1 && mahdi_prog_fail "تعذّر تثبيت المكتبة" "$pkg"
       fi
       return "$rc"
       ;;
