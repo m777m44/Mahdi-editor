@@ -21,6 +21,8 @@ MAHDI_AUTO_DEPS="${MAHDI_AUTO_DEPS:-1}"
 MAHDI_DEP_JOBS="${MAHDI_DEP_JOBS:-4}"
 MAHDI_PIP_INDEX="${MAHDI_PIP_INDEX:-}"
 MAHDI_NPM_REGISTRY="${MAHDI_NPM_REGISTRY:-}"
+# مرآة احتياطية تُجرَّب فقط عند فشل السجل الرسمي
+MAHDI_NPM_MIRROR="${MAHDI_NPM_MIRROR:-https://registry.npmmirror.com}"
 
 # في حال تشغيل الملف مستقلة دون utils
 if ! declare -f info >/dev/null 2>&1; then
@@ -227,12 +229,18 @@ mahdi_pip_run() {
   fi
   if declare -f mahdi_prog_start >/dev/null 2>&1; then
     mahdi_prog_start "$name" "تثبيت مباشر بـ pip…"
-    mahdi_prog 40 "تثبيت المكتبة" "$name"
+    # 8.0.0: كان هنا «mahdi_prog 40» ثابتًا — فيبقى الشريط جامدًا على 40٪ حتى
+    # ينتهي pip (وهو ما شكا منه المستخدم في اللقطة). الآن نبضة تُحرّك النسبة.
+    mahdi_prog 8 "تثبيت المكتبة" "$name"
   fi
+  declare -f mahdi_prog_creep_start >/dev/null 2>&1 && mahdi_prog_creep_start 94
   # 6.1.0: كل ضجيج pip إلى ملف مؤقت — الطرفية تعرض سطرًا واحدًا فقط عند الفشل
   local log="${TMPDIR:-/tmp}/mahdi-pip-$$.log"
-  if python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-    --quiet --no-input --retries 3 --timeout 20 "$@" >"$log" 2>&1; then
+  local _prc=0
+  python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+    --quiet --no-input --retries 3 --timeout 20 "$@" >"$log" 2>&1 || _prc=$?
+  declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
+  if [ "$_prc" -eq 0 ]; then
     rm -f "$log" 2>/dev/null || true
     declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم التثبيت" "$name"
     return 0
@@ -572,7 +580,9 @@ mahdi_py_deps() {
     return 0
   fi
 
-  info "سيُثبَّت: ${missing[*]}"
+  # 8.0.0: لا سطر «سيُثبَّت: …» في الطرفية — البطاقة تعرض الاسم والنسبة،
+  # والسطر المختلط (لاتيني + عربي) كان يتراكب في الرسم ثنائي الاتجاه.
+  : "${missing[*]}"
   local pip_rc=0
   mahdi_pip_install_many "${missing[@]}" || pip_rc=$?
   # 6.1.0: لا اتصال — سطر واحد واضح بدل سلسلة محاولات فاشلة
@@ -678,14 +688,18 @@ mahdi_node_deps() {
   local registry_args=()
   [ -n "$MAHDI_NPM_REGISTRY" ] && registry_args=(--registry "$MAHDI_NPM_REGISTRY")
 
+  # 8.0.0: مرآة npm احتياطية — إن فشل السجل الرسمي (بطء/حجب) نعيد المحاولة على
+  # مرآة سريعة مرة واحدة، بدل أن يفشل التثبيت ويترك المستخدم بلا شيء.
   if [ -w "$dir" ]; then
     (cd "$dir" && npm install --no-fund --no-audit --loglevel=error "${registry_args[@]}" "${missing[@]}") || {
-      npm install -g --no-fund --no-audit --loglevel=error "${registry_args[@]}" "${missing[@]}" ||
+      (cd "$dir" && npm install --no-fund --no-audit --loglevel=error --registry "$MAHDI_NPM_MIRROR" "${missing[@]}") ||
+        npm install -g --no-fund --no-audit --loglevel=error "${registry_args[@]}" "${missing[@]}" ||
         warn "تعذّر تثبيت بعض مكتبات Node"
       export NODE_PATH="$(npm root -g 2>/dev/null):${NODE_PATH:-}"
     }
   else
     npm install -g --no-fund --no-audit --loglevel=error "${registry_args[@]}" "${missing[@]}" ||
+      npm install -g --no-fund --no-audit --loglevel=error --registry "$MAHDI_NPM_MIRROR" "${missing[@]}" ||
       warn "تعذّر تثبيت بعض مكتبات Node"
     export NODE_PATH="$(npm root -g 2>/dev/null):${NODE_PATH:-}"
   fi

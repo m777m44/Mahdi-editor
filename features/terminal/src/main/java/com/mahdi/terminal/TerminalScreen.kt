@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,9 +38,9 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -105,6 +106,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AssistChip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 
 var terminalView = WeakReference<TerminalView?>(null)
 var virtualKeysView = WeakReference<VirtualKeysView?>(null)
@@ -127,6 +130,42 @@ fun TerminalScreen(modifier: Modifier = Modifier, terminalActivity: Terminal) {
         composable(SettingsRoutes.TerminalFontScreen.route) { TerminalFontScreen() }
         composable(SettingsRoutes.TerminalExtraKeys.route) { TerminalExtraKeys() }
         composable(SettingsRoutes.TerminalCheck.route) { TerminalCheckScreen() }
+    }
+}
+
+/**
+ * شريط علوي مصغّر للطرفية (8.0.0).
+ *
+ * استُبدل `TopAppBar` القياسي (٦٤dp) بصفّ بارتفاع ٤٦dp: أيقونة القائمة ثم اسم
+ * الشاشة، بلا عنوان كبير ولا مساحات مهدورة — فتكسب الطرفية ١٨dp من الارتفاع
+ * في كل لقطة، ويبقى الشريط محترمًا لمساحة شريط الحالة عبر statusBarsPadding.
+ */
+@Composable
+private fun CompactTopBar(title: String, onMenu: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
+        Row(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(46.dp)
+                    .padding(horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onMenu, modifier = Modifier.size(42.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = title,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -156,14 +195,12 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
             drawerContent = { TerminalDrawer(drawerWidth, terminalActivity, navController) },
             content = {
                 Scaffold(
+                    // 8.0.0: شريط علوي نحيف (٤٦dp بدل ٦٤) — مساحة أكبر للطرفية
+                    // وسطور أهدأ، وهو ما طلبه المستخدم: «شريط علوي نحيف جدًا».
                     topBar = {
-                        TopAppBar(
-                            title = { Text(text = stringResource(strings.terminal)) },
-                            navigationIcon = {
-                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Default.Menu, null)
-                                }
-                            },
+                        CompactTopBar(
+                            title = stringResource(strings.terminal),
+                            onMenu = { scope.launch { drawerState.open() } },
                         )
                     }
                 ) { paddingValues ->

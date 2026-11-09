@@ -10,20 +10,26 @@ YELLOW_BG='\033[1;43m'
 RED_BG='\033[1;41m'
 GREEN_BG='\033[42m'
 
+# 8.0.0: رسالة واحدة قصيرة، بلا صندوق ملوّن عريض.
+#
+# كان الشكل القديم «  INFO  » بخلفية زرقاء ثماني الخانات؛ وعندما تليه كلمة عربية
+# في نفس السطر كانت الخلفية الزرقاء تمتدّ تحت العربية وتتراكب الحروف — وهو ما
+# ظهر في لقطة المستخدم (`INFO سيُثبَّت: pyTelegramBotAPI`). صار الآن رمزًا واحدًا
+# (خانة واحدة) ثم نصّ سطر واحد: لا خلفية، ولا تراكب، ولا ضجيج.
 info() {
-  printf "\n${BLUE_BG}  INFO  ${RESET} ${BOLD_BLUE}%s${RESET}\n" "$1"
+  printf "\033[36m▸ ${RESET}%s\n" "$1"
 }
 
 warn() {
-  printf "\n${YELLOW_BG}  WARN  ${RESET} ${BOLD_YELLOW}%s${RESET}\n" "$1"
+  printf "\033[33m⚠ ${RESET}%s\n" "$1"
 }
 
 error() {
-  printf "\n${RED_BG} ERROR ${RESET} ${BOLD_RED}%s${RESET}\n" "$1"
+  printf "\033[31m✖ ${RESET}%s\n" "$1"
 }
 
 success() {
-  printf "\n${GREEN_BG} SUCCESS ${RESET} ${BOLD_GREEN}%s${RESET}\n" "$1"
+  printf "\033[32m✔ ${RESET}%s\n" "$1"
 }
 
 ask() {
@@ -98,8 +104,11 @@ apt_fast() {
     touch /.cache/apt_last_update 2>/dev/null || true
   fi
   declare -f mahdi_prog >/dev/null 2>&1 && mahdi_prog 45 "تنزيل وتثبيت حزم النظام" "$_label"
+  # 8.0.0: نبضة تُحرّك النسبة أثناء apt — لا رقم ثابت يبقى جامدًا حتى النهاية
+  declare -f mahdi_prog_creep_start >/dev/null 2>&1 && mahdi_prog_creep_start 95
   local _rc=0
   apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 install -y --no-install-recommends -o Acquire::Retries=3 "$@" </dev/null || _rc=$?
+  declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
   if [ "$_rc" -eq 0 ]; then
     declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم تثبيت حزم النظام" "$_label"
   fi
@@ -121,7 +130,9 @@ npm_fast() {
     mahdi_prog_auto "$_label" "تنزيل الحزمة…"
     mahdi_prog 15 "تنزيل الحزمة من npm" "$_label"
   fi
+  declare -f mahdi_prog_creep_start >/dev/null 2>&1 && mahdi_prog_creep_start 95
   npm --no-fund --no-audit --loglevel=error --prefer-offline --progress=false "$@" || _rc=$?
+  declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
   if [ "$_rc" -eq 0 ]; then
     declare -f mahdi_prog_done >/dev/null 2>&1 && mahdi_prog_done "تم تثبيت الحزمة" "$_label"
   fi
@@ -281,6 +292,43 @@ mahdi_prog_start() {
 mahdi_prog_auto() {
   [ -n "$MAHDI_PROG_ID" ] && return 0
   mahdi_prog_start "$1" "${2:-جارٍ التحضير…}"
+}
+
+# ————————————————————— نبضة التقدّم (8.0.0) —————————————————————
+# الشريط لا يجمد أبدًا: أي أمر طويل (apt، npm، pip) يُشغَّل ونحن نحرّك النسبة
+# ببطء أثناءه. النبضة لا تلمس النسبة إلا إذا **صمتت** العملية عن التحديث، فلا
+# تزاحم النِسب الحقيقية. (كان الخلل: رقم ثابت 40٪ يبقى حتى ينتهي التثبيت.)
+_MAHDI_CREEP_PID=""
+
+mahdi_prog_creep_start() {
+  declare -f _mahdi_prog_write >/dev/null 2>&1 || return 0
+  [ -z "${MAHDI_PROG_FILE:-}" ] && return 0
+  [ -n "$_MAHDI_CREEP_PID" ] && return 0
+  local ceil="${1:-95}"
+  (
+    last=-1
+    while sleep 1; do
+      [ -f "$MAHDI_PROG_FILE" ] || continue
+      cur=$(sed -n 's/.*"percent":\([0-9][0-9]*\).*/\1/p' "$MAHDI_PROG_FILE" 2>/dev/null | head -1)
+      [ -z "$cur" ] && continue
+      if [ "$cur" -ge "$ceil" ]; then last="$cur"; continue; fi
+      if [ "$cur" -eq "$last" ]; then
+        # نستبدل القيمة **القديمة بعينها** فقط: إن كتب أحدهم نسبة حقيقية في هذه
+        # اللحظة فلن يطابق النمط، فلا تدهس النبضة تقدّمًا حقيقيًا (ولا ترتدّ النسبة).
+        sed -i -E "s/\"percent\":$cur([^0-9])/\"percent\":$((cur + 1))\1/; s/\"ts\":[0-9]+/\"ts\":$(date +%s)/" "$MAHDI_PROG_FILE" 2>/dev/null || true
+        cur=$((cur + 1))
+      fi
+      last="$cur"
+    done
+  ) >/dev/null 2>&1 &
+  _MAHDI_CREEP_PID=$!
+  return 0
+}
+
+mahdi_prog_creep_stop() {
+  [ -n "$_MAHDI_CREEP_PID" ] && kill "$_MAHDI_CREEP_PID" 2>/dev/null
+  _MAHDI_CREEP_PID=""
+  return 0
 }
 
 # تحديث: mahdi_prog 42 "تنزيل الحزمة" "1.2/2.8 MB"
