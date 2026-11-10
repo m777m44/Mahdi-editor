@@ -15,6 +15,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +24,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -76,6 +85,7 @@ import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -104,11 +114,22 @@ class Terminal : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        ContextCompat.startForegroundService(this, Intent(this, SessionService::class.java))
+        startAndBindService()
+    }
 
-        Intent(this, SessionService::class.java).also { intent ->
-            bindService(intent, serviceConnection, BIND_AUTO_CREATE)
+    /**
+     * 8.2.0: إعادة الاتصال اليدوية من شاشة «تعذّر الاتصال بخدمة الطرفية».
+     * كان المستخدم يرى سطرًا عاريًا بلا أي إجراء، فيبقى التطبيق مجمّدًا إن ماتت
+     * الخدمة أو تأخّر الربط. الآن زرّ واحد يعيد تشغيلها ويُعيد ربطها بأمان.
+     */
+    fun startAndBindService() {
+        runCatching {
+            ContextCompat.startForegroundService(this, Intent(this, SessionService::class.java))
+            if (!isBound) {
+                bindService(Intent(this, SessionService::class.java), serviceConnection, BIND_AUTO_CREATE)
+            }
         }
+            .onFailure { toast(strings.terminal_service_error) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -196,12 +217,13 @@ class Terminal : AppCompatActivity() {
         setContent {
             MahdiTheme {
                 Surface {
-                    if (sessionBinder != null) {
+                    // 8.2.0: `WeakReference` قد تُنظَّف وبقيت الشاشة تظنّها متصلة
+                    // (sessionBinder != null) ثم ينهار `changeSession` على null.
+                    // نتحقّق من المرجع نفسه لا من غلافه.
+                    if (sessionBinder?.get() != null) {
                         TerminalScreenHost(this)
                     } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(strings.terminal_service_error.getString())
-                        }
+                        TerminalConnectionState(onReconnect = { startAndBindService() })
                     }
                 }
             }
@@ -527,6 +549,88 @@ class Terminal : AppCompatActivity() {
                             withContext(Dispatchers.Main) { onProgress(downloadedBytes, totalBytes) }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 8.2.0 — شاشة «تعذّر الاتصال بخدمة الطرفية» بصريًا وإجرائيًا.
+ *
+ * قبلها كان مجرّد `Text` عارٍ في وسط الشاشة بلا زرّ ولا حالة: إن ماتت الخدمة أو
+ * تأخّر الربط بقي المستخدم أمام شاشة ساكنة لا يعرف إن كانت تعمل أم لا. الآن:
+ * تدرّج هادئ، مؤشّر انتظار، عنوان واضح، ثم — إن طال الانتظار — عنوان فشل وزرّ
+ * «إعادة المحاولة» يعيد تشغيل الخدمة بلا فقدان للملفات أو الجلسات.
+ */
+@Composable
+private fun TerminalConnectionState(onReconnect: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    var timedOut by remember { mutableStateOf(false) }
+    var attempt by remember { mutableStateOf(0) }
+
+    // كل محاولة اتصال تعيد المؤشّر من البداية، فلا تبقى الشاشة على «فشل»
+    // بينما الخدمة عادت تعمل خلفها.
+    LaunchedEffect(attempt) {
+        timedOut = false
+        delay(4000)
+        timedOut = true
+    }
+
+    Box(
+        modifier =
+            Modifier.fillMaxSize()
+                .background(Brush.verticalGradient(listOf(scheme.surface, scheme.surfaceContainerHighest))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (timedOut) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = scheme.error,
+                    modifier = Modifier.size(36.dp),
+                )
+            } else {
+                CircularProgressIndicator(color = scheme.primary, modifier = Modifier.size(36.dp))
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Text(
+                text =
+                    stringResource(
+                        if (timedOut) strings.terminal_connection_failed else strings.terminal_connecting
+                    ),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text =
+                    stringResource(
+                        if (timedOut) {
+                            strings.terminal_connection_failed_desc
+                        } else {
+                            strings.terminal_connecting_desc
+                        }
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            if (timedOut) {
+                Spacer(Modifier.height(22.dp))
+                FilledTonalButton(
+                    onClick = {
+                        attempt++
+                        onReconnect()
+                    }
+                ) {
+                    Text(stringResource(strings.storage_retry))
                 }
             }
         }

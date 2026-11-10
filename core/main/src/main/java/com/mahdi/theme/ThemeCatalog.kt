@@ -188,39 +188,79 @@ private fun MahdiColors.toLightScheme(): ColorScheme {
     )
 }
 
-/** لوحة ANSI للطرفية: 16 لونًا واضحة على الخلفيات الداكنة والفاتحة. */
-private val terminalAnsi =
+/**
+ * لوحة ANSI للطرفية (8.2.0).
+ *
+ * كانت لوحة واحدة تُستخدم للثيمات الفاتحة والداكنة، فتبهت الألوان الساطعة على
+ * خلفية «الفاتح» وتصبح غير مقروءة. الآن لوحتان: داكنة بألوان مشعة وساطعة،
+ * وفاتحة بدرجات أعمق تحافظ على التباين. كلاهما يحمل هوية Mahdi:
+ * سماوي · تركوازي · نعناعي · ذهبي · بنفسجي · مرجاني — ستة ألوان متمايزة
+ * بدل تكرار الأزرق في أربع خانات كما كان.
+ *
+ * تؤثر في كل ما يكتبه `ls --color` و`grep --color` ورسائل المفسّرات وسكربتاتنا،
+ * فتظهر الطرفية كاملةً بلون واحد متّسق مهما اختلف الثيم.
+ */
+private val terminalAnsiDark =
     listOf(
-        "#20242E",
-        "#E06C75",
-        "#98C379",
-        "#E5C07B",
-        "#61AFEF",
-        "#C678DD",
-        "#56B6C2",
-        "#ABB2BF",
-        "#5C6370",
-        "#FF7B86",
-        "#B5E890",
-        "#FFD68A",
-        "#7CC0FF",
-        "#D99BEE",
-        "#6FD3DE",
-        "#F2F4F8",
+        "#2A3040", // 0  أسود · سطح
+        "#FB7185", // 1  مرجاني
+        "#34D399", // 2  نعناعي
+        "#F5D76E", // 3  ذهبي
+        "#38BDF8", // 4  سماوي
+        "#A78BFA", // 5  بنفسجي
+        "#2DD4BF", // 6  تركوازي
+        "#DDE3EE", // 7  أبيض
+        "#64748B", // 8  رمادي
+        "#FB923C", // 9  برتقالي
+        "#6EE7B7", // 10 أخضر ساطع
+        "#FDE68A", // 11 أصفر ساطع
+        "#7DD3FC", // 12 أزرق ساطع
+        "#C4B5FD", // 13 بنفسجي ساطع
+        "#5EEAD4", // 14 تركوازي ساطع
+        "#F8FAFC", // 15 أبيض ساطع
     )
 
-private fun terminalColors(scheme: ColorScheme, accentHex: String): Properties =
+private val terminalAnsiLight =
+    listOf(
+        "#1E293B", // 0  أسود
+        "#DC2626", // 1  أحمر
+        "#059669", // 2  أخضر
+        "#B45309", // 3  ذهبي داكن
+        "#0284C7", // 4  سماوي
+        "#7C3AED", // 5  بنفسجي
+        "#0D9488", // 6  تركوازي
+        "#475569", // 7  رمادي
+        "#94A3B8", // 8  رمادي فاتح
+        "#EA580C", // 9  برتقالي
+        "#047857", // 10 أخضر داكن
+        "#92400E", // 11 بني ذهبي
+        "#0369A1", // 12 أزرق داكن
+        "#6D28D9", // 13 بنفسجي داكن
+        "#0F766E", // 14 تركوازي داكن
+        "#0F172A", // 15 أسود ساطع
+    )
+
+private fun terminalColors(scheme: ColorScheme, accentHex: String, dark: Boolean): Properties =
     Properties().apply {
         put("foreground", scheme.onBackground.toHex())
         put("background", scheme.background.toHex())
         put("cursor", accentHex)
-        terminalAnsi.forEachIndexed { i, hex -> put("color$i", hex) }
-        put("color16", Color(0xFFF96A38).toHex())
-        put("color17", Color(0xFF3971ED).toHex())
-        put("color18", Color(0xFF282A2E).toHex())
-        put("color19", Color(0xFF373B41).toHex())
-        put("color20", Color(0xFFB4B7B4).toHex())
-        put("color21", Color(0xFFE0E0E0).toHex())
+        (if (dark) terminalAnsiDark else terminalAnsiLight).forEachIndexed { i, hex -> put("color$i", hex) }
+        if (dark) {
+            put("color16", "#FB923C")
+            put("color17", "#7DD3FC")
+            put("color18", "#111827")
+            put("color19", "#1F2937")
+            put("color20", "#94A3B8")
+            put("color21", "#F8FAFC")
+        } else {
+            put("color16", "#EA580C")
+            put("color17", "#0369A1")
+            put("color18", "#F1F5F9")
+            put("color19", "#E2E8F0")
+            put("color20", "#475569")
+            put("color21", "#0F172A")
+        }
     }
 
 /** يحوّل التعريف إلى [ThemeHolder] جاهز للاستخدام في الواجهة والمحرر. */
@@ -233,8 +273,8 @@ fun ThemeSpec.toThemeHolder(): ThemeHolder {
         inheritBase = false,
         lightScheme = lightScheme,
         darkScheme = darkScheme,
-        lightTerminalColors = terminalColors(lightScheme, colors.accent.c().toHex()),
-        darkTerminalColors = terminalColors(darkScheme, colors.accent.c().toHex()),
+        lightTerminalColors = terminalColors(lightScheme, colors.accent.c().toHex(), dark = false),
+        darkTerminalColors = terminalColors(darkScheme, colors.accent.c().toHex(), dark = true),
         lightEditorColors = emptyList(),
         darkEditorColors = emptyList(),
         lightTokenColors = JsonArray(),
@@ -414,8 +454,8 @@ fun themeHolderFrom(id: String, name: String, light: MahdiColors, dark: MahdiCol
         inheritBase = false,
         lightScheme = lightScheme,
         darkScheme = darkScheme,
-        lightTerminalColors = terminalColors(lightScheme, light.accent.c().toHex()),
-        darkTerminalColors = terminalColors(darkScheme, dark.accent.c().toHex()),
+        lightTerminalColors = terminalColors(lightScheme, light.accent.c().toHex(), dark = false),
+        darkTerminalColors = terminalColors(darkScheme, dark.accent.c().toHex(), dark = true),
         lightEditorColors = emptyList(),
         darkEditorColors = emptyList(),
         lightTokenColors = JsonArray(),
@@ -433,10 +473,12 @@ fun MahdiColors.asLightColorScheme(): ColorScheme = toLightScheme()
 fun MahdiColors.asDarkColorScheme(): ColorScheme = toDarkScheme()
 
 /** ألوان الطرفية (color0..color21 + cursor) للوضع الفاتح من هذه اللوحة. */
-fun MahdiColors.terminalLightPalette(): Properties = terminalColors(toLightScheme(), accent.c().toHex())
+fun MahdiColors.terminalLightPalette(): Properties =
+    terminalColors(toLightScheme(), accent.c().toHex(), dark = false)
 
 /** ألوان الطرفية (color0..color21 + cursor) للوضع الداكن من هذه اللوحة. */
-fun MahdiColors.terminalDarkPalette(): Properties = terminalColors(toDarkScheme(), accent.c().toHex())
+fun MahdiColors.terminalDarkPalette(): Properties =
+    terminalColors(toDarkScheme(), accent.c().toHex(), dark = true)
 
 /** الثيم الافتراضي جاهزًا للاستخدام. */
 val defaultTheme: ThemeHolder = MahdiSky.toThemeHolder()

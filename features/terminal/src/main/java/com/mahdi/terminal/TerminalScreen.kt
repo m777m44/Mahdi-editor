@@ -3,6 +3,7 @@ package com.mahdi.terminal
 import android.graphics.Typeface
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -55,6 +57,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -103,7 +108,10 @@ import java.util.Properties
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -142,28 +150,70 @@ fun TerminalScreen(modifier: Modifier = Modifier, terminalActivity: Terminal) {
  */
 @Composable
 private fun CompactTopBar(title: String, onMenu: () -> Unit) {
+    // 8.2.0: شريط نحيف كما هو (٤٦dp) لكن بهويّة بصرية واضحة: شريط متدرّج
+    // بثلاثة ألوان أسفلَه، ونقطة «متصل» بلون التركوازي. لا عناوين كبيرة ولا
+    // نصّ شرح — الطرفية تبقى ملكًا للمخرجات.
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
-        Row(
-            modifier =
-                Modifier.fillMaxWidth()
-                    .statusBarsPadding()
-                    .height(46.dp)
-                    .padding(horizontal = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onMenu, modifier = Modifier.size(42.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Menu,
-                    contentDescription = title,
-                    modifier = Modifier.size(20.dp),
+        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(46.dp).padding(horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onMenu, modifier = Modifier.size(42.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = title,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Box(
+                    modifier =
+                        Modifier.size(width = 3.dp, height = 18.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF38BDF8), Color(0xFF2DD4BF))
+                                )
+                            ),
                 )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier =
+                        Modifier.size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF34D399)),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = stringResource(strings.terminal_status_connected),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.width(10.dp))
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Box(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .height(2.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    Color(0xFF38BDF8),
+                                    Color(0xFF2DD4BF),
+                                    Color(0xFFA78BFA),
+                                    Color(0xFFF5D76E),
+                                )
+                            )
+                        ),
             )
         }
     }
@@ -647,24 +697,34 @@ private fun TerminalQuickBar(modifier: Modifier = Modifier) {
         applySize(target)
     }
 
-    val items: List<Pair<String, () -> Unit>> =
+    // 8.2.0: كل مجموعة بلونها، فتُقرأ الأزرار بالعين قبل قراءة نصّها:
+    // مرجاني للإيقاف، ذهبي للأوامر، بنفسجي للتنقّل، سماوي للأدوات.
+    val danger = Color(0xFFFB7185)
+    val control = Color(0xFFF5D76E)
+    val navigate = Color(0xFFA78BFA)
+    val utility = Color(0xFF38BDF8)
+    val accent = Color(0xFF2DD4BF)
+
+    val items: List<Triple<String, () -> Unit, Color>> =
         listOf(
-            "Ctrl+C" to { send("\u0003") },
-            "Ctrl+D" to { send("\u0004") },
-            stringResource(strings.terminal_tool_clear) to { send("\u000c") },
-            "Tab" to { send("\t") },
-            "Esc" to { send("\u001b") },
-            "↑" to { send("\u001b[A") },
-            "↓" to { send("\u001b[B") },
-            "←" to { send("\u001b[D") },
-            "→" to { send("\u001b[C") },
-            stringResource(strings.terminal_tool_paste) to {
-                clipboard.getText()?.text?.let { text -> if (text.isNotEmpty()) send(text) }
-            },
-            stringResource(strings.terminal_tool_zoom_in) to { zoomToNextLevel(true) },
-            stringResource(strings.terminal_tool_zoom_out) to { zoomToNextLevel(false) },
+            Triple("Ctrl+C", { send("\u0003") }, danger),
+            Triple("Ctrl+D", { send("\u0004") }, danger),
+            Triple(stringResource(strings.terminal_tool_clear), { send("\u000c") }, control),
+            Triple("Tab", { send("\t") }, control),
+            Triple("Esc", { send("\u001b") }, control),
+            Triple("↑", { send("\u001b[A") }, navigate),
+            Triple("↓", { send("\u001b[B") }, navigate),
+            Triple("←", { send("\u001b[D") }, navigate),
+            Triple("→", { send("\u001b[C") }, navigate),
+            Triple(
+                stringResource(strings.terminal_tool_paste),
+                { clipboard.getText()?.text?.let { text -> if (text.isNotEmpty()) send(text) } },
+                utility,
+            ),
+            Triple(stringResource(strings.terminal_tool_zoom_in), { zoomToNextLevel(true) }, utility),
+            Triple(stringResource(strings.terminal_tool_zoom_out), { zoomToNextLevel(false) }, utility),
             // إعادة الضبط تعادل Ctrl+0: حجم 12 الافتراضي
-            stringResource(strings.terminal_tool_zoom_reset) to { applySize(12) },
+            Triple(stringResource(strings.terminal_tool_zoom_reset), { applySize(12) }, accent),
         )
 
     Row(
@@ -676,8 +736,23 @@ private fun TerminalQuickBar(modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items.forEach { (label, action) ->
-            AssistChip(onClick = { action() }, label = { Text(label, style = MaterialTheme.typography.labelSmall) })
+        items.forEach { (label, action, tint) ->
+            AssistChip(
+                onClick = { action() },
+                label = {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tint,
+                        maxLines = 1,
+                    )
+                },
+                colors =
+                    AssistChipDefaults.assistChipColors(
+                        containerColor = tint.copy(alpha = 0.12f),
+                    ),
+            )
         }
     }
 }

@@ -9,7 +9,10 @@ export LANG="${LANG:-C.UTF-8}"
 export LC_ALL="${LC_ALL:-C.UTF-8}"
 export PYTHONIOENCODING=utf-8
 export PYTHONUTF8=1
-export PS1="\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\] \\$ "
+# 8.2.0: مِحَثّ (prompt) أنيق بأربع درجات من لوحة Mahdi، بدل الأخضر/الأزرق
+# الافتراضي. الألوان من خانات ANSI الـ16 التي يُعرّفها الثيم، فتظل مقروءة
+# على «الفاتح» كما على «السمائي». بلا أسطر إضافية تستهلك ارتفاع الهاتف.
+export PS1='\[\e[1;96m\]▌\[\e[0m\] \[\e[94m\]\u@\h\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] \[\e[93m\]❯\[\e[0m\] '
 
 source "$LOCAL/bin/utils"
 
@@ -26,7 +29,7 @@ fi
 
 
 if [ -f "$LOCAL/.sandbox_degraded" ]; then
-    warn "Running in degraded mode. Some features may not work. Please reinstall the terminal"
+    warn "الطرفية في وضع محدود؛ أعد تثبيتها لاستعادة كل المزايا."
 fi
 
 # Set timezone
@@ -75,16 +78,16 @@ ensure_packages_once() {
         return 0
     fi
 
-    info "Installing missing packages: ${MISSING[*]}"
+    info "تجهيز حزم النظام: ${MISSING[*]}"
 
     if export DEBIAN_FRONTEND=noninteractive && \
        apt update -y && \
        apt install -y "${MISSING[@]}"; then
        touch "$marker_file"
        clear
-       info "Setup complete."
+       success "اكتمل التجهيز."
     else
-        error "Failed to install packages."
+        error "تعذّر تثبيت الحزم."
         return 1
     fi
 
@@ -112,20 +115,20 @@ function command_not_found_handle {
     hint=$(/usr/share/command-not-found/command-not-found -- "$cmd" 2>&1 | sed -n 's/.*apt install \(.*\)/\1/p' | head -1)
   fi
 
-  printf '\033[31m✖\033[0m الأمر غير موجود: \033[1m%s\033[0m\n' "$cmd" >&2
+  printf "${M_CORAL}✖${M_RESET}  الأمر غير موجود: ${M_BOLD}%s${M_RESET}\n" "$cmd" >&2
 
   if [ -n "$hint" ]; then
     if [ "${MAHDI_AUTO_INSTALL:-0}" = "1" ] && declare -f apt_fast >/dev/null 2>&1; then
-      printf '\033[36m↳\033[0m تثبيت \033[1m%s\033[0m تلقائيًا…\n' "$hint" >&2
+      printf "${M_SKY}↳${M_RESET}  تثبيت ${M_BOLD}%s${M_RESET} تلقائيًا…\n" "$hint" >&2
       if apt_fast $hint >/dev/null 2>&1; then
         hash -r 2>/dev/null || true
         "$cmd" "$@"
         return $?
       fi
     fi
-    printf '\033[36m↳\033[0m يمكن تثبيته: \033[1mapt install %s\033[0m\n' "$hint" >&2
+    printf "${M_SKY}↳${M_RESET}  يمكن تثبيته: ${M_BOLD}apt install %s${M_RESET}\n" "$hint" >&2
   else
-    printf '\033[2m  تحقّق من الاسم أو ثبّته من: اللغات ← المشغّرات\033[0m\n' >&2
+    printf "${M_MUTED}  تحقّق من الاسم أو ثبّته من: اللغات ← المشغّرات${M_RESET}\n" >&2
   fi
   return 127
 }

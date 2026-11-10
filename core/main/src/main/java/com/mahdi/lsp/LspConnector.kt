@@ -14,6 +14,7 @@ import com.mahdi.events.Events
 import com.mahdi.events.LSPEvent
 import com.mahdi.file.FileObject
 import com.mahdi.file.FileTypeManager
+import com.mahdi.resources.getFilledString
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Preference
@@ -67,6 +68,12 @@ class LspConnector(
 
     companion object {
         private val projectCache = ConcurrentHashMap<String, LspProject>()
+
+        // 8.2.0: فتح خمسة ملفات في مشروع واحد كان يُنتج خمسة تنبيهات متطابقة
+        // «تعذّر الاتصال بخادم اللغة» فوق بعضها. تنبيه واحد لكل مشروع كل ٣٠ ثانية،
+        // وزرّ «إدارة» يبقى متاحًا مدّة أطول فلا يختفي قبل أن يُضغط.
+        private val lastConnectionWarning = ConcurrentHashMap<String, Long>()
+        private const val WARNING_THROTTLE_MS = 30_000L
     }
 
     fun isConnected(): Boolean {
@@ -128,19 +135,48 @@ class LspConnector(
                 }
 
                 if (failedConnections.isNotEmpty()) {
-                    launch {
-                        val snackbarHost = snackbarHostStateRef.get() ?: return@launch
-                        val result =
-                            snackbarHost.showSnackbar(
-                                message = strings.lsp_connection_error.getString(),
-                                actionLabel = strings.manage.getString(),
-                                duration = SnackbarDuration.Short,
-                            )
-                        if (result == SnackbarResult.ActionPerformed) {
-                            val activity = MainActivity.instance!!
-                            val intent = Intent(activity, SettingsActivity::class.java)
-                            intent.putExtra("route", SettingsRoutes.LspSettings.route)
-                            activity.startActivity(intent)
+                    val now = System.currentTimeMillis()
+                    val last = lastConnectionWarning[projectPath] ?: 0L
+                    if (now - last > WARNING_THROTTLE_MS) {
+                        lastConnectionWarning[projectPath] = now
+                        launch {
+                            val snackbarHost = snackbarHostStateRef.get() ?: return@launch
+
+                            // اسم الخادم وسببه: كان التنبيه بلا أي معلومة تُصلح المشكلة.
+                            val names =
+                                failedConnections.joinToString("، ") { server ->
+                                    val crashed =
+                                        server.instances.value.any { it.status.value == LspConnectionStatus.CRASHED }
+                                    val reason =
+                                        if (crashed) {
+                                            strings.lsp_connection_reason_crashed.getString()
+                                        } else {
+                                            strings.lsp_connection_reason_timeout.getString()
+                                        }
+                                    "${server.languageName} ($reason)"
+                                }
+                            val message =
+                                strings.lsp_connection_failed_names.getFilledString(names) +
+                                    " · " + strings.lsp_connection_failed_hint.getString()
+
+                            val result =
+                                snackbarHost.showSnackbar(
+                                    message = message,
+                                    actionLabel = strings.manage.getString(),
+                                    duration = SnackbarDuration.Long,
+                                )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                // MainActivity.instance قد يكون null بعد دوران الشاشة أو
+                                // إغلاق المحرّر: لا NPE، ولا شاشة فارغة، ولا انهيار.
+                                val activity = MainActivity.instance ?: return@launch
+                                val intent = Intent(activity, SettingsActivity::class.java)
+                                intent.putExtra("route", SettingsRoutes.LspSettings.route)
+                                intent.addFlags(
+                                    Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                )
+                                runCatching { activity.startActivity(intent) }
+                                    .onFailure { logError(it) }
+                            }
                         }
                     }
                 }

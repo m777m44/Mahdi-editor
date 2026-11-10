@@ -2,7 +2,7 @@ set -e
 
 source "$LOCAL/bin/utils"
 
-info "Extracting the Ubuntu container…"
+info "جارٍ فكّ ضغط حاوية أوبنتو…"
 
 ARGS="--kill-on-exit"
 ARGS="$ARGS -w /"
@@ -61,7 +61,7 @@ ret=$?
 set -e
 
 if [ "$ret" -ne 0 ]; then
-    warn "PRoot extraction failed (exit code $ret), falling back to direct extraction..."
+    warn "تعذّر فكّ الضغط عبر PRoot (الرمز $ret) — نحاول الاستخراج المباشر…"
 
     set +e
     LD_PRELOAD="$(realpath "$NATIVE_LIB_DIR/liblink2symlink.so")"
@@ -72,7 +72,7 @@ if [ "$ret" -ne 0 ]; then
     set -e
 
     if [ "$ret" -ne 0 ]; then
-        error "Extraction failed (exit code $ret)"
+        error "تعذّر الاستخراج (الرمز $ret)"
         exit "$ret"
     fi
 fi
@@ -80,7 +80,7 @@ fi
 
 SANDBOX_DIR="$LOCAL/sandbox"
 
-info "Setting up the Ubuntu container…"
+info "جارٍ تجهيز حاوية أوبنتو…"
 
 # values you want written
 nameserver="nameserver 8.8.8.8
@@ -145,7 +145,7 @@ touch $LOCAL/.terminal_setup_ok_DO_NOT_REMOVE
 
 
 
-info "Installing Node.js APT hook…"
+info "تثبيت رابط APT الخاص بـ Node.js…"
 
 mkdir -p "$SANDBOX_DIR/etc/apt/apt.conf.d"
 mkdir -p "$SANDBOX_DIR/usr/local/bin"
@@ -216,7 +216,7 @@ EOF
 
 chmod +x "$SANDBOX_DIR/usr/local/bin/node-postinstall.sh"
 
-info "Node.js APT hook installed"
+success "رابط APT الخاص بـ Node.js جاهز"
 
 
 

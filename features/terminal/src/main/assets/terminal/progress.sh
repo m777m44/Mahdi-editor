@@ -31,7 +31,36 @@ MAHDI_BAR_ENABLED="${MAHDI_BAR:-0}"
 MAHDI_BAR_LAST=""
 MAHDI_BAR_LABEL=""
 
-# يرسم سطرًا واحدًا: شريط سماوي + نسبة + تسمية
+# 8.2.0: تدرّج حقيقي داخل الشريط (سماوي ← بنفسجي) بدل لون سماوي واحد.
+# محطّات RGB للخلايا المملوءة، ورمادي خافت للخلايا الفارغة.
+MAHDI_BAR_STOPS=(56 189 248  45 212 191  52 211 153  245 215 110  167 139 250  244 114 182)
+
+# استقلال عن utils إن استُدعي الشريط وحده
+if ! declare -f mahdi_rgb >/dev/null 2>&1; then
+  M_RESET='' M_BOLD='' M_GOLD='' M_MINT='' M_CORAL='' M_MUTED=''
+  mahdi_rgb() { :; }
+fi
+
+# يبني سلسلة الشريط (ألوان + محارف) لتُفسَّر لاحقًا عبر printf '%b'
+_mahdi_bar_build() {
+  local width="$1" filled="$2" i=0 k r g b out=''
+  while [ "$i" -lt "$width" ]; do
+    if [ "$i" -lt "$filled" ]; then
+      k=$((i * 6 / width))
+      [ "$k" -gt 5 ] && k=5
+      r=${MAHDI_BAR_STOPS[k * 3]}
+      g=${MAHDI_BAR_STOPS[k * 3 + 1]}
+      b=${MAHDI_BAR_STOPS[k * 3 + 2]}
+      out="${out}$(mahdi_rgb "$r" "$g" "$b")▓"
+    else
+      out="${out}${M_MUTED}░"
+    fi
+    i=$((i + 1))
+  done
+  printf '%s' "$out"
+}
+
+# يرسم سطرًا واحدًا: شريط متدرّج + نسبة + تسمية، بلا كتابة مكرّرة
 mahdi_bar_render() {
   local percent="$1" label="${2:-}"
   [ "$MAHDI_BAR_ENABLED" = "0" ] && return 0
@@ -45,13 +74,14 @@ mahdi_bar_render() {
   [ "$filled" -gt "$width" ] && filled="$width"
   [ "$filled" -lt 0 ] && filled=0
 
-  local bar="" i=0
-  while [ "$i" -lt "$filled" ]; do bar="$bar▓"; i=$((i + 1)); done
-  while [ "$i" -lt "$width" ]; do bar="$bar░"; i=$((i + 1)); done
+  local bar
+  bar="$(_mahdi_bar_build "$width" "$filled")"
 
-  # \r يعود لبداية السطر، و\033[K يمسح أي بقايا أطول
-  printf '\r\033[K\033[33m▸ %s\033[0m \033[36m[%s]\033[0m \033[33m%3d%%\033[0m' \
-    "$MAHDI_BAR_LABEL" "$bar" "$percent"
+  # \r يعود لبداية السطر، و\033[K يمسح أي بقايا أطول من السطر الجديد
+  printf '\r\033[K'
+  printf "${M_GOLD}▸ %s${M_RESET}  " "$MAHDI_BAR_LABEL"
+  printf '%b' "$bar"
+  printf "${M_RESET} ${M_BOLD}%3d%%${M_RESET}" "$percent"
   return 0
 }
 
@@ -74,11 +104,12 @@ mahdi_bar_set() {
 mahdi_bar_done() {
   [ "$MAHDI_BAR_ENABLED" = "0" ] && return 0
   local label="${1:-$MAHDI_BAR_LABEL}"
-  MAHDI_BAR_LAST=""
   local width="$MAHDI_BAR_WIDTH"
-  local bar="" i=0
-  while [ "$i" -lt "$width" ]; do bar="$bar▓"; i=$((i + 1)); done
-  printf '\r\033[K\033[32m[%s]\033[0m \033[32m100%%\033[0m  \033[32m✔ %s\033[0m\n' "$bar" "$label"
+  local bar
+  bar="$(_mahdi_bar_build "$width" "$width")"
+  printf '\r\033[K'
+  printf '%b' "$bar"
+  printf "${M_RESET} ${M_BOLD}100%%${M_RESET}  ${M_MINT}✔ %s${M_RESET}\n" "$label"
   MAHDI_BAR_LAST=""
   MAHDI_BAR_LABEL=""
   return 0
@@ -88,7 +119,7 @@ mahdi_bar_done() {
 mahdi_bar_abort() {
   [ "$MAHDI_BAR_ENABLED" = "0" ] && return 0
   local label="${1:-$MAHDI_BAR_LABEL}"
-  printf '\r\033[K\033[31m✖ %s\033[0m\n' "${label:-فشل}"
+  printf "\r\033[K${M_CORAL}✖ %s${M_RESET}\n" "${label:-فشل}"
   MAHDI_BAR_LAST=""
   MAHDI_BAR_LABEL=""
   return 0
