@@ -25,7 +25,7 @@ uninstall() {
   rm -rf "$INSTALL_DIR"
   info 'LemMinX language server uninstalled successfully.'
 
-  if ask "Do you want to uninstall OpenJDK? It was installed as a dependency of this language server."; then
+  if ask "حذف OpenJDK المثبَّت تبعًا لخادم اللغة؟"; then
     info "Uninstalling OpenJDK..."
     apt-get -o DPkg::Lock::Timeout=60 remove -y default-jdk
     apt-get -o DPkg::Lock::Timeout=60 autoremove -y

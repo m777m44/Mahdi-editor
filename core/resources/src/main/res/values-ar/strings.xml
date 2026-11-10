@@ -1185,4 +1185,16 @@
     <string name="storage_clean_temp">تنظيف الملفات المؤقتة</string>
 
     <string name="languages_tab_commands">الأوامر</string>
+    <!-- 8.2.0 — إدارة تعذّر الاتصال بالخادم -->
+    <string name="lsp_connection_failed_names">تعذّر الاتصال بخادم اللغة: %1$s</string>
+    <string name="lsp_connection_failed_hint">افتح «إدارة» لتثبيت الخادم أو إعادة تشغيله.</string>
+    <string name="lsp_connection_reason_timeout">انتهت مهلة الاتصال</string>
+    <string name="lsp_connection_reason_crashed">توقّف الخادم فجأة</string>
+    <string name="lsp_server_missing">الخادم غير متاح</string>
+    <string name="lsp_server_missing_desc">ربما حُذف أو أُزيلت إضافته. ارجع إلى قائمة خوادم اللغة.</string>
+    <string name="terminal_connecting">جارٍ الاتصال بخدمة الطرفية…</string>
+    <string name="terminal_connecting_desc">تُجهَّز بيئة التشغيل، لحظة واحدة.</string>
+    <string name="terminal_connection_failed">تعذّر الاتصال بخدمة الطرفية</string>
+    <string name="terminal_connection_failed_desc">أعد الاتصال لتشغيل الخدمة من جديد؛ ملفاتك وجلساتك محفوظة.</string>
+    <string name="terminal_status_connected">متصل</string>
 </resources>

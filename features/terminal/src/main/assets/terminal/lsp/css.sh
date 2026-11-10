@@ -16,7 +16,7 @@ install() {
 }
 
 uninstall() {
-  if ask "Are you sure you want to uninstall the extracted VSCode language servers? This will also remove the HTML, CSS and JSON language servers."; then
+  if ask "حذف خوادم اللغة المستخرجة من VSCode؟ سيُحذف معها HTML وCSS وJSON."; then
     info 'Uninstalling extracted VSCode language servers...'
     npm_fast uninstall -g --prefix /usr vscode-langservers-extracted
     info 'Extracted VSCode language servers uninstalled successfully.'

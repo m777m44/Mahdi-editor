@@ -40,11 +40,11 @@ if ! declare -f mahdi_run_heal >/dev/null 2>&1; then
 fi
 
 if [ ! -f "$file" ]; then
-  error "File not found -> $file"
+  error "الملف غير موجود: $file"
   exit 1
 fi
 
-# ———————————————————— تقرير التشغيل (8.1.0) ————————————————————
+# ———————————————————— تقرير التشغيل (8.2.0) ————————————————————
 # كان المستخدم لا يعرف: هل السكربت يعمل أم انتهى أم فشل؟ الطرفية تبقى ساكنة
 # والشاشة لا تتحرّك (شكوى «يبقى واقف في شاشة ولا يسوي شي»). الآن:
 #   ▸ اسم الملف        عند البدء
@@ -58,21 +58,24 @@ mahdi_run_footer() {
   local rc=$?
   local dur=$((SECONDS - MAHDI_RUN_STARTED))
   if [ "$rc" -eq 0 ]; then
-    printf '\033[32m✔\033[0m تمّ التشغيل — %ss\n' "$dur" || true
+    printf "${M_MINT}✔${M_RESET}  ${M_BOLD}تمّ التشغيل${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$dur" || true
   else
-    printf '\033[31m✖\033[0m توقّف السكربت (الرمز %s) — %ss\n' "$rc" "$dur" || true
+    printf "${M_CORAL}✖${M_RESET}  ${M_BOLD}توقّف السكربت (الرمز %s)${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$rc" "$dur" || true
   fi
 
   # طرفية حيّة بعد الانتهاء: لا شاشة ميتة، ويستطيع المستخدم إعادة التشغيل بيده
   if [ "${MAHDI_KEEP_SHELL:-1}" = "1" ] && [ -t 0 ] && [ -t 1 ]; then
-    printf '\033[2m  طرفية تفاعلية — اكتب exit للخروج\033[0m\n' || true
+    printf "${M_MUTED}  طرفية تفاعلية — اكتب exit للخروج${M_RESET}\n" || true
     exec /bin/bash -i || true
   fi
   return 0
 }
 trap mahdi_run_footer EXIT
 
-printf '\033[36m▸\033[0m %s\n' "$(basename "$file")" || true
+# سطر البدء يبقى لاتينيًا خالصًا (اسم الملف + الوقت): إضافة كلمة عربية كانت
+# تجعل السطر ذا اتجاه RTL فيُعاد ترتيب الاسم والرمز بصريًا داخل الطرفية.
+printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s${M_RESET}  ${M_MUTED}│  %s${M_RESET}\n" \
+  "$(basename "$file")" "$(printf '%(%H:%M)T' -1)" || true
 
 # ——————————————— 4.1.0: بيئة تشغيل موحّدة ———————————————
 # كل المفسّرات (Python/Node/PHP/Ruby/…‎) تُشغَّل بترميز UTF-8 افتراضيًا، فلا تتعطّل السكربتات
@@ -162,7 +165,7 @@ case "$file" in
 esac
 
 run_code() {
-    echo -e "\e[32;1m[✓]\e[37m Compilation successful! Running...\e[0m"
+    success "اكتملت الترجمة — جارٍ التشغيل…"
     chmod +x "$1" 2>/dev/null || true
     if [ -x "$1" ]; then
         "$1"
@@ -185,7 +188,7 @@ install_package() {
     fi
   fi
 
-  info "Installing $packages..."
+  info "تثبيت الحزم: $packages…"
   # بدون apt upgrade وبدون الحزم الاختيارية، وبمهلة قفل محدودة — لا انتظار للأبد
   export DEBIAN_FRONTEND=noninteractive
   if declare -f apt_fast >/dev/null 2>&1; then
@@ -197,14 +200,14 @@ install_package() {
 }
 
 install_nodejs() {
-  info "Installing Node.js LTS..."
+  info "تثبيت Node.js LTS…"
   install_package "curl"
   curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
   apt install -y nodejs
 }
 
 install_rust() {
-  info "Installing Rust..."
+  info "تثبيت Rust…"
   install_package "curl"
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
   source "$HOME/.cargo/env"
@@ -213,7 +216,7 @@ install_rust() {
 }
 
 install_dotnet() {
-  info "Installing .NET SDK..."
+  info "تثبيت .NET SDK…"
   if declare -f mahdi_fetch_fast >/dev/null 2>&1; then
     mahdi_fetch_fast https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb packages-microsoft-prod.deb
   else
@@ -227,7 +230,7 @@ install_dotnet() {
 
 install_kotlin() {
     install_package "unzip curl"
-    info "Fetching latest Kotlin compiler..."
+    info "جلب أحدث مترجم Kotlin…"
     url=$(curl -s https://api.github.com/repos/JetBrains/kotlin/releases/latest \
         | grep "browser_download_url" \
         | grep "kotlin-compiler-.*zip" \
@@ -235,11 +238,11 @@ install_kotlin() {
         | cut -d '"' -f 4)
 
     if [ -z "$url" ]; then
-        error "Could not find Kotlin compiler download URL."
+        error "تعذّر العثور على رابط مترجم Kotlin."
         return 1
     fi
 
-    info "Downloading from: $url"
+    info "التنزيل من: $url"
     if declare -f mahdi_fetch_fast >/dev/null 2>&1; then
         mahdi_fetch_fast "$url" /tmp/kotlin.zip
     elif declare -f mahdi_fetch >/dev/null 2>&1; then
@@ -248,14 +251,14 @@ install_kotlin() {
         curl -fL --retry 5 -C - -o /tmp/kotlin.zip "$url"
     fi
 
-    info "Extracting to /opt/kotlinc ..."
+    info "الاستخراج إلى /opt/kotlinc …"
     mkdir -p /opt/kotlinc
     unzip -qo /tmp/kotlin.zip -d /opt
 
     ln -sf /opt/kotlinc/bin/kotlinc /usr/local/bin/kotlinc
     ln -sf /opt/kotlinc/bin/kotlin /usr/local/bin/kotlin
 
-    info "Kotlin installed at /opt/kotlinc"
+    success "Kotlin جاهز في /opt/kotlinc"
 }
 
 case "$file" in
@@ -284,7 +287,7 @@ case "$file" in
     mahdi_auto_deps "$file"
 
     if ! command_exists tsc; then
-      info "Installing TypeScript compiler..."
+      info "تثبيت مترجم TypeScript…"
       npm install -g typescript
     fi
 
@@ -314,11 +317,11 @@ case "$file" in
 
   *.kt)
     if ! command_exists java; then
-      info "Installing Java..."
+      info "تثبيت Java…"
       install_package "default-jdk"
     fi
     if ! command_exists kotlinc; then
-      info "Installing Kotlin..."
+      info "تثبيت Kotlin…"
       install_kotlin
     fi
     kotlinc "$file" -include-runtime -d temp.jar && java -jar temp.jar
@@ -446,14 +449,14 @@ case "$file" in
 
   *.elm)
     if ! command_exists elm; then
-      info "Installing Elm..."
+      info "تثبيت Elm…"
       if ! command_exists node; then
         install_nodejs
       fi
       npm install -g elm
     fi
     elm make "$file" --output=temp.html
-    info "Elm compiled to temp.html - transfer to browser to view"
+    success "تُرجم ملف Elm إلى temp.html — افتحه في المعاينة"
     ;;
 
   *.fsx|*.fs)
@@ -566,7 +569,7 @@ case "$file" in
     if ! command_exists xmllint; then
       install_package "libxml2-utils"
     fi
-    xmllint --noout "$file" && echo "✓ XML صحيح" || error "XML غير صالح"
+    xmllint --noout "$file" && success "ملف XML صحيح" || error "ملف XML غير صالح"
     ;;
 
   *.md|*.markdown)

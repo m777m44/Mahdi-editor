@@ -10,35 +10,106 @@ YELLOW_BG='\033[1;43m'
 RED_BG='\033[1;41m'
 GREEN_BG='\033[42m'
 
+# ——————————————————————————————————————————————————————————————————————————————
+# لوحة Mahdi للطرفية (8.2.0)
+#
+# كل ما يُكتب داخل الطرفية يمرّ من هنا: الشعار، أسطر الحالة، شريط التقدّم،
+# وأسطر بداية/نهاية التشغيل. الألوان من خانات ANSI الـ16 التي يُعرّفها الثيم،
+# فتتكيّف تلقائيًا مع «السمائي/الداكن/المظلم/الفاتح» وتبقى مقروءة على الفاتح
+# أيضًا — بخلاف ألوان RGB الثابتة التي كانت تبهت على الخلفية البيضاء.
+#
+#   سماوي  ·  تركوازي  ·  نعناعي  ·  ذهبي  ·  بنفسجي  ·  مرجاني  ·  رمادي
+#
+# التعطيل الكامل للألوان (لالتقاط المخرجات في ملف أو سجل):
+#   MAHDI_COLOR=0   أو   NO_COLOR=1   أو   TERM=dumb
+# ——————————————————————————————————————————————————————————————————————————————
+M_RESET='\033[0m'
+M_BOLD='\033[1m'
+M_DIM='\033[2m'
+M_SKY='\033[94m'
+M_TEAL='\033[96m'
+M_MINT='\033[92m'
+M_GOLD='\033[93m'
+M_VIOLET='\033[95m'
+M_CORAL='\033[91m'
+M_MUTED='\033[90m'
+M_WHITE='\033[97m'
+
+if [ "${MAHDI_COLOR:-1}" = "0" ] || [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = "dumb" ]; then
+  MAHDI_PLAIN=1
+  M_RESET='' M_BOLD='' M_DIM='' M_SKY='' M_TEAL='' M_MINT='' M_GOLD=''
+  M_VIOLET='' M_CORAL='' M_MUTED='' M_WHITE=''
+  RESET='' BOLD_BLUE='' BOLD_YELLOW='' BOLD_RED='' BOLD_GREEN=''
+  BLUE_BG='' YELLOW_BG='' RED_BG='' GREEN_BG=''
+fi
+
+# لون RGB حقيقي (24-bit) للعناصر الزخرفية فقط — مربّعات الشريط والشعار.
+# يُعاد كسلسلة تحتوي \033 حرفيًا لتُفسَّر عبر printf '%b'.
+mahdi_rgb() {
+  [ "${MAHDI_PLAIN:-0}" = "1" ] && return 0
+  printf '\033[38;2;%d;%d;%dm' "$1" "$2" "$3"
+}
+
+# خطّ فاصل متدرّج: ست درجات من السماوي إلى البنفسجي، بلا نصّ، بلا عرض ثابت.
+mahdi_rule() {
+  local n="${1:-46}" i=0 r g b out=''
+  local stops=(56 189 248   45 212 191   52 211 153   245 215 110   167 139 250   244 114 182)
+  while [ "$i" -lt "$n" ]; do
+    local k=$((i * 6 / n))
+    [ "$k" -gt 5 ] && k=5
+    r=${stops[k * 3]}; g=${stops[k * 3 + 1]}; b=${stops[k * 3 + 2]}
+    out="${out}$(mahdi_rgb "$r" "$g" "$b")─"
+    i=$((i + 1))
+  done
+  printf '%b\n' "${out}${M_RESET}"
+}
+
+# عنوان قسم أنيق: شريط رقيق + نصّ، بلا خلفية عريضة (تتراكب مع العربية).
+mahdi_heading() {
+  printf "${M_SKY}▏${M_RESET} ${M_BOLD}%s${M_RESET}\n" "$1"
+}
+
 # 8.0.0: رسالة واحدة قصيرة، بلا صندوق ملوّن عريض.
 #
 # كان الشكل القديم «  INFO  » بخلفية زرقاء ثماني الخانات؛ وعندما تليه كلمة عربية
 # في نفس السطر كانت الخلفية الزرقاء تمتدّ تحت العربية وتتراكب الحروف — وهو ما
 # ظهر في لقطة المستخدم (`INFO سيُثبَّت: pyTelegramBotAPI`). صار الآن رمزًا واحدًا
 # (خانة واحدة) ثم نصّ سطر واحد: لا خلفية، ولا تراكب، ولا ضجيج.
+# 8.2.0: الرمز وحده ملوّن، والنصّ يبقى بلون الثيم (onSurface) فيُقرأ على
+# الداكن والفاتح معًا. لا خلفيات عريضة: كانت تمتدّ تحت العربية فتتراكب الحروف.
 info() {
-  printf "\033[36m▸ ${RESET}%s\n" "$1"
+  printf "${M_SKY}▸${M_RESET}  %s\n" "$1"
 }
 
 warn() {
-  printf "\033[33m⚠ ${RESET}%s\n" "$1"
+  printf "${M_GOLD}⚠${M_RESET}  %s\n" "$1"
 }
 
 error() {
-  printf "\033[31m✖ ${RESET}%s\n" "$1"
+  printf "${M_CORAL}✖${M_RESET}  %s\n" "$1"
 }
 
 success() {
-  printf "\033[32m✔ ${RESET}%s\n" "$1"
+  printf "${M_MINT}✔${M_RESET}  %s\n" "$1"
+}
+
+# سطر «مفتاح ← قيمة» بمحاذاة ثابتة: للملف واللغة والزمن ورمز الخروج.
+mahdi_kv() {
+  printf "  ${M_MUTED}%-12s${M_RESET} ${M_WHITE}%s${M_RESET}\n" "$1" "$2"
 }
 
 ask() {
   local prompt="$1"
   local response
 
+  # 8.2.0: في جلسة غير تفاعلية لا يوجد من يجيب، و`read` قد يُعلّق التطبيق
+  # إلى الأبد. نعود بـ «لا» فورًا بدل شاشة واقفة.
+  [ -t 0 ] || return 1
+
   while true; do
-    printf "\n${BLUE_BG}  ?  ${RESET} ${BOLD_BLUE}%s${RESET}\n" "$prompt"
-    read -rp "[y/N]: " response
+    printf "\n${M_GOLD}?${M_RESET}  ${M_BOLD}%s${M_RESET}\n" "$prompt"
+    printf "${M_MUTED}[y/N]: ${M_RESET}"
+    IFS= read -r response || return 1
     case "$response" in
       [Yy]|[Yy][Ee][Ss])
         return 0
@@ -47,7 +118,7 @@ ask() {
         return 1
         ;;
       *)
-        warn "Please answer yes or no."
+        warn "أجب بـ y أو n من فضلك."
         ;;
     esac
   done
@@ -140,10 +211,10 @@ npm_fast() {
 }
 
 install_nodejs() {
-  info "Installing Node.js..."
+  info "تثبيت Node.js…"
   # أولًا: حزمة التوزيعة (أسرع بكثير من سكربت NodeSource)، ثم السكربت كخطة بديلة
   if apt_fast nodejs npm >/dev/null 2>&1 && command_exists node && command_exists npm; then
-    success "Node.js installed from the distribution repository"
+    success "Node.js جاهز من مستودع التوزيعة"
     return 0
   fi
 
@@ -156,11 +227,11 @@ install_nodejs() {
 }
 
 uninstall_nodejs() {
-  if ask "Do you want to uninstall Node.js LTS? It was installed as a dependency of this language server. This will also remove all globally installed npm packages."; then
-    info "Uninstalling Node.js LTS..."
+  if ask "حذف Node.js LTS المثبَّت تبعًا لخادم اللغة؟ سيُحذف معه كل ما ثُبِّت عبر npm بشكل عام."; then
+    info "جارٍ حذف Node.js LTS…"
     apt remove -y nodejs
     apt autoremove -y
-    info "Node.js LTS uninstalled successfully."
+    success "حُذف Node.js LTS بنجاح."
   fi
 }
 

@@ -1155,4 +1155,16 @@ Thank you for using Mahdi-Editor.</string>
     <string name="storage_clean_temp">Clean temp files</string>
 
     <string name="languages_tab_commands">Commands</string>
+    <!-- 8.2.0 — server connection failure management -->
+    <string name="lsp_connection_failed_names">Unable to connect to language server: %1$s</string>
+    <string name="lsp_connection_failed_hint">Open Manage to install or restart the server.</string>
+    <string name="lsp_connection_reason_timeout">Connection timed out</string>
+    <string name="lsp_connection_reason_crashed">Server stopped unexpectedly</string>
+    <string name="lsp_server_missing">Server unavailable</string>
+    <string name="lsp_server_missing_desc">It may have been removed. Go back to the language servers list.</string>
+    <string name="terminal_connecting">Connecting to terminal service…</string>
+    <string name="terminal_connecting_desc">Preparing the runtime, one moment.</string>
+    <string name="terminal_connection_failed">Unable to connect to terminal service</string>
+    <string name="terminal_connection_failed_desc">Reconnect to start the service again. Your files and sessions are kept.</string>
+    <string name="terminal_status_connected">Connected</string>
 </resources>
