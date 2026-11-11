@@ -98,6 +98,23 @@ mahdi_kv() {
   printf "  ${M_MUTED}%-12s${M_RESET} ${M_WHITE}%s${M_RESET}\n" "$1" "$2"
 }
 
+# ——————————————————————————————————————————————————————————————————————————————
+# 8.3.0: «groups: cannot find name for group ID 99909997»
+#
+# `/etc/bash.bashrc` في أوبنتو يستدعي `groups` ضمن تلميح sudo. تحت proot
+# تحمل العملية مجموعات أندرويد التكميلية بلا أسماء في `/etc/group`، فيُطبع
+# هذا السطر عند كل فتح طرفية تفاعلية. الملفان يُسكتان التلميح (الطريقة
+# الرسمية في أوبنتو) بلا تعديل ملفات النظام ولا حذف أي مجموعة.
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_quiet_shell_startup() {
+  local h="${HOME:-}"
+  [ -n "$h" ] && [ -d "$h" ] || return 0
+  : > "$h/.hushlogin" 2>/dev/null || true
+  : > "$h/.sudo_as_admin_successful" 2>/dev/null || true
+  return 0
+}
+mahdi_quiet_shell_startup
+
 ask() {
   local prompt="$1"
   local response
