@@ -9,22 +9,40 @@ export LANG="${LANG:-C.UTF-8}"
 export LC_ALL="${LC_ALL:-C.UTF-8}"
 export PYTHONIOENCODING=utf-8
 export PYTHONUTF8=1
-# 8.2.0: مِحَثّ (prompt) أنيق بأربع درجات من لوحة Mahdi، بدل الأخضر/الأزرق
-# الافتراضي. الألوان من خانات ANSI الـ16 التي يُعرّفها الثيم، فتظل مقروءة
-# على «الفاتح» كما على «السمائي». بلا أسطر إضافية تستهلك ارتفاع الهاتف.
-export PS1='\[\e[1;96m\]▌\[\e[0m\] \[\e[94m\]\u@\h\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] \[\e[93m\]❯\[\e[0m\] '
-
 source "$LOCAL/bin/utils"
+
+# 8.3.0: «groups: cannot find name for group ID 99909997»
+# أندرويد يمنح التطبيق مجموعات تكميلية بلا أسماء داخل /etc/group، و`/etc/bash.bashrc`
+# في أوبنتو يستدعي groups() فتُطبع الرسالة عند كل طرفية تفاعلية. نُسمّي كل
+# مجموعة مجهولة مرة واحدة لكل تثبيت (بلا حذف ولا تعديل مجموعات النظام).
+if [ ! -f /etc/.mahdi_groups_ok ] && [ -w /etc/group ]; then
+    _mahdi_gids="$(id -G 2>/dev/null) "
+    _mahdi_groups_line="$(grep '^Groups:' /proc/self/status 2>/dev/null | cut -d: -f2-)"
+    _mahdi_gids="$_mahdi_gids $_mahdi_groups_line"
+    for _mahdi_gid in $_mahdi_gids; do
+        case "$_mahdi_gid" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        if ! grep -qE "^[^:]+:[^:]*:${_mahdi_gid}:" /etc/group 2>/dev/null; then
+            printf 'mahdi_g%s:x:%s:\n' "$_mahdi_gid" "$_mahdi_gid" >> /etc/group 2>/dev/null || true
+        fi
+    done
+    : > /etc/.mahdi_groups_ok 2>/dev/null || true
+    unset _mahdi_gids _mahdi_groups_line _mahdi_gid
+fi
 
 SDK="$(getprop ro.build.version.sdk 2>/dev/null)"
 
-# Use ${SDK:-999} to default to 999 if $SDK is empty, preventing syntax errors.
-if [ "${SDK:-999}" -le 29 ]; then
-    rm -f "$LOCAL/bin/mahdi"
-    cp "$NATIVE_LIB_DIR/libmahdi_cli.so" "$LOCAL/bin/mahdi"
-    chmod +x "$LOCAL/bin/mahdi"
-else
-    ln -sfn "$NATIVE_LIB_DIR/libmahdi_cli.so" "$LOCAL/bin/mahdi"
+# 8.3.0: الطرفية التفاعلية التي تُفتح بعد انتهاء سكربت لا تُعيد تجهيز الحاوية.
+if [ "${MAHDI_SKIP_INIT_SETUP:-0}" != "1" ]; then
+    # Use ${SDK:-999} to default to 999 if $SDK is empty, preventing syntax errors.
+    if [ "${SDK:-999}" -le 29 ]; then
+        rm -f "$LOCAL/bin/mahdi"
+        cp "$NATIVE_LIB_DIR/libmahdi_cli.so" "$LOCAL/bin/mahdi"
+        chmod +x "$LOCAL/bin/mahdi"
+    else
+        ln -sfn "$NATIVE_LIB_DIR/libmahdi_cli.so" "$LOCAL/bin/mahdi"
+    fi
 fi
 
 
@@ -32,17 +50,16 @@ if [ -f "$LOCAL/.sandbox_degraded" ]; then
     warn "الطرفية في وضع محدود؛ أعد تثبيتها لاستعادة كل المزايا."
 fi
 
-# Set timezone
-CONTAINER_TIMEZONE="UTC"  # or any timezone like "Asia/Kolkata"
-
-# Symlink /etc/localtime to the desired timezone
-ln -snf "/usr/share/zoneinfo/$CONTAINER_TIMEZONE" /etc/localtime
-
-# Write the timezone string to /etc/timezone
-echo "$CONTAINER_TIMEZONE" > /etc/timezone
-
-# Reconfigure tzdata to apply without prompts
-DEBIAN_FRONTEND=noninteractive dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1
+# 8.3.0: ضبط المنطقة الزمنية كان يعمل عند **كل** فتح طرفية (حتى الطرفية
+# التفاعلية بعد انتهاء سكربت)، فيُعيد dpkg-reconfigure ويُبطئ البدء.
+# علامة واحدة تكفي: تُضبط مرة لكل تثبيت.
+if [ ! -f /etc/.mahdi_timezone_ok ]; then
+    CONTAINER_TIMEZONE="UTC"
+    ln -snf "/usr/share/zoneinfo/$CONTAINER_TIMEZONE" /etc/localtime 2>/dev/null || true
+    printf '%s\n' "$CONTAINER_TIMEZONE" > /etc/timezone 2>/dev/null || true
+    DEBIAN_FRONTEND=noninteractive dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
+    : > /etc/.mahdi_timezone_ok 2>/dev/null || true
+fi
 
 
 if [[ -f ~/.bashrc ]]; then
@@ -50,8 +67,15 @@ if [[ -f ~/.bashrc ]]; then
     source ~/.bashrc
 fi
 
+# 8.3.0: مِحَثّ Mahdi **بعد** ~/.bashrc.
+# ملف bashrc الافتراضي في أوبنتو يعيد تعيين PS1 إلى `root@localhost:\w#`
+# — وهو بالضبط ما ظهر في لقطة المستخدم — فكان مِحَثّنا الأنيق يُلغى فورًا.
+export PS1='\[\e[1;96m\]▌\[\e[0m\] \[\e[94m\]\u@\h\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] \[\e[93m\]❯\[\e[0m\] '
+
 
 ensure_packages_once() {
+    # 8.3.0: لا apt ولا dpkg عند فتح طرفية بعد انتهاء سكربت
+    [ "${MAHDI_SKIP_INIT_SETUP:-0}" = "1" ] && return 0
     local marker_file="/.cache/.packages_ensured"
     local PACKAGES=("command-not-found" "sudo" "xkb-data" "libjemalloc-dev")
 

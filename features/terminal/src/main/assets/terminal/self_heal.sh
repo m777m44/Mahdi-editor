@@ -42,29 +42,46 @@ mahdi_heal_strip_noise() {
 }
 
 # يعرض خطأ التشغيل النهائي بشكل مفهوم ومختصر
+#
+# 8.3.0: قبل الآن كان `stderr` يُخزَّن في ملف ولا يُعرض إلا في حالتين، فإن
+# فشل تثبيت مكتبة ناقصة بقي المستخدم أمام «✖ توقّف السكربت (الرمز 1)»
+# بلا أي سبب. الآن: سبب واحد واضح دائمًا، حتى لو لم يكتب السكربت شيئًا.
 mahdi_heal_report() {
-  local lang="$1" errfile="$2"
-  [ -s "$errfile" ] || return 0
+  local lang="$1" errfile="$2" rc="${3:-1}"
+  local mod=""
 
-  local mod
-  mod="$(mahdi_heal_missing_module "$errfile")"
+  if [ -s "$errfile" ]; then
+    mod="$(mahdi_heal_missing_module "$errfile")"
+  fi
+
   if [ -n "$mod" ]; then
-    printf '\033[31m✖ لم تعمل الحزمة «%s» — مكتبة بايثون غير مثبّتة.\033[0m\n' "$mod" >&2
+    MAHDI_FAIL_REASON="مكتبة ناقصة: $mod"
+    printf "${M_CORAL}✖ المكتبة «%s» غير مثبّتة — لم يعمل السكربت.${M_RESET}\n" "$mod" >&2
     # لا نطبع «pip install <module>»: اسم الوحدة يختلف عن اسم الحزمة في PyPI
-    # (telegram ⇒ python-telegram-bot)، والطباعة الخاطئة تُثبّت مكتبة أخرى.
-    printf '\033[2m  وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+    printf "${M_MUTED}  وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات${M_RESET}\n" >&2
     return 0
   fi
 
-  # خطأ بايثون آخر: سطر الخطأ الأخير فقط بدل الأثر الكامل
-  if grep -q '^Traceback (most recent call last)' "$errfile"; then
-    printf '\033[31m✖ توقّف السكربت بخطأ:\033[0m\n' >&2
+  if [ -s "$errfile" ] && grep -q '^Traceback (most recent call last)' "$errfile"; then
+    MAHDI_FAIL_REASON="خطأ في السكربت"
+    printf "${M_CORAL}✖ توقّف السكربت بخطأ:${M_RESET}\n" >&2
     grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception):' "$errfile" | tail -n 2 >&2
     return 0
   fi
 
-  # أخطاء أخرى (npm، composer…): بلا ضجيج، وبحدّ أقصى ١٢ سطرًا
-  mahdi_heal_strip_noise "$errfile" | tail -n 12 >&2
+  if [ -s "$errfile" ]; then
+    local lines
+    lines="$(mahdi_heal_strip_noise "$errfile" | tail -n 12)"
+    if [ -n "$lines" ]; then
+      MAHDI_FAIL_REASON="خطأ في السكربت"
+      printf '%s\n' "$lines" >&2
+      return 0
+    fi
+  fi
+
+  # stderr فارغ تمامًا: لا نترك المستخدم بلا تفسير
+  MAHDI_FAIL_REASON="أنهاه السكربت بالرمز $rc"
+  printf "${M_MUTED}  أنهاه السكربت بالرمز %s دون رسالة — افتح الملف وتحقّق من أوامره.${M_RESET}\n" "$rc" >&2
   return 0
 }
 
@@ -93,6 +110,12 @@ mahdi_heal_detect() {
 mahdi_heal_install() {
   local lang="$1" pkg="$2"
   local label
+
+  # 8.3.0: محرّك الاعتماديات جرّب هذه الحزمة وفشل (غالبًا بلا اتصال)؛
+  # إعادة المحاولة هنا كانت رابع محاولة وتُضيف ثوانٍ بلا فائدة.
+  if declare -f mahdi_deps_failed >/dev/null 2>&1 && mahdi_deps_failed "$pkg"; then
+    return 1
+  fi
 
   case "$lang" in
     python)
@@ -189,7 +212,7 @@ mahdi_run_heal() {
   local script="$2"
   shift 2
 
-  local max_attempts=3
+  local max_attempts=2
   local attempt=1
   local errfile
   errfile="$(mktemp "/tmp/mahdi-heal-XXXXXX.log" 2>/dev/null || echo "/tmp/mahdi-heal-$$.log")"
@@ -203,33 +226,53 @@ mahdi_run_heal() {
     rc=$?
     set -e
 
-    [ "$rc" -eq 0 ] && { mahdi_heal_report "$lang" "$errfile"; break; }
-    [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile"; break; }
-    [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile"; break; }
+    if [ "$rc" -eq 0 ]; then
+      rm -f "$errfile" 2>/dev/null || true
+      return 0
+    fi
+    [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
+    [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
 
     local pkgs
     pkgs="$(mahdi_heal_detect "$lang" "$errfile" "$script" || true)"
 
-    # 6.1.0: لا نعرض stderr خامًا. إن كانت هناك مكتبة محدّدة سنثبّتها الآن،
-    # نكتفي بسطر واحد؛ وإن لم نستطع الإصلاح نعرض تقريرًا عربيًا مختصرًا.
+    # لا مكتبة ناقصة ⇒ الخطأ من السكربت نفسه: نعرضه ونقف.
     if [ -z "$pkgs" ]; then
-      mahdi_heal_report "$lang" "$errfile"
+      mahdi_heal_report "$lang" "$errfile" "$rc"
       break
     fi
 
-    printf '\033[33m⟳ مكتبة ناقصة — جاري تثبيتها: %s\033[0m\n' "$(printf '%s' "$pkgs" | tr '\n' ' ')"
-
-    local failed=0
-    local pkg
+    # كل الحزم المكتشفة سبق أن فشل تثبيتها ⇒ لا محاولة رابعة، نعرض السبب الحقيقي.
+    local all_failed=1 pkg
     while IFS= read -r pkg; do
       [ -z "$pkg" ] && continue
+      if declare -f mahdi_deps_failed >/dev/null 2>&1 && mahdi_deps_failed "$pkg"; then
+        continue
+      fi
+      all_failed=0
+    done <<<"$pkgs"
+    if [ "$all_failed" -eq 1 ]; then
+      mahdi_heal_report "$lang" "$errfile" "$rc"
+      break
+    fi
+
+    printf "${M_GOLD}⟳ مكتبة ناقصة — جاري تثبيتها: %s${M_RESET}\n" "$(printf '%s' "$pkgs" | tr '\n' ' ')"
+
+    local failed=0
+    while IFS= read -r pkg; do
+      [ -z "$pkg" ] && continue
+      # لا نُعيد حزمة سُجّل فشلها قبل قليل
+      if declare -f mahdi_deps_failed >/dev/null 2>&1 && mahdi_deps_failed "$pkg"; then
+        continue
+      fi
       local install_rc=0
       mahdi_heal_install "$lang" "$pkg" || install_rc=$?
       if [ "$install_rc" -ne 0 ]; then
+        declare -f mahdi_deps_mark_failed >/dev/null 2>&1 && mahdi_deps_mark_failed "$pkg"
         if [ "$install_rc" -eq 2 ]; then
-          printf '\033[33m⚠ لا يوجد اتصال بالإنترنت — تعذّر تجهيز المكتبة.\033[0m\n' >&2
+          printf "${M_GOLD}⚠ لا يوجد اتصال بالإنترنت — تعذّر تجهيز المكتبة.${M_RESET}\n" >&2
         else
-          printf '\033[31m✖ تعذّر تثبيت %s\033[0m\n' "$pkg" >&2
+          printf "${M_CORAL}✖ تعذّر تثبيت %s${M_RESET}\n" "$pkg" >&2
         fi
         failed=1
         break
@@ -237,14 +280,12 @@ mahdi_run_heal() {
     done <<<"$pkgs"
 
     if [ "$failed" -eq 1 ]; then
-      printf '\033[2m  تحقّق من الاتصال بالإنترنت ثم أعد المحاولة، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+      # 8.3.0: كان يكتفي بسطر «تحقّق من الاتصال» ويُخفي خطأ السكربت الأصلي.
+      mahdi_heal_report "$lang" "$errfile" "$rc"
       break
     fi
 
     attempt=$((attempt + 1))
-    if [ "$attempt" -le "$max_attempts" ]; then
-      printf '\033[36m↻ إعادة تشغيل السكربت (محاولة %d من %d)\033[0m\n' "$attempt" "$max_attempts"
-    fi
   done
 
   rm -f "$errfile" 2>/dev/null || true

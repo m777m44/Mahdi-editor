@@ -61,12 +61,24 @@ mahdi_run_footer() {
     printf "${M_MINT}✔${M_RESET}  ${M_BOLD}تمّ التشغيل${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$dur" || true
   else
     printf "${M_CORAL}✖${M_RESET}  ${M_BOLD}توقّف السكربت (الرمز %s)${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$rc" "$dur" || true
+    # 8.3.0: سبب الفشل كان يُخفى تمامًا خلف رمز الخروج وحده
+    if [ -n "${MAHDI_FAIL_REASON:-}" ]; then
+      printf "${M_MUTED}  %s${M_RESET}\n" "$MAHDI_FAIL_REASON" || true
+    fi
   fi
 
   # طرفية حيّة بعد الانتهاء: لا شاشة ميتة، ويستطيع المستخدم إعادة التشغيل بيده
   if [ "${MAHDI_KEEP_SHELL:-1}" = "1" ] && [ -t 0 ] && [ -t 1 ]; then
     printf "${M_MUTED}  طرفية تفاعلية — اكتب exit للخروج${M_RESET}\n" || true
-    exec /bin/bash -i || true
+    # 8.3.0: كان `exec /bin/bash -i` يقرأ bashrc أوبنتو وحده، فيعود المِحَثّ
+    # القديم ويظهر تلميح sudo المزعج. نمرّر ملف تهيئة Mahdi نفسه، ونكتم
+    # الشعار كي لا يُعاد رسمه فوق مخرجات السكربت.
+    export MAHDI_BANNER=0 MAHDI_SKIP_INIT_SETUP=1
+    if [ -f "$LOCAL/bin/init" ]; then
+      exec /bin/bash --rcfile "$LOCAL/bin/init" -i || true
+    else
+      exec /bin/bash -i || true
+    fi
   fi
   return 0
 }

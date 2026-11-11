@@ -280,15 +280,29 @@ def tracker():
 # ————————————————————————————— أدوات مساعدة —————————————————————————————
 
 
-def net_ok(host="pypi.org", timeout=6.0):
-    """هل يوجد اتصال حقيقي (DNS) قبل إزعاج المستخدم بمحاولات pip فاشلة؟"""
+_NET_STATE = {}
+
+
+def net_ok(host="pypi.org", timeout=3.0):
+    """هل يوجد اتصال حقيقي (DNS) قبل إزعاج المستخدم بمحاولات pip فاشلة؟
+
+    8.3.0: النتيجة تُخزَّن لكل مضيف داخل العملية، و`MAHDI_OFFLINE=1` الذي
+    يضبطه محرّك الاعتماديات يقطع الطريق فورًا بدل ستّ ثوانٍ من انتظار DNS
+    تتكرّر مع كل حزمة.
+    """
+    if os.environ.get("MAHDI_OFFLINE") == "1":
+        return False
     if os.environ.get("MAHDI_NET_CHECK", "1") == "0":
         return True
+    if host in _NET_STATE:
+        return _NET_STATE[host]
     try:
         socket.setdefaulttimeout(timeout)
-        return bool(socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP))
+        ok = bool(socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP))
     except Exception:
-        return False
+        ok = False
+    _NET_STATE[host] = ok
+    return ok
 
 
 def file_name(url):
