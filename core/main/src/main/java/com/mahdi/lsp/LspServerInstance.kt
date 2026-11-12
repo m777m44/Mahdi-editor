@@ -31,6 +31,7 @@ import com.mahdi.utils.logInfo
 import io.github.rosemoe.sora.lsp.client.languageserver.wrapper.LanguageServerWrapper
 import io.github.rosemoe.sora.lsp.editor.LspProject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -137,6 +138,14 @@ data class LspServerInstance(
         _startupTime.value = value
     }
 
+    companion object {
+        /** أقصى انتظار لنجاح الإحياء الصامت (٣ ثوانٍ — no UI ينتظرها). */
+        private const val SILENT_START_TIMEOUT_MS = 3_000L
+
+        /** دقّة متابعة الحالة أثناء الإحياء. */
+        private const val SILENT_START_POLL_MS = 250L
+    }
+
     fun getWrapper(): LanguageServerWrapper? {
         return server.supportedExtensions.firstOrNull()?.let {
             lspProject.getLanguageServerWrapper(it, server.serverName)
@@ -194,6 +203,46 @@ data class LspServerInstance(
             }
         }
     }
+
+    /**
+     * إحياء صامت (9.0.0) — يُستدعى من [LspManager] وحده عند انهيار الخادم.
+     *
+     * لا يكتب «المستخدم أعاد التشغيل» في السجل (المستخدم لم يفعل شيئًا)، ولا يمسح
+     * عدّاد الأخطاء، ولا يُظهر أي واجهة. يعيد `true` إذا صار الخادم يعمل.
+     */
+    suspend fun startSilently(): Boolean =
+        withContext(Dispatchers.IO) {
+            val wrapper = getWrapper() ?: return@withContext false
+            runCatching {
+                    // `restartAndReconnect` آمنة في كل الحالات: تُعيد الإقلاع إن كان
+                    // الخادم ميتًا، وتُعيد الربط إن كان حيًّا.
+                    wrapper.restartAndReconnect()
+                    DefinitionPrevention.unregister(lspProject, server)
+                }
+                .onFailure { logError(it, "silent start ${server.serverName}") }
+
+            addLog(
+                LspLogEntry(
+                    MessageSource.Client,
+                    MessageType.Info,
+                    "Silent restart of language server instance",
+                )
+            )
+
+            // إعادة ربط المحرّرات المفتوحة بهدوء، فلا يبقى ملف بلا إكمال
+            val reconnected = mutableListOf<EditorTab>()
+            runCatching { reconnect(reconnected) }
+
+            // نجاح الإحياء = عودة الحالة إلى RUNNING. لا نكتفي بوجود المُغلِّف
+            // (فهو موجود حتى وهو منهار)، وإلا صار العدّاد يُصفَّر كل مرة فيدور
+            // التطبيق في إعادة تشغيل لا تنتهي بلا أن يبلغ حدّ المحاولات.
+            var waited = 0L
+            while (waited < SILENT_START_TIMEOUT_MS && status.value != LspConnectionStatus.RUNNING) {
+                delay(SILENT_START_POLL_MS)
+                waited += SILENT_START_POLL_MS
+            }
+            status.value == LspConnectionStatus.RUNNING
+        }
 
     /**
      * Starts this language server instance

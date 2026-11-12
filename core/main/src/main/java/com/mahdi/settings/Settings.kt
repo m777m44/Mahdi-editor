@@ -175,7 +175,19 @@ object Settings {
     var editor_autocomplete_bar by CachedPreference("editor_autocomplete_bar", true)
     var terminal_font_size by CachedPreference("terminal_font_size", 12)
     var terminal_scrollback_buffer by CachedPreference("terminal_scrollback_buffer", 5000)
-    var auto_save_delay by CachedPreference("auto_save_delay", 400L)
+    /**
+     * 9.0.0: الحفظ التلقائي كل ٥ ثوانٍ — كانت ٤٠٠ مللي ثانية، وهي وتيرة تُتعب
+     * البطاقة وتُشعر الكتابة بالتقصّف. القيمة القديمة الافتراضية تُرقّى صامتًا،
+     * ومن اختار مهلة بنفسه تبقى مهلته كما هي.
+     */
+    var auto_save_delay by AutoSaveDelayPreference()
+
+    /**
+     * 9.0.0: وضع الشاشة الكاملة أثناء الكتابة — تُخفى أشرطة النظام (الحالة والتنقّل)
+     * ويظهر شريط المحرّر والاستعادة بسحب من الحافة. مطفأ افتراضيًا حتى لا يفقد
+     * المستخدم زرّي الرجوع والرئيسية في أول تجربة.
+     */
+    var immersive_editing by CachedPreference("immersive_editing", false)
     var lsp_log_limit by CachedPreference("lsp_log_limit", 5000)
     var app_log_limit by CachedPreference("app_log_limit", 5000)
 
@@ -516,6 +528,30 @@ class CachedExtensionPreference<T>(
     key: String,
     defaultValue: T,
 ) : CachedPreference<T>("$id.$key", defaultValue)
+
+/**
+ * 9.0.0: مهلة الحفظ التلقائي مع ترقية صامتة من ٤٠٠ إلى ٥٠٠٠ مللي ثانية.
+ *
+ * الترقية تتم مرة واحدة: نقرأ المخزَّن قبل تهيئة [CachedPreference]؛ فإن كان
+ * ٤٠٠ (القيمة الافتراضية القديمة) نكتب ٥٠٠٠. أي قيمة أخرى اختارها المستخدم
+ * بنفسه لا تُمسّ إطلاقًا.
+ */
+private class AutoSaveDelayPreference : ReadWriteProperty<Any?, Long> {
+    init {
+        runCatching {
+            if (Preference.getLong("auto_save_delay", 5000L) == 400L) {
+                Preference.setLong("auto_save_delay", 5000L)
+            }
+        }
+    }
+
+    private val delegate = CachedPreference("auto_save_delay", 5000L)
+
+    override fun getValue(thisRef: Any?, property: KProperty<*>): Long = delegate.getValue(thisRef, property)
+
+    override fun setValue(thisRef: Any?, property: KProperty<*>, value: Long) =
+        delegate.setValue(thisRef, property, value)
+}
 
 @Suppress("UNCHECKED_CAST")
 open class CachedPreference<T>(val key: String, val defaultValue: T) : ReadWriteProperty<Any?, T> {

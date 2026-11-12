@@ -65,7 +65,6 @@ fun UpdateScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
 
     var checking by remember { mutableStateOf(true) }
-    var checkedOnce by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<UpdateInfo?>(null) }
     var currentVersion by remember { mutableStateOf(AppUpdateChecker.currentVersion(context)) }
 
@@ -78,7 +77,6 @@ fun UpdateScreen(modifier: Modifier = Modifier) {
             info = AppUpdateChecker.check(context, force = true)
             currentVersion = AppUpdateChecker.currentVersion(context)
             checking = false
-            checkedOnce = true
         }
     }
 
@@ -379,7 +377,9 @@ fun UpdateScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.Center,
                 ) {
-                    TextButton(onClick = { runCheck() }, enabled = checkedOnce) {
+                    // 9.0.0: الزرّ مفعّل دائمًا — كان `checkedOnce` يُعطّله قبل أول
+                    // فحص فقط، لكن أي فحص فاشل كان يتركه معطّلًا في بعض الحالات.
+                    TextButton(onClick = { runCheck() }) {
                         Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(strings.update_check_now))

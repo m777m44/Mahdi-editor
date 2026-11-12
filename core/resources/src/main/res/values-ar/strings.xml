@@ -1168,6 +1168,10 @@
     <string name="update_notes_empty">لا توجد ملاحظات لهذا الإصدار.</string>
     <string name="update_percent">%1$d٪</string>
     <string name="home_action">الرئيسية</string>
+    <string name="immersive_editing">شاشة كاملة أثناء الكتابة</string>
+    <string name="immersive_editing_desc">تُخفى أشرطة النظام في المحرّر؛ اسحب من الحافة لإظهارها</string>
+    <string name="terminal_close_session">إغلاق الطرفية</string>
+    <string name="workspace_project_files">ملفات المشروع</string>
     <string name="back_to_home">العودة إلى المحرّر</string>
     <string name="storage_calculating">جارٍ حساب الحجم…</string>
     <string name="storage_cached">قيمة محفوظة من آخر فحص — تُحدَّث الآن</string>

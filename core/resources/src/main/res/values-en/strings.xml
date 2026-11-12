@@ -1138,6 +1138,10 @@ Thank you for using Mahdi-Editor.</string>
     <string name="update_notes_empty">No notes for this release.</string>
     <string name="update_percent">%1$d%%</string>
     <string name="home_action">Home</string>
+    <string name="immersive_editing">Immersive editing</string>
+    <string name="immersive_editing_desc">Hide the system bars while editing; swipe from an edge to reveal them</string>
+    <string name="terminal_close_session">Close terminal</string>
+    <string name="workspace_project_files">Project files</string>
     <string name="back_to_home">Back to editor</string>
     <string name="storage_calculating">Calculating size…</string>
     <string name="storage_cached">Saved from the last scan — updating now</string>

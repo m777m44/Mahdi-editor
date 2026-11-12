@@ -21,8 +21,6 @@ import com.mahdi.settings.Preference
 import com.mahdi.tabs.editor.EditorTab
 import com.mahdi.utils.logError
 import com.mahdi.utils.logInfo
-import com.mahdi.utils.showSnackbar
-import com.mahdi.utils.toast
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.lsp.client.languageserver.LspFeature
 import io.github.rosemoe.sora.lsp.client.languageserver.ServerStatus
@@ -69,11 +67,49 @@ class LspConnector(
     companion object {
         private val projectCache = ConcurrentHashMap<String, LspProject>()
 
-        // 8.2.0: فتح خمسة ملفات في مشروع واحد كان يُنتج خمسة تنبيهات متطابقة
-        // «تعذّر الاتصال بخادم اللغة» فوق بعضها. تنبيه واحد لكل مشروع كل ٣٠ ثانية،
-        // وزرّ «إدارة» يبقى متاحًا مدّة أطول فلا يختفي قبل أن يُضغط.
-        private val lastConnectionWarning = ConcurrentHashMap<String, Long>()
-        private const val WARNING_THROTTLE_MS = 30_000L
+    }
+
+    /**
+     * الخادم الأساسي لهذا المحرّر — يستخدمه شريط الحالة (9.0.0) لعرض كلمة واحدة
+     * عن حالة الخادم بلا أي تفاصيل تقنية.
+     */
+    fun primaryServer(): LspServer? = servers.firstOrNull()
+
+    init {
+        // 9.0.0: التنبيه الوحيد المسموح — بعد استنفاد ثلاث محاولات صامتة.
+        // فحص الحالة بعد كل محاولة كان يُبقي الرسالة حبيسة `finally` (تُنفَّذ مرة
+        // واحدة قبل بدء المحاولات)، فلا تظهر أبدًا. الآن يُبَثّ حدث عند البلوغ
+        // إلى الحد، وتستقبله كل المحرّرات، ويُعرض مرة واحدة لكل خادم كل ٣٠ ثانية.
+        DefaultScope.launch {
+            LspManager.degradedEvents.collect { server ->
+                if (!LspManager.shouldNotify(server)) return@collect
+                val snackbarHost = snackbarHostStateRef.get() ?: return@collect
+                val message =
+                    strings.lsp_connection_failed_names.getFilledString(server.languageName) +
+                        " · " + strings.lsp_connection_failed_hint.getString()
+                val result =
+                    snackbarHost.showSnackbar(
+                        message = message,
+                        actionLabel = strings.manage.getString(),
+                        duration = SnackbarDuration.Long,
+                    )
+                if (result == SnackbarResult.ActionPerformed) {
+                    openLspSettings()
+                }
+            }
+        }
+    }
+
+    /**
+     * يفتح شاشة إدارة خوادم اللغة. `MainActivity.instance` قد تكون null بعد دوران
+     * الشاشة أو إغلاق المحرّر: لا NPE ولا انهيار.
+     */
+    private fun openLspSettings() {
+        val activity = MainActivity.instance ?: return
+        val intent = Intent(activity, SettingsActivity::class.java)
+        intent.putExtra("route", SettingsRoutes.LspSettings.route)
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        runCatching { activity.startActivity(intent) }.onFailure { logError(it) }
     }
 
     fun isConnected(): Boolean {
@@ -133,54 +169,6 @@ class LspConnector(
                         instance.lspProject == project && (isCrashed || isTimeout)
                     }
                 }
-
-                if (failedConnections.isNotEmpty()) {
-                    val now = System.currentTimeMillis()
-                    val last = lastConnectionWarning[projectPath] ?: 0L
-                    if (now - last > WARNING_THROTTLE_MS) {
-                        lastConnectionWarning[projectPath] = now
-                        launch {
-                            val snackbarHost = snackbarHostStateRef.get() ?: return@launch
-
-                            // اسم الخادم وسببه: كان التنبيه بلا أي معلومة تُصلح المشكلة.
-                            val names =
-                                failedConnections.joinToString("، ") { server ->
-                                    val crashed =
-                                        server.instances.value.any { it.status.value == LspConnectionStatus.CRASHED }
-                                    val reason =
-                                        if (crashed) {
-                                            strings.lsp_connection_reason_crashed.getString()
-                                        } else {
-                                            strings.lsp_connection_reason_timeout.getString()
-                                        }
-                                    "${server.languageName} ($reason)"
-                                }
-                            val message =
-                                strings.lsp_connection_failed_names.getFilledString(names) +
-                                    " · " + strings.lsp_connection_failed_hint.getString()
-
-                            val result =
-                                snackbarHost.showSnackbar(
-                                    message = message,
-                                    actionLabel = strings.manage.getString(),
-                                    duration = SnackbarDuration.Long,
-                                )
-                            if (result == SnackbarResult.ActionPerformed) {
-                                // MainActivity.instance قد يكون null بعد دوران الشاشة أو
-                                // إغلاق المحرّر: لا NPE، ولا شاشة فارغة، ولا انهيار.
-                                val activity = MainActivity.instance ?: return@launch
-                                val intent = Intent(activity, SettingsActivity::class.java)
-                                intent.putExtra("route", SettingsRoutes.LspSettings.route)
-                                intent.addFlags(
-                                    Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                )
-                                runCatching { activity.startActivity(intent) }
-                                    .onFailure { logError(it) }
-                            }
-                        }
-                    }
-                }
-
                 Events.publish(
                     LSPEvent.ConnectionCompleted(
                         servers = servers,
@@ -295,11 +283,15 @@ class LspConnector(
                         override fun onShowMessage(messageParams: MessageParams) {
                             instance.addLog(messageParams)
 
+                            // 9.0.0: خوادم اللغة تُخبر عن أخطاء داخلية كثيرة أثناء العمل
+                            // (تحليل ملف، مكتبة ناقصة…). عرضها كـSnackbar كان يُقاطع
+                            // الكتابة باستمرار. تبقى في سجلّ الخادم فقط، والواجهة لا
+                            // تعرض إلا ما يحتاج قرارًا من المستخدم.
                             when (messageParams.type) {
-                                MessageType.Error -> showSnackbar(messageParams.message)
-                                MessageType.Warning -> showSnackbar(messageParams.message)
-                                MessageType.Info -> showSnackbar(messageParams.message)
-                                MessageType.Log -> toast(messageParams.message)
+                                MessageType.Error,
+                                MessageType.Warning,
+                                MessageType.Info,
+                                MessageType.Log,
                                 MessageType.Debug -> {}
                             }
                         }
@@ -372,6 +364,22 @@ class LspConnector(
                                 Events.publish(
                                     LSPEvent.StatusChanged(instance, instance.status.value, oldConnectionStatus)
                                 )
+                            }
+
+                            // 9.0.0: انهيار الخادم ⇒ إحياء صامت بلا أي رسالة.
+                            // كان كل انهيار يُظهر «تعذّر الاتصال بخادم اللغة» فورًا،
+                            // بينما إعادة محاولة واحدة تُنجح الإقلاع في أغلب الأحيان.
+                            val connectionStatus = instance.status.value
+                            if (connectionStatus == LspConnectionStatus.CRASHED ||
+                                connectionStatus == LspConnectionStatus.TIMEOUT
+                            ) {
+                                DefaultScope.launch { LspManager.recover(instance) }
+                            }
+
+                            if (newStatus == ServerStatus.STARTED ||
+                                newStatus == ServerStatus.INITIALIZED
+                            ) {
+                                LspManager.noteSuccess(instance.server)
                             }
                         }
                     }

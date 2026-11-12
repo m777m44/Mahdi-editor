@@ -29,6 +29,7 @@ import com.mahdi.components.isPermanentDrawer
 import com.mahdi.drawer.DrawerViewModel
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
+import com.mahdi.text.FileNameText
 import com.mahdi.utils.toast
 import kotlinx.coroutines.launch
 
@@ -60,8 +61,11 @@ fun MahdiTopBar(
             // كان `title = {}` فارغًا، فلا يعرف المستخدم أي ملف مفتوح (شكوى اللقطة).
             title = {
                 val tab = viewModel.visibleTabs.getOrNull(viewModel.visibleCurrentTabIndex)
-                Text(
-                    text = tab?.title ?: strings.app_name.getString(),
+                val title = tab?.title ?: strings.app_name.getString()
+                // 9.0.0: اسم الملف معزول بـFSI…PDI فلا ينفصل الامتداد `.py` عن الاسم
+                // العربي، وبخط أحادي العرض بلون سماوي كما في بيئات التطوير الاحترافية.
+                FileNameText(
+                    name = title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,

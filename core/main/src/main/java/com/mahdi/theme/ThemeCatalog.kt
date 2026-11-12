@@ -203,10 +203,10 @@ private fun MahdiColors.toLightScheme(): ColorScheme {
 private val terminalAnsiDark =
     listOf(
         "#2A3040", // 0  أسود · سطح
-        "#FB7185", // 1  مرجاني
-        "#34D399", // 2  نعناعي
+        "#FF5D73", // 1  أحمر فاقع (‏ANSI 31) — أخطاء أوضح على الخلفية الليلية
+        "#4ADE80", // 2  أخضر فاقع (‏ANSI 32) — نجاح واضح
         "#F5D76E", // 3  ذهبي
-        "#38BDF8", // 4  سماوي
+        "#22D3EE", // 4  سماوي فاقع (‏ANSI 36) — معلومات بارزة
         "#A78BFA", // 5  بنفسجي
         "#2DD4BF", // 6  تركوازي
         "#DDE3EE", // 7  أبيض

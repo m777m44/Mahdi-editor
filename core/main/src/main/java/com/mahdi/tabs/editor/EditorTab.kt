@@ -41,6 +41,8 @@ import com.mahdi.activities.main.ui.searchViewModel
 import com.mahdi.color.ColorPicker
 import com.mahdi.components.SingleInputDialog
 import com.mahdi.editor.intelligent.IntelligentFeatureRegistry
+import com.mahdi.editor.status.EditorStatusBar
+import com.mahdi.editor.status.ImmersiveEditingEffect
 import com.mahdi.events.EditorTabEvent
 import com.mahdi.events.Events
 import com.mahdi.extension.api.MahdiExtensionPoint
@@ -752,6 +754,16 @@ open class EditorTab(
                         editorState.showColorPicker = null
                     }
                 }
+
+                // 9.0.0: وضع الشاشة الكاملة (اختياري) — تُخفى أشرطة النظام أثناء الكتابة
+                ImmersiveEditingEffect(enabled = Settings.immersive_editing)
+
+                // 9.0.0: شريط حالة أسفل المحرّر — رقم السطر والعمود وحالة LSP وإصدار بايثون
+                EditorStatusBar(
+                    editor = editorState.editor.get(),
+                    extension = fileExtension,
+                    lspConnector = lspConnector,
+                )
 
                 if (Settings.show_extra_keys) {
                     ExtraKeys(editorTab = this@EditorTab)

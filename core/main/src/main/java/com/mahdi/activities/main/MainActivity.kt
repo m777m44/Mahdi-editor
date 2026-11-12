@@ -38,8 +38,9 @@ import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.tabs.editor.applyHighlightingAndConnectLSP
 import com.mahdi.utils.errorDialog
-import com.mahdi.utils.toast
 import com.mahdi.utils.logError
+import com.mahdi.utils.toast
+import com.mahdi.update.AppUpdateChecker
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -189,6 +190,15 @@ class MainActivity : AppCompatActivity() {
                 db.documentStateDao().deleteOldestRecords(1000)
             }
                 .onFailure { logError(it, "document state database") }
+        }
+
+        // 9.0.0: فحص التحديث **عند كل فتح للتطبيق** لا مرة كل عملية.
+        // `force = false` يحترم مهلة داخلية قصيرة (٣٠ دقيقة) تمنع تكرار الشبكة
+        // عند تبديل الشاشات فقط، والنتيجة تظهر في شريط الرئيسية
+        // ([com.mahdi.activities.main.ui.WelcomeScreen]) بلا انتظار ولا نافذة.
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { AppUpdateChecker.check(applicationContext, force = false) }
+                .onFailure { logError(it, "update check on open") }
         }
 
         enableEdgeToEdge()

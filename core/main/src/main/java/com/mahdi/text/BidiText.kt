@@ -7,6 +7,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -17,7 +19,9 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
+import com.mahdi.theme.JetBrainsMonoFontFamily
 
 /**
  * معالجة الأرقام في السياق العربي (3.0.0).
@@ -41,8 +45,15 @@ object BidiText {
     /** نهاية العزل. */
     const val PDI = '\u2069'
 
+    /** بداية عزل حسب المحتوى (First Strong Isolate) — للأسماء المختلطة عربي/لاتيني. */
+    const val FSI = '\u2068'
+
+    /** بداية عزل عربي. */
+    const val RLI = '\u2067'
+
     /** علامات التحكّم التي تُضاف وتُزال — تُرشَّح من أي نص مُدخل. */
-    private val CONTROL_CHARS = charArrayOf(LRI, PDI, '\u2067', '\u2068', '\u202A', '\u202B', '\u202C', '\u202D', '\u202E')
+    private val CONTROL_CHARS =
+        charArrayOf(LRI, PDI, FSI, RLI, '\u202A', '\u202B', '\u202C', '\u202D', '\u202E')
 
     private val DIGIT_RUN = Regex("[0-9]+")
 
@@ -93,6 +104,58 @@ object BidiText {
 
 /** نسخة نصية جاهزة للعرض مع أرقام معزولة. */
 fun String.bidiNumbers(): String = BidiText.display(this)
+
+/**
+ * اسم ملف آمن العرض داخل واجهة عربية (8.6.0 — 9.0.0).
+ *
+ * الظاهرة في لقطات المستخدم: اسم عربي مثل `استنساخ الاصوات مهدي.py` كان يُعرض
+ * والامتداد `.py` **منفصلًا في أقصى اليسار**: خوارزمية الاتجاه تعامل `.py` كسلسلة
+ * لاتينية محايدة، فتتّحد مع سلسلة لاتينية مجاورة (اسم الخادم مثلًا) وتُقذف إلى
+ * طرف السطر. والحلّ المعياري: **عزل** الاسم بين FSI…PDI فيبقى الامتداد ملتصقًا به
+ * وترتيب أحرفه الداخلي سليم، وعلامات التحكّم لا تُخزَّن في أي اسم ملف.
+ */
+fun String.bidiFileName(): String = "${BidiText.FSI}$this${BidiText.PDI}"
+
+/** الاسم نفسه معزولًا — يبقى الامتداد ملتصقًا ولا يندمج مع النص المجاور. */
+@Composable
+fun FileNameText(
+    name: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
+    color: Color = fileNameAccent(),
+    fontWeight: FontWeight? = null,
+    maxLines: Int = 1,
+    overflow: TextOverflow = TextOverflow.Ellipsis,
+) {
+    Text(
+        text = name.bidiFileName(),
+        modifier = modifier,
+        style =
+            style.copy(
+                textDirection = TextDirection.ContentOrLtr,
+                // خط ثابت العرض: يحفظ محاذاة الامتداد مع الاسم. الحروف العربية
+                // لا توجد في JetBrains Mono، فتقع تلقائيًا على خط النظام العربي
+                // (fallback لكل محرف) — الشكل العربي سليم والامتداد ثابت.
+                fontFamily = JetBrainsMonoFontFamily,
+            ),
+        color = color,
+        fontWeight = fontWeight,
+        maxLines = maxLines,
+        overflow = overflow,
+    )
+}
+
+/**
+ * لون اسم الملف: **سماوي** كما في بيئات التطوير الاحترافية.
+ *
+ * `#00E5FF` على الخلفيات الداكنة، و`#0E7490` على الفاتحة لأنه يبقى مقروءًا
+ * (تباين ≥ 4.5:1) بينما السماوي الفاتح يذوب في الأبيض.
+ */
+@Composable
+private fun fileNameAccent(): Color {
+    val lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    return if (lightSurface) Color(0xFF0E7490) else Color(0xFF00E5FF)
+}
 
 /**
  * نص آمن للأرقام في أي سياق (RTL أو LTR).
