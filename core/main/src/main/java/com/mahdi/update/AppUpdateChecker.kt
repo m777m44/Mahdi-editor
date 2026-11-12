@@ -38,7 +38,12 @@ object AppUpdateChecker {
     private const val KEY_NOTIFIED = "notified_version"
 
     /** لا نُزعج الشبكة أكثر من مرة كل ست ساعات في الفحص التلقائي. */
-    private const val MIN_INTERVAL_MS = 6L * 60L * 60L * 1000L
+    /**
+     * 9.0.0: الفحص تلقائيًا **عند كل فتح للتطبيق** — مهلة قصيرة (٣٠ دقيقة) تحمي
+     * الشبكة من إعادة الفحص عند تبديل الشاشة أو إعادة إنشاء النشاط فقط، بينما
+     * يرى المستخدم أي إصدار جديد في أول فتحة بعد صدوره.
+     */
+    private const val MIN_INTERVAL_MS = 30L * 60L * 1000L
 
     /** آخر تحديث مكتشَف — تقرأه الواجهة لإظهار الإشعار. */
     val pending = MutableStateFlow<UpdateInfo?>(null)

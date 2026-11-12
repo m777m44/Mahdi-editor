@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -57,6 +58,7 @@ import com.mahdi.commands.ActionContext
 import com.mahdi.commands.Command
 import com.mahdi.commands.CommandProvider
 import com.mahdi.drawer.DrawerViewModel
+import com.mahdi.file.FileObject
 import com.mahdi.file.FileWrapper
 import com.mahdi.filetree.FileTreeTab
 import com.mahdi.filetree.getAppropriateName
@@ -69,6 +71,7 @@ import com.mahdi.text.bidiNumbers
 import com.mahdi.ui.components.AppLogo
 import com.mahdi.update.AppUpdateChecker
 import com.mahdi.update.UpdateDownloader
+import com.mahdi.text.FileNameText
 import com.mahdi.utils.toast
 import java.io.File
 import java.text.SimpleDateFormat
@@ -180,6 +183,14 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                 }
             }
 
+            // 9.0.0: «مساحة العمل» — ملفات المشروع الحالي في الصفحة نفسها، بجانب
+            // «آخر الملفات» وأزرار التشغيل والطرفية: كل ما يحتاجه المستخدم لبدء
+            // العمل في مكان واحد، بلا تنقّل بين ثلاث شاشات.
+            currentProject?.let { project ->
+                Spacer(Modifier.height(10.dp))
+                ProjectFilesRow(root = project)
+            }
+
             if (recentFiles.size > 1) {
                 Spacer(Modifier.height(12.dp))
                 RecentFilesRow(
@@ -206,7 +217,8 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                         CommandProvider.getForId("editor.run"),
                         CommandProvider.getForId("global.terminal"),
                         CommandProvider.getForId("global.store"),
-                        CommandProvider.DocumentationCommand,
+                        // 9.0.0: زرّ «التوثيق» أُزيل من الواجهة الرئيسية كما طُلب.
+                        // الدليل الكامل يبقى في «الإعدادات» (مكان واحد، آخر عنصر).
                         CommandProvider.SettingsCommand,
                     )
             )
@@ -455,6 +467,80 @@ private fun RecentFilesRow(files: List<RecentFile>, isArabic: Boolean, onOpen: (
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ملفات المشروع الحالي (9.0.0) — «شجرة مصغّرة» في الرئيسية: أول عشرة ملفات في
+ * جذر المشروع، بلمسة واحدة تُفتح في المحرّر.
+ *
+ * لا مجلدات ولا مستويات هنا (الشجرة الكاملة في الدُرج)؛ الهدف أن يرى المستخدم
+ * ما في مشروعه فور فتح التطبيق، وأن يبدأ بلمسة، بلا أي شرح نصّي إضافي.
+ */
+@Composable
+private fun ProjectFilesRow(root: FileObject) {
+    val scope = rememberCoroutineScope()
+    var files by remember(root) { mutableStateOf<List<FileObject>>(emptyList()) }
+
+    LaunchedEffect(root) {
+        files =
+            runCatching {
+                    root.listFiles()
+                        .filter { it.isFile() }
+                        .sortedBy { it.getName().lowercase() }
+                        .take(10)
+                }
+                .getOrDefault(emptyList())
+    }
+
+    if (files.isEmpty()) return
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(strings.workspace_project_files),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp),
+        ) {
+            items(files.size) { index ->
+                val file = files[index]
+                Card(
+                    modifier =
+                        Modifier.widthIn(max = 200.dp)
+                            .clickable {
+                                scope.launch {
+                                    runCatching {
+                                        MainActivity.instance?.viewModel?.editorManager?.openFile(file)
+                                    }
+                                        .onFailure { toast(it.message ?: "تعذّر فتح الملف") }
+                                }
+                            },
+                    shape = RoundedCornerShape(14.dp),
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Color(0xFF00E5FF),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        FileNameText(name = file.getName(), maxLines = 1)
                     }
                 }
             }

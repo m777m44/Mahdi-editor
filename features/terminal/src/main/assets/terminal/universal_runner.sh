@@ -89,20 +89,31 @@ mahdi_run_footer() {
 }
 trap mahdi_run_footer EXIT
 
-# سطر البدء يبقى لاتينيًا خالصًا (اسم الملف + المفسّر + الوقت): إضافة كلمة
-# عربية كانت تجعل السطر ذا اتجاه RTL فيُعاد ترتيب الاسم والرمز بصريًا.
-# 8.4.0: شارة المفسّر تُظهر إصدار بايثون الحقيقي الذي سيُنفَّذ به السكربت
-# (وهو نفسه الذي تُثبَّت له المكتبات)، فلا مفاجآت في الواردات.
+# ———————————————————— ترويسة التشغيل (9.0.0) ————————————————————
+# اللقطة كشفت خللًا اتجاهيًا: `استنساخ الاصوات مهدي.py` كان يُعرض والامتداد `.py`
+# منفصلًا في أقصى يسار السطر، لأن `.py` سلسلة لاتينية محايدة اندمجت مع
+# `Python 3.12.3` المجاورة لها في السطر الواحد.
+#
+# الحلّ: الاسم **معزول** بين FSI…PDI (فيبقى امتداده ملتصقًا به) ويُطبع في سطر
+# وحده، والمعلومات (الإصدار والوقت) في سطر ثانٍ لاتيني خالص. لا خلط اتجاهات
+# في سطر واحد، ولا اعتماد على ترتيب خوارزمية الاتجاه.
+_mahdi_name="$(basename "$file")"
 _mahdi_badge=""
 case "$file" in
   *.py | *.pyz | *.zipapp) _mahdi_badge="Python $(mahdi_python_version)" ;;
 esac
+_mahdi_now="$(printf '%(%H:%M)T' -1)"
+
+# FSI = U+2068، PDI = U+2069 — علامتا تحكّم للعزل، لا تُخزَّنان مع الاسم.
+# (‏`printf` لا يفسّر \u داخل سلسلة التنسيق، لذا نبنيهما بـ$'…' ثم نطبعهما بـ%s.)
+_mahdi_fsi=$'\u2068'
+_mahdi_pdi=$'\u2069'
+printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s%s%s${M_RESET}\n" "$_mahdi_fsi" "$_mahdi_name" "$_mahdi_pdi" || true
 if [ -n "$_mahdi_badge" ]; then
-  printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s${M_RESET}  ${M_MUTED}│${M_RESET}  ${M_TEAL}%s${M_RESET}  ${M_MUTED}│${M_RESET}  ${M_GOLD}%s${M_RESET}\n" \
-    "$(basename "$file")" "$_mahdi_badge" "$(printf '%(%H:%M)T' -1)" || true
+  printf "   ${M_TEAL}%s${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%s${M_RESET}\n" \
+    "$_mahdi_badge" "$_mahdi_now" || true
 else
-  printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s${M_RESET}  ${M_MUTED}│${M_RESET}  ${M_GOLD}%s${M_RESET}\n" \
-    "$(basename "$file")" "$(printf '%(%H:%M)T' -1)" || true
+  printf "   ${M_GOLD}%s${M_RESET}\n" "$_mahdi_now" || true
 fi
 
 # 8.4.0: تفسير رموز الخروج الشائعة بدل رقم بلا معنى

@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +45,7 @@ import com.mahdi.file.ZipFileObject
 import com.mahdi.resources.drawables
 import com.mahdi.settings.Settings
 import com.mahdi.utils.drawErrorUnderline
+import com.mahdi.text.bidiFileName
 import com.mahdi.utils.getFileColor
 import com.mahdi.utils.getUnderlineColor
 
@@ -183,8 +185,13 @@ fun FileTreeNodeItem(
             val underlineColor = getUnderlineColor(context, viewModel, file)
             Row(modifier = Modifier.width((getDrawerWidth() - 61.dp)), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = displayName,
-                    style = MaterialTheme.typography.bodyMedium,
+                    // 9.0.0: عزل الاسم بـFSI…PDI — وإلا اندمج امتداد `.py` مع سلسلة
+                    // لاتينية مجاورة وقُذف إلى أقصى يسار السطر في الواجهة العربية.
+                    text = displayName.bidiFileName(),
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            textDirection = TextDirection.ContentOrLtr,
+                        ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.addIf(underlineColor != null) { drawErrorUnderline(underlineColor!!) },

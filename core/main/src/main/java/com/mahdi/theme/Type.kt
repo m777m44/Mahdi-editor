@@ -14,6 +14,18 @@ import com.mahdi.editor.R
  */
 val LegacyOutfitFontFamily = FontFamily(Font(R.font.outfit_regular, FontWeight.Normal, FontStyle.Normal))
 
+/**
+ * 9.0.0: خط الأسماء والأرقام في الواجهة — **JetBrains Mono** نفسه المستخدم في
+ * المحرّر والطرفية، لكن عبر مورد خط حقيقي (لا تحميل من `assets`) ليعمل في Compose
+ * بلا تأخير أو وميض. يُستخدم لأسماء الملفات العربية (فيبقى الامتداد ملتصقًا
+ * بمحاذاة ثابتة العرض) وشريط الحالة.
+ */
+val JetBrainsMonoFontFamily =
+    FontFamily(
+        Font(R.font.jetbrains_mono_regular, FontWeight.Normal, FontStyle.Normal),
+        Font(R.font.jetbrains_mono_medium, FontWeight.Medium, FontStyle.Normal),
+    )
+
 /*
  * Overrides the default typo
  */

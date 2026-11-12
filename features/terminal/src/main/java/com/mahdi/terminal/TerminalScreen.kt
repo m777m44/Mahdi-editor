@@ -25,6 +25,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Delete
@@ -86,6 +88,7 @@ import com.mahdi.file.sandboxDir
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
+import com.mahdi.utils.logError
 import com.mahdi.settings.editor.DEFAULT_TERMINAL_FONT_PATH
 import com.mahdi.settings.editor.TerminalFontScreen
 import com.mahdi.settings.terminal.DEFAULT_TERMINAL_EXTRA_KEYS
@@ -149,7 +152,12 @@ fun TerminalScreen(modifier: Modifier = Modifier, terminalActivity: Terminal) {
  * في كل لقطة، ويبقى الشريط محترمًا لمساحة شريط الحالة عبر statusBarsPadding.
  */
 @Composable
-private fun CompactTopBar(title: String, onMenu: () -> Unit) {
+private fun CompactTopBar(
+    title: String,
+    onMenu: () -> Unit,
+    onHome: (() -> Unit)? = null,
+    onExit: (() -> Unit)? = null,
+) {
     // 8.2.0: شريط نحيف كما هو (٤٦dp) لكن بهويّة بصرية واضحة: شريط متدرّج
     // بثلاثة ألوان أسفلَه، ونقطة «متصل» بلون التركوازي. لا عناوين كبيرة ولا
     // نصّ شرح — الطرفية تبقى ملكًا للمخرجات.
@@ -198,7 +206,30 @@ private fun CompactTopBar(title: String, onMenu: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
-                Spacer(Modifier.width(10.dp))
+
+                // 9.0.0: زرّا «الرئيسية» و«إغلاق الطرفية» داخل الطرفية نفسها —
+                // كان الخروج من الطرفية يتطلّب «رجوع» مرتين أو الخروج من التطبيق.
+                onHome?.let { home ->
+                    IconButton(onClick = home, modifier = Modifier.size(42.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Home,
+                            contentDescription = stringResource(strings.home_action),
+                            modifier = Modifier.size(19.dp),
+                            tint = Color(0xFF38BDF8),
+                        )
+                    }
+                }
+                onExit?.let { exit ->
+                    IconButton(onClick = exit, modifier = Modifier.size(42.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(strings.terminal_close_session),
+                            modifier = Modifier.size(19.dp),
+                            tint = Color(0xFFFB7185),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(6.dp))
             }
             Box(
                 modifier =
@@ -251,6 +282,20 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                         CompactTopBar(
                             title = stringResource(strings.terminal),
                             onMenu = { scope.launch { drawerState.open() } },
+                            onHome = {
+                                // الرئيسية فورًا: إنهاء نشاط الطرفية والعودة للمحرّر
+                                runCatching { terminalActivity.finish() }
+                                    .onFailure { logError(it) }
+                            },
+                            onExit = {
+                                // إغلاق الجلسة الحالية كاملةً (العملية والطرفية) بلا سؤال
+                                runCatching {
+                                        terminalView.get()?.currentSession?.finishIfRunning()
+                                    }
+                                    .onFailure { logError(it) }
+                                runCatching { terminalActivity.finish() }
+                                    .onFailure { logError(it) }
+                            },
                         )
                     }
                 ) { paddingValues ->
@@ -705,29 +750,28 @@ private fun TerminalQuickBar(modifier: Modifier = Modifier) {
     val utility = Color(0xFF38BDF8)
     val accent = Color(0xFF2DD4BF)
 
+    // 9.0.0: شريط مدمج كما في Pydroid/Termux — الأزرار التي تُستخدم فعلًا فقط،
+    // بترتيب واحد ثابت: مقاطعة · تحكّم · حركة · إدخال · عرض. أُزيلت أزرار
+    // «Ctrl+D» و«إعادة ضبط الخط» و«mh» لأنها تشغل مكانًا بلا حاجة يومية.
     val items: List<Triple<String, () -> Unit, Color>> =
         listOf(
             Triple("Ctrl+C", { send("\u0003") }, danger),
-            Triple("Ctrl+D", { send("\u0004") }, danger),
-            Triple(stringResource(strings.terminal_tool_clear), { send("\u000c") }, control),
-            Triple("Tab", { send("\t") }, control),
             Triple("Esc", { send("\u001b") }, control),
-            Triple("↑", { send("\u001b[A") }, navigate),
-            Triple("↓", { send("\u001b[B") }, navigate),
+            Triple("Tab", { send("\t") }, control),
+            Triple("/", { send("/") }, control),
+            Triple("-", { send("-") }, control),
             Triple("←", { send("\u001b[D") }, navigate),
             Triple("→", { send("\u001b[C") }, navigate),
+            Triple("↑", { send("\u001b[A") }, navigate),
+            Triple("↓", { send("\u001b[B") }, navigate),
+            Triple(stringResource(strings.terminal_tool_clear), { send("\u000c") }, utility),
             Triple(
                 stringResource(strings.terminal_tool_paste),
                 { clipboard.getText()?.text?.let { text -> if (text.isNotEmpty()) send(text) } },
                 utility,
             ),
-            Triple(stringResource(strings.terminal_tool_zoom_in), { zoomToNextLevel(true) }, utility),
-            Triple(stringResource(strings.terminal_tool_zoom_out), { zoomToNextLevel(false) }, utility),
-            // إعادة الضبط تعادل Ctrl+0: حجم 12 الافتراضي
-            Triple(stringResource(strings.terminal_tool_zoom_reset), { applySize(12) }, accent),
-            // 8.5.0: أدوات المطوّر بلمسة واحدة — فحص البيئة كاملًا أو بدء مشروع جاهز
-            Triple("mh doctor", { send("mh doctor\r") }, accent),
-            Triple("mh new", { send("mh new ") }, accent),
+            Triple(stringResource(strings.terminal_tool_zoom_in), { zoomToNextLevel(true) }, accent),
+            Triple(stringResource(strings.terminal_tool_zoom_out), { zoomToNextLevel(false) }, accent),
         )
 
     Row(

@@ -365,6 +365,13 @@ fun SettingsEditorScreen(navController: NavController) {
             )
 
             EditorSettingsItem(
+                label = stringResource(id = strings.immersive_editing),
+                description = stringResource(id = strings.immersive_editing_desc),
+                default = Settings.immersive_editing,
+                sideEffect = { Settings.immersive_editing = it },
+            )
+
+            EditorSettingsItem(
                 label = stringResource(id = strings.extra_key_bg),
                 description = stringResource(id = strings.extra_key_bg_desc),
                 isEnabled = Settings.show_extra_keys,

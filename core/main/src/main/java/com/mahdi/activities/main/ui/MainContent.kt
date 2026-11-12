@@ -69,6 +69,7 @@ import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.tabs.base.Tab
 import com.mahdi.tabs.editor.EditorTab
+import com.mahdi.text.FileNameText
 import com.mahdi.utils.dialogRes
 import com.mahdi.utils.drawErrorUnderline
 import com.mahdi.utils.getFileColor
@@ -364,8 +365,10 @@ private fun TabItemContent(
                 )
             }
 
-            Text(
-                text = tab.title,
+            // 9.0.0: اسم تبويب معزول الاتجاه — `استنساخ الاصوات.py` يبقى امتداده ملتصقًا
+            // (كان الامتداد يُقذف إلى أقصى اليسار في الواجهة العربية).
+            FileNameText(
+                name = tab.title,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.addIf(underlineColor != null) { drawErrorUnderline(underlineColor!!) },
