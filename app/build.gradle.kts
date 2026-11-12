@@ -22,8 +22,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // versioning
-        versionCode = 38
-        versionName = "9.0.0"
+        versionCode = 39
+        versionName = "9.0.1"
         vectorDrawables { useSupportLibrary = true }
     }
 
