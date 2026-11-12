@@ -376,9 +376,11 @@ class LspConnector(
                                 DefaultScope.launch { LspManager.recover(instance) }
                             }
 
-                            if (newStatus == ServerStatus.STARTED ||
-                                newStatus == ServerStatus.INITIALIZED
-                            ) {
+                            // النجاح الحقيقي = INITIALIZED (تهيّأ الخادم فعلًا).
+                            // `STARTED` يعني أن العملية أقلعت للتوّ؛ تصفير العدّاد
+                            // عنده كان يمنع بلوغ حدّ المحاولات إذا أقلع الخادم ثم
+                            // انهار قبل التهيئة، فيدور الإحياء بلا نهاية.
+                            if (newStatus == ServerStatus.INITIALIZED) {
                                 LspManager.noteSuccess(instance.server)
                             }
                         }
