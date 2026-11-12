@@ -47,6 +47,9 @@ fun setupTerminalFiles() {
         )
     internalFiles.forEach { setupAssetFile(it) }
 
+    // 8.4.0: أمر «mahdi-python» — معلومات المفسّر والانتقال بين الإصدارات
+    setupAssetFile("mahdi-python", "mahdi_python.sh")
+
     // 3.0.0: شريط التقدّم الأحادي السطر + مثبّت بيئات التشغيل + شعار MAHDI
     // (تُنسَخ عبر internalFiles أعلاه، ويُعاد كتابتها تلقائيًا عند تغيّر محتواها)
 

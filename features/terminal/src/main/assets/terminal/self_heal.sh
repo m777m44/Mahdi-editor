@@ -41,47 +41,97 @@ mahdi_heal_strip_noise() {
     tr -d '\r' | grep -v '^[[:space:]]*$'
 }
 
-# يعرض خطأ التشغيل النهائي بشكل مفهوم ومختصر
+# ——————————————————————————————————————————————————————————————————————————————
+# 8.4.0 — تقرير أخطاء ملوّن ومنظّم
 #
-# 8.3.0: قبل الآن كان `stderr` يُخزَّن في ملف ولا يُعرض إلا في حالتين، فإن
-# فشل تثبيت مكتبة ناقصة بقي المستخدم أمام «✖ توقّف السكربت (الرمز 1)»
-# بلا أي سبب. الآن: سبب واحد واضح دائمًا، حتى لو لم يكتب السكربت شيئًا.
+# قبلها كان أي خطأ يُعرض كسطر أحمر واحد «توقّف السكربت بخطأ:» ثم آخر سطر
+# خام، بلا تصنيف ولا تلميح. الآن لكل نوع خطأ لونٌ وعنوانٌ عربي وإجراءٌ واحد
+# واضح: مكتبة قديمة، صياغة، ملف مفقود، صلاحية، شبكة، إلخ.
+# MAHDI_TRACE=1 يعرض أثر بايثون كاملًا بعد منقي الضجيج (للمطوّرين).
+# ——————————————————————————————————————————————————————————————————————————————
 mahdi_heal_report() {
   local lang="$1" errfile="$2" rc="${3:-1}"
-  local mod=""
+  local mod="" line="" tone="" title="" hint=""
 
   if [ -s "$errfile" ]; then
     mod="$(mahdi_heal_missing_module "$errfile")"
+    line="$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception|Interrupt):' "$errfile" | tail -n 1)"
   fi
 
   if [ -n "$mod" ]; then
+    tone="$M_CORAL"
+    title="المكتبة «$mod» غير مثبّتة"
+    hint="وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات"
     MAHDI_FAIL_REASON="مكتبة ناقصة: $mod"
-    printf "${M_CORAL}✖ المكتبة «%s» غير مثبّتة — لم يعمل السكربت.${M_RESET}\n" "$mod" >&2
-    # لا نطبع «pip install <module>»: اسم الوحدة يختلف عن اسم الحزمة في PyPI
-    printf "${M_MUTED}  وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات${M_RESET}\n" >&2
-    return 0
+  else
+    case "$line" in
+      AttributeError:*)
+        tone="$M_VIOLET"; title="مكتبة قديمة أو ملف يحجبها"
+        hint="حدّث المكتبة، أو أعد تسمية أي ملف بنفس اسمها بجانب السكربت"
+        MAHDI_FAIL_REASON="مكتبة غير متوافقة" ;;
+      SyntaxError:*|IndentationError:*|TabError:*)
+        tone="$M_GOLD"; title="خطأ في صياغة الملف"
+        hint="افتح الملف وصحّح السطر المشار إليه"
+        MAHDI_FAIL_REASON="خطأ في الصياغة" ;;
+      FileNotFoundError:*|IsADirectoryError:*|NotADirectoryError:*)
+        tone="$M_GOLD"; title="ملف أو مجلد مفقود"
+        hint="تحقّق من المسار ومن وجود الملفات بجانب السكربت"
+        MAHDI_FAIL_REASON="ملف مفقود" ;;
+      PermissionError:*)
+        tone="$M_CORAL"; title="لا توجد صلاحية للوصول"
+        hint="امنح التطبيق صلاحية «كل الملفات» من الإعدادات"
+        MAHDI_FAIL_REASON="صلاحية مرفوضة" ;;
+      *ConnectionError:*|*TimeoutError:*|*ConnectionRefusedError:*|*gaierror:*)
+        tone="$M_GOLD"; title="تعذّر الاتصال بالشبكة"
+        hint="تحقّق من الإنترنت ثم أعد التشغيل"
+        MAHDI_FAIL_REASON="اتصال بالشبكة" ;;
+      KeyboardInterrupt:*)
+        tone="$M_MUTED"; title="أوقفت التشغيل بنفسك"
+        hint="لا شيء لإصلاحه"
+        MAHDI_FAIL_REASON="إيقاف من المستخدم" ;;
+      ModuleNotFoundError:*|ImportError:*)
+        tone="$M_CORAL"; title="مكتبة ناقصة"
+        hint="وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات"
+        MAHDI_FAIL_REASON="مكتبة ناقصة" ;;
+      TypeError:*|ValueError:*|KeyError:*|NameError:*|IndexError:*|ZeroDivisionError:*|RuntimeError:*|OSError:*|Exception:*)
+        tone="$M_VIOLET"; title="خطأ في السكربت"
+        hint="راجع الرسالة أعلاه والسطر المشار إليه في الملف"
+        MAHDI_FAIL_REASON="خطأ في السكربت" ;;
+      *)
+        if [ -z "$line" ]; then
+          tone="$M_MUTED"; title="أنهاه السكربت بالرمز $rc دون رسالة"
+          hint="افتح الملف وتحقّق من أوامره"
+          MAHDI_FAIL_REASON="أنهاه السكربت بالرمز $rc"
+        else
+          tone="$M_VIOLET"; title="توقّف السكربت"
+          hint="راجع الرسالة أدناه"
+          MAHDI_FAIL_REASON="خطأ في السكربت"
+        fi ;;
+    esac
   fi
 
-  if [ -s "$errfile" ] && grep -q '^Traceback (most recent call last)' "$errfile"; then
-    MAHDI_FAIL_REASON="خطأ في السكربت"
-    printf "${M_CORAL}✖ توقّف السكربت بخطأ:${M_RESET}\n" >&2
-    grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception):' "$errfile" | tail -n 2 >&2
-    return 0
+  printf "%b✖  %s%b\n" "$tone" "$title" "$M_RESET" >&2
+  if [ -n "$line" ] && [ -z "$mod" ]; then
+    printf "  ${M_WHITE}%s${M_RESET}\n" "$line" >&2
+  fi
+  if [ -n "$hint" ]; then
+    printf "${M_MUTED}  %s${M_RESET}\n" "$hint" >&2
   fi
 
-  if [ -s "$errfile" ]; then
-    local lines
-    lines="$(mahdi_heal_strip_noise "$errfile" | tail -n 12)"
-    if [ -n "$lines" ]; then
-      MAHDI_FAIL_REASON="خطأ في السكربت"
-      printf '%s\n' "$lines" >&2
-      return 0
+  # سطور إضافية غير مصنّفة (أخطاء المفسّرات الأخرى) بعد تنقية ضجيج pip/npm
+  if [ -z "$mod" ] && [ -s "$errfile" ]; then
+    # سطور إضافية للغات الأخرى فقط: أثر بايثون فيه أسطر كود وإشارات ^^^^^
+    # لا تضيف معلومة بعد أن عرضنا آخر سطر خطأ وتصنيفه.
+    if [ "$lang" != "python" ] && [ -n "$line" ]; then
+      local extra
+      extra="$(mahdi_heal_strip_noise "$errfile" | grep -vF "$line" | tail -n 3)"
+      [ -n "$extra" ] && printf "${M_MUTED}%s${M_RESET}\n" "$extra" >&2
+    fi
+    if [ "${MAHDI_TRACE:-0}" = "1" ]; then
+      printf "${M_MUTED}  ── أثر التنفيذ ──${M_RESET}\n" >&2
+      mahdi_heal_strip_noise "$errfile" | tail -n 24 >&2
     fi
   fi
-
-  # stderr فارغ تمامًا: لا نترك المستخدم بلا تفسير
-  MAHDI_FAIL_REASON="أنهاه السكربت بالرمز $rc"
-  printf "${M_MUTED}  أنهاه السكربت بالرمز %s دون رسالة — افتح الملف وتحقّق من أوامره.${M_RESET}\n" "$rc" >&2
   return 0
 }
 
@@ -102,8 +152,64 @@ mahdi_heal_detect() {
   local helper
   helper="$(mahdi_heal_helper)"
   [ -n "$helper" ] && [ -f "$helper" ] || return 1
-  command -v python3 >/dev/null 2>&1 || return 1
-  python3 "$helper" --lang "$lang" --stderr "$errfile" --file "$script" 2>/dev/null
+  command -v "${MAHDI_PY:-python3}" >/dev/null 2>&1 || return 1
+  "${MAHDI_PY:-python3}" "$helper" --lang "$lang" --stderr "$errfile" --file "$script" 2>/dev/null
+}
+
+# 8.4.0: مكتبة موجودة لكنها قديمة/خاطئة — أوامر الإصلاح لا أسماء حزم
+mahdi_heal_detect_broken() {
+  local lang="$1" errfile="$2" script="$3"
+  [ "$lang" = "python" ] || return 1
+  local helper
+  helper="$(mahdi_heal_helper)"
+  [ -n "$helper" ] && [ -f "$helper" ] || return 1
+  "${MAHDI_PY:-python3}" "$helper" --broken --lang python --stderr "$errfile" --file "$script" 2>/dev/null
+}
+
+# ينفّذ أوامر remove:/upgrade:/shadow: ويعيد 0 فقط إن أُنجز إصلاح حقيقي
+mahdi_heal_repair() {
+  local actions="$1" action did=0
+  while IFS= read -r action; do
+    [ -z "$action" ] && continue
+    case "$action" in
+      shadow:*)
+        printf "${M_GOLD}⚠  الملف «%s» بجانب السكربت يحجب المكتبة الحقيقية — أعد تسميته.${M_RESET}\n" "${action#shadow:}" >&2
+        ;;
+      remove:*)
+        local bare="${action#remove:}"
+        if "${MAHDI_PY:-python3}" -m pip uninstall -y "$bare" >/dev/null 2>&1; then
+          did=1
+        fi
+        ;;
+      upgrade:*)
+        local dist="${action#upgrade:}"
+        if [ "${MAHDI_OFFLINE:-0}" = "1" ]; then
+          if [ "${MAHDI_UPGRADE_OFFLINE_SHOWN:-0}" != "1" ]; then
+            printf "${M_GOLD}⚠  لا يوجد اتصال — لا يمكن تحديث المكتبة.${M_RESET}\n" >&2
+            MAHDI_UPGRADE_OFFLINE_SHOWN=1
+          fi
+          declare -f mahdi_deps_mark_failed >/dev/null 2>&1 && mahdi_deps_mark_failed "upgrade:$dist"
+          return 2
+        fi
+        if declare -f mahdi_deps_failed >/dev/null 2>&1 && mahdi_deps_failed "upgrade:$dist"; then
+          continue
+        fi
+        printf "${M_SKY}↻  تحديث %s …${M_RESET}\n" "$dist" >&2
+        local rc=0
+        "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --no-input \
+          --quiet --disable-pip-version-check --retries 2 --timeout 20 "$dist" >/dev/null 2>&1 || rc=$?
+        if [ "$rc" -eq 0 ]; then
+          printf "${M_MINT}✔  جُدِّث %s${M_RESET}\n" "$dist" >&2
+          did=1
+        else
+          declare -f mahdi_deps_mark_failed >/dev/null 2>&1 && mahdi_deps_mark_failed "upgrade:$dist"
+          printf "${M_CORAL}✖  تعذّر تحديث %s${M_RESET}\n" "$dist" >&2
+        fi
+        ;;
+    esac
+  done <<<"$actions"
+  [ "$did" -eq 1 ] && return 0
+  return 1
 }
 
 # تثبيت حزمة واحدة حسب اللغة، بشريط تقدّم داخل الطرفية
@@ -129,7 +235,7 @@ mahdi_heal_install() {
         return "$rc"
       fi
       mahdi_bar_start "$label"
-      python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+      "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --disable-pip-version-check \
         --quiet --no-input --retries 3 --timeout 30 "$pkg" 2>/dev/null
       local rc=$?
       if [ "$rc" -eq 0 ]; then
@@ -212,8 +318,9 @@ mahdi_run_heal() {
   local script="$2"
   shift 2
 
-  local max_attempts=2
+  local max_attempts=3
   local attempt=1
+  local repaired=0
   local errfile
   errfile="$(mktemp "/tmp/mahdi-heal-XXXXXX.log" 2>/dev/null || echo "/tmp/mahdi-heal-$$.log")"
 
@@ -232,6 +339,21 @@ mahdi_run_heal() {
     fi
     [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
     [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
+
+    # 8.4.0: مكتبة موجودة لكنها قديمة أو خاطئة (مثل telebot بلا AsyncTeleBot).
+    # لا يظهر ModuleNotFoundError، فلا يلتقطها كاشف الحزم — نصلحها هنا مرة واحدة.
+    if [ "$repaired" -eq 0 ]; then
+      local broken
+      broken="$(mahdi_heal_detect_broken "$lang" "$errfile" "$script" || true)"
+      if [ -n "$broken" ]; then
+        repaired=1
+        if mahdi_heal_repair "$broken"; then
+          printf "${M_SKY}↻  إعادة التشغيل بعد الإصلاح…${M_RESET}\n"
+          attempt=$((attempt + 1))
+          continue
+        fi
+      fi
+    fi
 
     local pkgs
     pkgs="$(mahdi_heal_detect "$lang" "$errfile" "$script" || true)"

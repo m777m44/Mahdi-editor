@@ -115,6 +115,44 @@ mahdi_quiet_shell_startup() {
 }
 mahdi_quiet_shell_startup
 
+# ——————————————————————————————————————————————————————————————————————————————
+# 8.4.0 — أحدث مفسّر بايثون متاح في الحاوية
+#
+# يختار أعلى إصدار `python3.X` **يمتلك pip**، لأن تثبيت المكتبات بمفسّر وتشغيل
+# السكربت بآخر يجعل الواردات تختفي. يُحترم `MAHDI_PY_PREFERRED` لاختيار يدوي،
+# ويُعرض الإصدار في سطر بداية التشغيل.
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_python_bin() {
+  local preferred="${MAHDI_PY_PREFERRED:-}"
+  local pref_file="${HOME:-/home}/.mahdi/python_preferred"
+  if [ -z "$preferred" ] && [ -r "$pref_file" ]; then
+    preferred="$(head -n 1 "$pref_file" 2>/dev/null)"
+  fi
+  if [ -n "$preferred" ] && command -v "$preferred" >/dev/null 2>&1; then
+    printf '%s' "$preferred"
+    return 0
+  fi
+  local c best="python3" best_key=0 key
+  for c in python3 python3.9 python3.10 python3.11 python3.12 python3.13 python3.14; do
+    command -v "$c" >/dev/null 2>&1 || continue
+    key="$("$c" -c 'import sys;print(sys.version_info[0]*10000+sys.version_info[1]*100+sys.version_info[2])' 2>/dev/null)" || continue
+    [ -z "$key" ] && continue
+    "$c" -m pip --version >/dev/null 2>&1 || continue
+    if [ "$key" -gt "$best_key" ] 2>/dev/null; then
+      best_key="$key"
+      best="$c"
+    fi
+  done
+  printf '%s' "$best"
+}
+
+mahdi_python_version() {
+  "${MAHDI_PY:-python3}" -c 'import sys;print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null || printf '—'
+}
+
+MAHDI_PY="${MAHDI_PY:-$(mahdi_python_bin)}"
+export MAHDI_PY
+
 ask() {
   local prompt="$1"
   local response

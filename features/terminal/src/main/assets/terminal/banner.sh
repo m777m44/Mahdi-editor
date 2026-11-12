@@ -29,7 +29,7 @@ if [ -z "${MAHDI_VERSION:-}" ]; then
     MAHDI_VERSION="$(cat "$LOCAL/bin/.mahdi_version" 2>/dev/null)"
   fi
 fi
-MAHDI_VERSION="${MAHDI_VERSION:-8.3.0}"
+MAHDI_VERSION="${MAHDI_VERSION:-8.4.0}"
 
 # ست محطّات لونية: سماوي ← تركوازي ← نعناعي ← ذهبي ← بنفسجي ← وردي.
 # تُستخدم للأحرف الفنية والحدود، فتبدو اللوحة متدرّجة بدل لون واحد قديم.

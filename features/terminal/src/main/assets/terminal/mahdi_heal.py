@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import os
 import re
 import sys
@@ -24,6 +25,26 @@ PY_PATTERNS = (
     re.compile(r"ImportError: No module named ['\"]?([\w.\-]+)['\"]?"),
     re.compile(r"ModuleNotFoundError: No module named ['\"]?([\w.\-]+)"),
 )
+
+# 8.4.0 — «مكتبة موجودة لكنها خاطئة/قديمة»
+# أشهر مثال: `AttributeError: module 'telebot' has no attribute 'AsyncTeleBot'`.
+# الوحدة تُستورد بنجاح فلا يظهر ModuleNotFoundError، لكن الحزمة المثبّتة إمّا
+# نسخة قديمة من pyTelegramBotAPI (قبل 4.x) أو حزمة PyPI أخرى اسمها `telebot`
+# تحجب الحزمة الصحيحة. لا يُصلحهما إلا ترقية/إزالة، لا «تثبيت» عادي.
+PY_BROKEN_PATTERNS = (
+    re.compile(r"AttributeError: module ['\"]([\w.\-]+)['\"] has no attribute ['\"]([\w]+)['\"]"),
+    re.compile(r"ImportError: cannot import name ['\"][^'\"]+['\"] from ['\"]([\w.\-]+)['\"]"),
+    re.compile(r"TypeError: ['\"]module['\"] object is not callable"),
+    re.compile(r"AttributeError: partially initialized module ['\"]([\w.\-]+)['\"]"),
+)
+
+# فحوص وقائية: إن استخدم السكربت ميزة لا توفّرها النسخة القديمة، نُصلح قبل التشغيل
+FEATURE_PROBES = {
+    "telebot": ("AsyncTeleBot", "pytelegrambotapi"),
+    "telegram": ("ext", "python-telegram-bot"),
+    "PIL": ("ImageOps", "pillow"),
+    "cv2": ("data", "opencv-python"),
+}
 
 # اسم الوحدة → اسم حزمة PyPI (الاستيراد غالبًا لا يطابق اسم الحزمة)
 PY_DIST = {
@@ -223,6 +244,76 @@ def to_packages(modules: list[str], script: str | None) -> list[str]:
     return packages
 
 
+def broken_actions(text: str, script: str | None) -> list[str]:
+    """أوامر إصلاح لمكتبة مستوردة لكنها خاطئة: remove: / upgrade: / shadow:.
+
+    `remove:` فقط إن كانت هناك توزيعة **أخرى** تحمل اسم الوحدة نفسها مثبّتة
+    فعلًا (مثل حزمة `telebot` الصغيرة التي تحجب pyTelegramBotAPI).
+    `shadow:` إن وُجد ملف محلي `<module>.py` بجانب السكربت يحجب المكتبة.
+    """
+    modules: list[str] = []
+    for pattern in PY_BROKEN_PATTERNS:
+        for match in pattern.finditer(text):
+            if match.lastindex is None:
+                continue
+            name = match.group(1).strip().split(".")[0]
+            if name and re.match(r"^[A-Za-z_][\w]*$", name) and name not in modules:
+                modules.append(name)
+
+    stdlib = python_stdlib()
+    locals_ = local_modules(script)
+    actions: list[str] = []
+    for module in modules:
+        if module in stdlib or module.startswith("_"):
+            continue
+        if module in locals_:
+            actions.append(f"shadow:{module}.py")
+            continue
+        dist = PY_DIST.get(module, module)
+        if not dist:
+            continue
+        bare = dist.lower().replace("-", "_")
+        if bare != module.lower():
+            try:
+                importlib.metadata.distribution(module)
+                actions.append(f"remove:{module}")
+            except Exception:
+                pass
+        actions.append(f"upgrade:{dist}")
+    # بلا تكرار مع الحفاظ على الترتيب
+    seen: set[str] = set()
+    return [a for a in actions if not (a in seen or seen.add(a))]
+
+
+def preflight_repairs(script: str | None) -> list[str]:
+    """فحص وقائي قبل أول تشغيل: هل يستورد السكربت ميزة غير موجودة في النسخة؟"""
+    if not script or not os.path.isfile(script):
+        return []
+    try:
+        with open(script, "r", encoding="utf-8", errors="replace") as handle:
+            src = handle.read(400_000)
+    except OSError:
+        return []
+    actions: list[str] = []
+    for module, (attr, dist) in FEATURE_PROBES.items():
+        if not re.search(r"\b" + re.escape(module) + r"\s*\.\s*" + re.escape(attr) + r"\b", src):
+            continue
+        try:
+            mod = __import__(module)
+            if hasattr(mod, attr):
+                continue
+        except Exception:
+            continue  # الوحدة ناقصة أصلًا: يتولّاها auto_deps
+        try:
+            importlib.metadata.distribution(module)
+            actions.append(f"remove:{module}")
+        except Exception:
+            pass
+        actions.append(f"upgrade:{dist}")
+    seen: set[str] = set()
+    return [a for a in actions if not (a in seen or seen.add(a))]
+
+
 # ————————————————————————— Node —————————————————————————
 
 NODE_PATTERNS = (
@@ -275,6 +366,8 @@ def main() -> int:
     parser.add_argument("--lang", default="python")
     parser.add_argument("--stderr", dest="err", default="")
     parser.add_argument("--file", dest="script", default="")
+    parser.add_argument("--broken", action="store_true")
+    parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args()
 
     text = ""
@@ -284,6 +377,16 @@ def main() -> int:
                 text = handle.read()[-200_000:]
         except OSError:
             return 0
+
+    if args.preflight:
+        for action in preflight_repairs(args.script):
+            print(action)
+        return 0
+
+    if args.broken:
+        for action in broken_actions(text, args.script):
+            print(action)
+        return 0
 
     if not text:
         return 0
