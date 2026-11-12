@@ -132,6 +132,23 @@ mahdi_python_bin() {
     printf '%s' "$preferred"
     return 0
   fi
+
+  # 8.5.0: نتيجة الفحص تُحفظ ست ساعات. قبلها كان كل فتح طرفية (وكل اختصار py)
+  # يشغّل حتى ١٤ عملية بايثون صغيرة لمعرفة الإصدارات، فيتأخّر البدء بلا داعٍ.
+  # الملف: "<طابع زمني> <اسم المفسّر>"، ويُعاد الفحص فورًا إن اختفى المفسّر أو pip.
+  local cache="${HOME:-/home}/.mahdi/python_scan" now ts cached
+  now="$(date +%s)"
+  if [ -r "$cache" ]; then
+    read -r ts cached _ <"$cache" 2>/dev/null || true
+    case "${ts:-}" in '' | *[!0-9]*) ts=0 ;; esac
+    if [ -n "${cached:-}" ] && [ "$ts" -gt 0 ] && [ $((now - ts)) -lt 21600 ] &&
+      command -v "$cached" >/dev/null 2>&1 &&
+      "$cached" -m pip --version >/dev/null 2>&1; then
+      printf '%s' "$cached"
+      return 0
+    fi
+  fi
+
   local c best="python3" best_key=0 key
   for c in python3 python3.9 python3.10 python3.11 python3.12 python3.13 python3.14; do
     command -v "$c" >/dev/null 2>&1 || continue
@@ -143,6 +160,8 @@ mahdi_python_bin() {
       best="$c"
     fi
   done
+  mkdir -p "${HOME:-/home}/.mahdi" 2>/dev/null || true
+  printf '%s %s\n' "$now" "$best" >"$cache" 2>/dev/null || true
   printf '%s' "$best"
 }
 
@@ -152,6 +171,142 @@ mahdi_python_version() {
 
 MAHDI_PY="${MAHDI_PY:-$(mahdi_python_bin)}"
 export MAHDI_PY
+
+# ——————————————————————————————————————————————————————————————————————————————
+# 8.5.0 — أدوات مشتركة لكل الأمر الرسومية (mh · mahdi-python · الأوامر القصيرة)
+#
+# كان pip يختفي نهائيًا من الطرفية إذا حُذف مرة واحدة: مُثبّت الاختصارات كان
+# يكتب `pip` مرة واحدة فقط ثم يضع علامة إصدار فلا يعيد المحاولة أبدًا. لذلك
+# صار لكل أمر هنا فحص «هل موجود؟» مستقلًا، والأدوات تُبنى من جديد إن غابت.
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_have() { command -v "$1" >/dev/null 2>&1; }
+
+# حجم مقروء: 184 MB بدل 192937984
+mahdi_human_size() {
+  local b="${1:-0}"
+  case "$b" in '' | *[!0-9]*) b=0 ;; esac
+  if [ "$b" -ge 1073741824 ] 2>/dev/null; then
+    awk -v v="$b" 'BEGIN{printf "%.1f GB", v/1073741824}'
+  elif [ "$b" -ge 1048576 ] 2>/dev/null; then
+    awk -v v="$b" 'BEGIN{printf "%.1f MB", v/1048576}'
+  elif [ "$b" -ge 1024 ] 2>/dev/null; then
+    awk -v v="$b" 'BEGIN{printf "%.1f KB", v/1024}'
+  else
+    printf '%s B' "$b"
+  fi
+}
+
+# حجم مسار بالبايت (0 إن لم يوجد) — بلا du للتوافق
+mahdi_path_bytes() {
+  local p="$1"
+  [ -e "$p" ] || { printf '0'; return 0; }
+  if command -v du >/dev/null 2>&1; then
+    du -sb "$p" 2>/dev/null | awk '{print $1; exit}' || printf '0'
+  else
+    printf '0'
+  fi
+}
+
+mahdi_os_name() {
+  if [ -r /etc/os-release ]; then
+    (
+      # shellcheck disable=SC1091
+      . /etc/os-release 2>/dev/null
+      printf '%s' "${PRETTY_NAME:-${NAME:-Linux}}"
+    )
+  else
+    printf 'Linux'
+  fi
+}
+
+# فحص اتصال قصير (ثانيتان) — لا يُعلّق الشاشة أبدًا
+mahdi_net_ok_fast() {
+  local host="${1:-pypi.org}"
+  [ "${MAHDI_OFFLINE:-0}" = "1" ] && return 1
+  "${MAHDI_PY:-python3}" -c 'import socket,sys;socket.setdefaulttimeout(2);socket.create_connection((sys.argv[1],443)).close()' \
+    "$host" >/dev/null 2>&1
+}
+
+# pip جاهز دائمًا: يُستدعى من أمر pip وpip3 ومن مدير الأدوات.
+# لا أسئلة، لا أقفال نظام معلّقة، ولا انتظار إن كان pip موجودًا.
+mahdi_ensure_pip() {
+  local py="${MAHDI_PY:-python3}"
+  mahdi_have "$py" || py=python3
+  mahdi_have "$py" || return 1
+
+  export PIP_DISABLE_PIP_VERSION_CHECK=1
+  export PIP_ROOT_USER_ACTION=ignore
+  export PIP_NO_INPUT=1
+  export PIP_BREAK_SYSTEM_PACKAGES=1
+
+  "$py" -m pip --version >/dev/null 2>&1 && return 0
+
+  mkdir -p "${HOME:-/home}/.local/bin" 2>/dev/null || true
+  case ":$PATH:" in
+    *":${HOME}/.local/bin:"*) ;;
+    *) PATH="${HOME}/.local/bin:$PATH"; export PATH ;;
+  esac
+
+  # 1) ensurepip المدمج (بلا شبكة)
+  "$py" -m ensurepip --upgrade --user >/dev/null 2>&1 || true
+  "$py" -m ensurepip --default-pip >/dev/null 2>&1 || true
+  "$py" -m pip --version >/dev/null 2>&1 && return 0
+
+  # 2) get-pip الرسمي (شبكة)
+  local tmp="${TMPDIR:-/tmp}/mahdi-get-pip.py"
+  if mahdi_have curl; then
+    curl -fsSL --retry 2 --connect-timeout 6 --max-time 60 https://bootstrap.pypa.io/get-pip.py -o "$tmp" 2>/dev/null &&
+      "$py" "$tmp" --user --no-warn-script-location >/dev/null 2>&1 || true
+  elif mahdi_have wget; then
+    wget -q -T 60 -O "$tmp" https://bootstrap.pypa.io/get-pip.py 2>/dev/null &&
+      "$py" "$tmp" --user --no-warn-script-location >/dev/null 2>&1 || true
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  "$py" -m pip --version >/dev/null 2>&1 && return 0
+
+  # 3) حزمة التوزيعة — بمهلة قفل، وبلا أي سؤال
+  if declare -f apt_fast >/dev/null 2>&1; then
+    apt_fast python3-pip >/dev/null 2>&1 || true
+  fi
+  "$py" -m pip --version >/dev/null 2>&1
+}
+
+# سطر حالة ملوّن: mahdi_status ok|warn|bad|info "التسمية" "القيمة"
+mahdi_status() {
+  local tone="$1" label="$2" value="$3" mark color
+  case "$tone" in
+    ok) mark='✔' color="$M_MINT" ;;
+    warn) mark='!' color="$M_GOLD" ;;
+    bad) mark='✖' color="$M_CORAL" ;;
+    *) mark='·' color="$M_SKY" ;;
+  esac
+  printf "  ${color}%s${M_RESET}  ${M_MUTED}%s${M_RESET} ${M_DIM}·${M_RESET} ${M_WHITE}%s${M_RESET}\n" \
+    "$mark" "$label" "$value"
+}
+
+# صيغة الجمع العربية: mahdi_ar_plural 3 "حزمة" "حزمتان" "حزم" "حزمة"  → «3 حزم»
+mahdi_ar_plural() {
+  local n="$1" one="$2" two="$3" few="$4" many="$5"
+  case "$n" in
+    0) printf '%s' "${many:-$one}" ;;
+    1) printf '%s' "$one" ;;
+    2) printf '%s' "${two:-$one}" ;;
+    *)
+      if [ "$n" -le 10 ] 2>/dev/null; then
+        printf '%s %s' "$n" "${few:-$one}"
+      else
+        printf '%s %s' "$n" "${many:-$one}"
+      fi
+      ;;
+  esac
+}
+
+# قسم كامل: سطر فاصل متدرّج + عنوان
+mahdi_section() {
+  printf '\n'
+  mahdi_rule 34
+  mahdi_heading "$1"
+}
 
 ask() {
   local prompt="$1"

@@ -117,6 +117,23 @@ object GuideContent {
         - الشعار `MAHDI` يظهر في بداية كل تشغيل — للسكربتات الداخلية والخارجية على حد سواء.
         - المكتبات الناقصة تُثبَّت تلقائيًا؛ وإن كانت كلها موجودة فلا يُطبع أي سطر إضافي.
 
+        ### مركز الأدوات `mh`
+
+        أمر واحد يجمع أدوات المطوّر، وله زرّان في شريط الاختصارات فوق لوحة المفاتيح:
+
+        ```bash
+        mh doctor          # فحص ملوّن: النظام · بايثون · pip · Node · المخازن · خوادم اللغة
+        mh doctor --fix    # يجهّز pip والمخازن والاختصارات تلقائيًا
+        mh new py app      # مشروع جاهز: py · bot · web · api · html · node
+        mh py --list       # كل مفسّرات بايثون، و--use للاختيار
+        mh pip install …   # pip عبر أحدث مفسّر وبمخزن دائم
+        mh cache           # أحجام المخازن، وprune ينظّف المؤقت فقط
+        ```
+
+        - `pip` و`pip3` يمرّان دائمًا على مفسّر بايثون المختار، ويُعاد بناؤهما تلقائيًا إن حُذفا.
+        - المِحَثّ يعرض فرع Git ورمز آخر أمر فاشل، ويتحوّل `❯` إلى اللون المرجاني عند الخطأ.
+        - إكمال Tab يعمل لأوامر `mh` و`py` و`run` بلا أي إعداد.
+
         ## ١٠ · الترميزات
 
         **٢٣ ترميزًا** بأسماء عربية، منها UTF-8/16/32 (LE وBE)، ASCII، ISO-8859-1، **ISO-8859-6** (العربية)،
@@ -222,6 +239,20 @@ object GuideContent {
         - Installing writes a marker in `~/.mahdi/installed`, so the sky **Installed** badge
           survives restarts.
         - The run button derives the interpreter from the language registry automatically.
+
+        ### The `mh` tools centre
+
+        ```bash
+        mh doctor          # colour health check: system · Python · pip · Node · caches · LSP
+        mh doctor --fix    # prepares pip, caches and shell shims automatically
+        mh new py app      # ready project: py · bot · web · api · html · node
+        mh py --list       # every Python interpreter, --use to switch
+        mh pip install …   # pip through the newest interpreter, permanent cache
+        ```
+
+        - `pip` and `pip3` always resolve to the selected interpreter and rebuild themselves if removed.
+        - The prompt shows the Git branch and the last failed status; `❯` turns coral on error.
+        - Tab completion works for `mh`, `py` and `run` with no setup.
 
         ## 10 · Encodings
 

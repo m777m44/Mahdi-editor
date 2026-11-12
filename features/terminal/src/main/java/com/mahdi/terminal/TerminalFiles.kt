@@ -50,6 +50,9 @@ fun setupTerminalFiles() {
     // 8.4.0: أمر «mahdi-python» — معلومات المفسّر والانتقال بين الإصدارات
     setupAssetFile("mahdi-python", "mahdi_python.sh")
 
+    // 8.5.0: أمر «mh» — مركز الأدوات: فحص البيئة mh doctor وإنشاء المشاريع mh new
+    setupAssetFile("mh", "mahdi_tools.sh")
+
     // 3.0.0: شريط التقدّم الأحادي السطر + مثبّت بيئات التشغيل + شعار MAHDI
     // (تُنسَخ عبر internalFiles أعلاه، ويُعاد كتابتها تلقائيًا عند تغيّر محتواها)
 
@@ -91,5 +94,9 @@ fun setupAssetFile(fileName: String, assetPath: String = "$fileName.sh") {
             createFileIfNot()
             writeText(assetText)
         }
+        // 8.5.0: الأدوات المنسوخة من الأصول (mh · mahdi-python · mahdi_pip.py · الاختصارات)
+        // تُنفَّذ مباشرة من الطرفية، و`chmod -R +x` في sandbox.sh يعمل مرة واحدة عند
+        // التثبيت فقط؛ فكانت أي أداة جديدة تُنسخ بعد تحديث التطبيق بلا صلاحية تنفيذ.
+        runCatching { setExecutable(true, false) }
     }
 }
