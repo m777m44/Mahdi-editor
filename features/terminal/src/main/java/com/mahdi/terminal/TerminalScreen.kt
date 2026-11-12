@@ -725,6 +725,9 @@ private fun TerminalQuickBar(modifier: Modifier = Modifier) {
             Triple(stringResource(strings.terminal_tool_zoom_out), { zoomToNextLevel(false) }, utility),
             // إعادة الضبط تعادل Ctrl+0: حجم 12 الافتراضي
             Triple(stringResource(strings.terminal_tool_zoom_reset), { applySize(12) }, accent),
+            // 8.5.0: أدوات المطوّر بلمسة واحدة — فحص البيئة كاملًا أو بدء مشروع جاهز
+            Triple("mh doctor", { send("mh doctor\r") }, accent),
+            Triple("mh new", { send("mh new ") }, accent),
         )
 
     Row(

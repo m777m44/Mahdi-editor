@@ -656,7 +656,9 @@ mahdi_py_deps() {
   local dir
   dir=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || dir="$(dirname "$file")"
 
-  if [ -f "$dir/requirements.txt" ]; then
+  # 8.5.0: ملف متطلبات فارغ أو معلّقات فقط لا يستحق سطرًا ولا عملية pip.
+  if [ -f "$dir/requirements.txt" ] &&
+    grep -qEv '^[[:space:]]*(#|$)' "$dir/requirements.txt" 2>/dev/null; then
     info "متطلبات requirements.txt…"
     mahdi_pip_run "requirements.txt" -r "$dir/requirements.txt" ||
       warn "بعض متطلبات requirements.txt لم تُثبَّت"
@@ -752,7 +754,10 @@ mahdi_node_deps() {
   local dir
   dir=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || dir="$(dirname "$file")"
 
-  if [ -f "$dir/package.json" ] && mahdi_have npm; then
+  # 8.5.0: لا `npm install` لمشروع بلا اعتماديات ولا بعد تثبيتها سابقًا
+  if [ -f "$dir/package.json" ] && mahdi_have npm &&
+    grep -qE '"(dependencies|devDependencies)"[[:space:]]*:' "$dir/package.json" 2>/dev/null &&
+    [ ! -d "$dir/node_modules" ]; then
     info "تثبيت متطلبات package.json…"
     (cd "$dir" && npm install --no-fund --no-audit --loglevel=error) || warn "تعذّر تثبيت package.json كاملًا"
   fi

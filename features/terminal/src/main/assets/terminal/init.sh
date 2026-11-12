@@ -70,7 +70,34 @@ fi
 # 8.3.0: مِحَثّ Mahdi **بعد** ~/.bashrc.
 # ملف bashrc الافتراضي في أوبنتو يعيد تعيين PS1 إلى `root@localhost:\w#`
 # — وهو بالضبط ما ظهر في لقطة المستخدم — فكان مِحَثّنا الأنيق يُلغى فورًا.
-export PS1='\[\e[1;96m\]▌\[\e[0m\] \[\e[94m\]\u@\h\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] \[\e[93m\]❯\[\e[0m\] '
+# 8.5.0: المِحَثّ صار حيًّا: يعرض رمز آخر أمر عند الفشل، وفرع Git الحالي،
+# ويتحوّل `❯` إلى المرجاني عند الخطأ — فيعرف المستخدم نتيجة الأمر قبل قراءته.
+# للتعطيل: MAHDI_GIT_PS1=0 (يُخفي فرع Git فقط)
+_mahdi_prompt() {
+    local rc=$? status='' branch='' arrow
+    if [ "$rc" -ne 0 ]; then
+        status="\[\e[1;91m\]✖ ${rc}\[\e[0m\] "
+        arrow='\[\e[1;91m\]❯\[\e[0m\] '
+    else
+        arrow='\[\e[93m\]❯\[\e[0m\] '
+    fi
+    if [ "${MAHDI_GIT_PS1:-1}" != "0" ] && command -v git >/dev/null 2>&1; then
+        branch="$(GIT_OPTIONAL_LOCKS=0 git rev-parse --abbrev-ref HEAD 2>/dev/null)" || branch=''
+        [ "$branch" = "HEAD" ] && branch=''
+        # فرع طويل يدفع المِحَثّ إلى سطرين؛ نعرض 21 محرفًا ثم …
+        if [ "${#branch}" -gt 24 ]; then
+            branch="${branch:0:21}…"
+        fi
+        [ -n "$branch" ] && branch="\[\e[95m\]${branch}\[\e[0m\] "
+    fi
+    PS1="\[\e[1;96m\]▌\[\e[0m\] \[\e[94m\]\u@\h\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] ${status}${branch}${arrow}"
+}
+# نحترم أي PROMPT_COMMAND سابق (من bashrc) بدل إلغائه، ونتجنّب تكرار أنفسنا
+case "${PROMPT_COMMAND:-}" in
+    *_mahdi_prompt*) ;;
+    "") PROMPT_COMMAND="_mahdi_prompt" ;;
+    *) PROMPT_COMMAND="_mahdi_prompt; $PROMPT_COMMAND" ;;
+esac
 
 
 ensure_packages_once() {
@@ -131,6 +158,19 @@ function command_not_found_handle {
   shift || true
   local hint=""
 
+  # 8.5.0: pip أو pip3 غائب ⇒ يُجهَّز فورًا ويُنفَّذ الأمر نفسه بلا «الأمر غير موجود».
+  # كان الاختصار يُكتب مرة واحدة فقط، فإذا حُذف pip بقي الأمر مفقودًا للأبد.
+  case "$cmd" in
+    pip | pip3)
+      printf "${M_MUTED}  تجهيز pip تلقائيًا…${M_RESET}\n" >&2
+      if declare -f mahdi_ensure_pip >/dev/null 2>&1 && mahdi_ensure_pip >/dev/null 2>&1; then
+        hash -r 2>/dev/null || true
+        "${MAHDI_PY:-python3}" -m pip "$@"
+        return $?
+      fi
+      ;;
+  esac
+
   if [ -x /usr/lib/command-not-found ]; then
     hint=$(/usr/lib/command-not-found -- "$cmd" 2>&1 | sed -n 's/.*apt install \(.*\)/\1/p' | head -1)
   elif [ -x /usr/share/command-not-found/command-not-found ]; then
@@ -180,4 +220,30 @@ fi
 if [ -f "$LOCAL/bin/aliases" ]; then
     # shellcheck disable=SC1091
     source "$LOCAL/bin/aliases"
+fi
+
+# 8.5.0: إكمال Tab لأوامر Mahdi وملفاتها — بلا أي إعداد من المستخدم
+if [ -n "${BASH_VERSION:-}" ] && [ "${MAHDI_NO_COMPLETION:-0}" != "1" ]; then
+    _mahdi_complete() {
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        case "${COMP_WORDS[0]}" in
+            mh)
+                if [ "${COMP_CWORD}" -eq 1 ]; then
+                    COMPREPLY=($(compgen -W "doctor py pip new run cache version help فحص بايثون جديد تشغيل مخزن إصدار مساعدة" -- "$cur"))
+                elif [ "${COMP_WORDS[1]}" = "new" ] && [ "${COMP_CWORD}" -eq 2 ]; then
+                    COMPREPLY=($(compgen -W "py bot web api html node" -- "$cur"))
+                elif [ "${COMP_WORDS[1]}" = "doctor" ]; then
+                    COMPREPLY=($(compgen -W "--fix --net --help" -- "$cur"))
+                fi
+                ;;
+            mahdi-python)
+                COMPREPLY=($(compgen -W "--info --list --use --upgrade --doctor --reset" -- "$cur"))
+                ;;
+            py | Py | pY | PY | js | Js | jS | JS | ts | Ts | tS | TS | run)
+                COMPREPLY=($(compgen -f -- "$cur"))
+                ;;
+        esac
+        return 0
+    }
+    complete -F _mahdi_complete mh mahdi-python py Py pY PY js Js jS JS ts Ts tS TS run 2>/dev/null || true
 fi
