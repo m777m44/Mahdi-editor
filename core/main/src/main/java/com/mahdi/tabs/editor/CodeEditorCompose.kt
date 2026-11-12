@@ -468,39 +468,20 @@ private suspend fun Editor.connectLsp(
     }
 }
 
+/**
+ * 8.4.0 — لا سؤال تثبيت عند فتح أي ملف.
+ *
+ * كان يظهر Snackbar «هل تريد تثبيت خادم اللغة …؟» عند كل ملف بايثون/جافاسكربت،
+ * فيبدو للمستخدم أن تشغيل السكربت «يسأله» قبل أن يعمل. التطبيق لا يطلب إذنًا:
+ * إمّا أن يكون الخادم مثبّتًا فيُستخدم، أو يُتجاهل بهدوء، والتثبيت يكون من
+ * «اللغات ← خوادم اللغة» فقط (كل ما يخصّ اللغة في مكان واحد).
+ */
 private fun LspServer.promptLspInstall(activity: Activity, scope: CoroutineScope) {
-    scope.launch {
-        val snackbarHost = snackbarHostStateRef.get() ?: return@launch
-        val result =
-            snackbarHost.showSnackbar(
-                message = strings.ask_lsp_install.getFilledString(languageName, activity),
-                actionLabel = strings.install.getString(),
-                withDismissAction = true,
-                duration = SnackbarDuration.Short,
-            )
-        if (result == SnackbarResult.ActionPerformed) {
-            Preference.removeKey("lsp_install_reject_count_${id}")
-            install(activity)
-        } else if (result == SnackbarResult.Dismissed) {
-            val rejectCount = Preference.getInt("lsp_install_reject_count_${id}", 0)
-            Preference.setInt("lsp_install_reject_count_${id}", rejectCount + 1)
-        }
-    }
+    logInfo("LSP ${languageName} is not installed; no prompt shown (8.4.0)")
 }
 
 private fun LspServer.promptLspUpdate(activity: Activity, scope: CoroutineScope) {
-    scope.launch {
-        val snackbarHost = snackbarHostStateRef.get() ?: return@launch
-        val result =
-            snackbarHost.showSnackbar(
-                message = strings.ask_lsp_update.getFilledString(languageName, activity),
-                actionLabel = strings.update.getString(),
-                duration = SnackbarDuration.Long,
-            )
-        if (result == SnackbarResult.ActionPerformed) {
-            update(activity)
-        }
-    }
+    logInfo("LSP ${languageName} has an update; no prompt shown (8.4.0)")
 }
 
 private suspend fun FileObject.getExtensionServers(

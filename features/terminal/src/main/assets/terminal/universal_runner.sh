@@ -63,7 +63,12 @@ mahdi_run_footer() {
     printf "${M_CORAL}✖${M_RESET}  ${M_BOLD}توقّف السكربت (الرمز %s)${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$rc" "$dur" || true
     # 8.3.0: سبب الفشل كان يُخفى تمامًا خلف رمز الخروج وحده
     if [ -n "${MAHDI_FAIL_REASON:-}" ]; then
-      printf "${M_MUTED}  %s${M_RESET}\n" "$MAHDI_FAIL_REASON" || true
+      printf "${M_VIOLET}  ↳ %s${M_RESET}\n" "$MAHDI_FAIL_REASON" || true
+    fi
+    local _hint
+    _hint="$(mahdi_exit_hint "$rc")"
+    if [ -n "$_hint" ]; then
+      printf "${M_MUTED}  ↳ %s${M_RESET}\n" "$_hint" || true
     fi
   fi
 
@@ -84,10 +89,34 @@ mahdi_run_footer() {
 }
 trap mahdi_run_footer EXIT
 
-# سطر البدء يبقى لاتينيًا خالصًا (اسم الملف + الوقت): إضافة كلمة عربية كانت
-# تجعل السطر ذا اتجاه RTL فيُعاد ترتيب الاسم والرمز بصريًا داخل الطرفية.
-printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s${M_RESET}  ${M_MUTED}│  %s${M_RESET}\n" \
-  "$(basename "$file")" "$(printf '%(%H:%M)T' -1)" || true
+# سطر البدء يبقى لاتينيًا خالصًا (اسم الملف + المفسّر + الوقت): إضافة كلمة
+# عربية كانت تجعل السطر ذا اتجاه RTL فيُعاد ترتيب الاسم والرمز بصريًا.
+# 8.4.0: شارة المفسّر تُظهر إصدار بايثون الحقيقي الذي سيُنفَّذ به السكربت
+# (وهو نفسه الذي تُثبَّت له المكتبات)، فلا مفاجآت في الواردات.
+_mahdi_badge=""
+case "$file" in
+  *.py | *.pyz | *.zipapp) _mahdi_badge="Python $(mahdi_python_version)" ;;
+esac
+if [ -n "$_mahdi_badge" ]; then
+  printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s${M_RESET}  ${M_MUTED}│${M_RESET}  ${M_TEAL}%s${M_RESET}  ${M_MUTED}│${M_RESET}  ${M_GOLD}%s${M_RESET}\n" \
+    "$(basename "$file")" "$_mahdi_badge" "$(printf '%(%H:%M)T' -1)" || true
+else
+  printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s${M_RESET}  ${M_MUTED}│${M_RESET}  ${M_GOLD}%s${M_RESET}\n" \
+    "$(basename "$file")" "$(printf '%(%H:%M)T' -1)" || true
+fi
+
+# 8.4.0: تفسير رموز الخروج الشائعة بدل رقم بلا معنى
+mahdi_exit_hint() {
+  case "$1" in
+    2) printf '%s' 'وسائط ناقصة أو استخدام خاطئ' ;;
+    126) printf '%s' 'الملف غير قابل للتنفيذ' ;;
+    127) printf '%s' 'المفسّر أو الأمر غير موجود' ;;
+    130) printf '%s' 'أُوقف بـ Ctrl+C' ;;
+    137) printf '%s' 'أُنهي لقلة الذاكرة' ;;
+    139) printf '%s' 'انهيار في مكتبة أصلية' ;;
+    *) printf '%s' '' ;;
+  esac
+}
 
 # ——————————————— 4.1.0: بيئة تشغيل موحّدة ———————————————
 # كل المفسّرات (Python/Node/PHP/Ruby/…‎) تُشغَّل بترميز UTF-8 افتراضيًا، فلا تتعطّل السكربتات
@@ -212,10 +241,11 @@ install_package() {
 }
 
 install_nodejs() {
+  export DEBIAN_FRONTEND=noninteractive
   info "تثبيت Node.js LTS…"
   install_package "curl"
   curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-  apt install -y nodejs
+  apt-get install -y --no-install-recommends nodejs </dev/null
 }
 
 install_rust() {
@@ -275,12 +305,12 @@ install_kotlin() {
 
 case "$file" in
   *.py)
-    if ! command_exists python3; then
+    if ! command_exists "${MAHDI_PY:-python3}"; then
       install_package "python3 python3-pip python3-venv"
     fi
     # 1) يكتشف كل import في الملف + أوامر pip المكتوبة داخله، 2) يثبّت الناقص بآخر إصدار، 3) يشغّل
     mahdi_auto_deps "$file"
-    mahdi_run_heal python "$file" python3 "$file"
+    mahdi_run_heal python "$file" "${MAHDI_PY:-python3}" "$file"
     ;;
 
   *.js|*.mjs|*.cjs)
@@ -561,20 +591,20 @@ case "$file" in
 
   *.json)
     # التحقق من صحّة JSON وطباعته مرتّبًا
-    python3 -c 'import json,sys; json.dump(json.load(open(sys.argv[1], encoding="utf-8")), sys.stdout, ensure_ascii=False, indent=2)' "$file" && echo
+    "${MAHDI_PY:-python3}" -c 'import json,sys; json.dump(json.load(open(sys.argv[1], encoding="utf-8")), sys.stdout, ensure_ascii=False, indent=2)' "$file" && echo
     ;;
 
   *.yaml|*.yml)
     mahdi_auto_deps "$file"
-    python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1], encoding="utf-8")); print("✓ YAML صحيح")' "$file"
+    "${MAHDI_PY:-python3}" -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1], encoding="utf-8")); print("✓ YAML صحيح")' "$file"
     ;;
 
   *.toml)
-    python3 -c 'import sys,tomllib; tomllib.load(open(sys.argv[1],"rb")); print("✓ TOML صحيح")' "$file"
+    "${MAHDI_PY:-python3}" -c 'import sys,tomllib; tomllib.load(open(sys.argv[1],"rb")); print("✓ TOML صحيح")' "$file"
     ;;
 
   *.ini|*.cfg|*.conf)
-    python3 -c 'import configparser,sys; c=configparser.ConfigParser(); c.read(sys.argv[1], encoding="utf-8"); print("✓ INI صحيح — أقسام:", ", ".join(c.sections()) or "—")' "$file"
+    "${MAHDI_PY:-python3}" -c 'import configparser,sys; c=configparser.ConfigParser(); c.read(sys.argv[1], encoding="utf-8"); print("✓ INI صحيح — أقسام:", ", ".join(c.sections()) or "—")' "$file"
     ;;
 
   *.xml|*.svg)
@@ -586,9 +616,9 @@ case "$file" in
 
   *.md|*.markdown)
     mahdi_auto_deps "$file"
-    if python3 -c "import markdown" 2>/dev/null; then
+    if "${MAHDI_PY:-python3}" -c "import markdown" 2>/dev/null; then
       out="${file%.*}.html"
-      python3 -c 'import sys,markdown; open(sys.argv[2],"w",encoding="utf-8").write(markdown.markdown(open(sys.argv[1],encoding="utf-8").read(), extensions=["extra","toc"]))' "$file" "$out"
+      "${MAHDI_PY:-python3}" -c 'import sys,markdown; open(sys.argv[2],"w",encoding="utf-8").write(markdown.markdown(open(sys.argv[1],encoding="utf-8").read(), extensions=["extra","toc"]))' "$file" "$out"
       success "تم تحويل Markdown إلى HTML: $out"
     else
       info "معاينة Markdown:"; sed -n '1,200p' "$file"
@@ -597,7 +627,7 @@ case "$file" in
 
   *.html|*.htm|*.xhtml)
     info "ملف HTML جاهز للمعاينة — استخدم «معاينة HTML» من التطبيق."
-    python3 - "$file" <<'PYEOF'
+    "${MAHDI_PY:-python3}" - "$file" <<'PYEOF'
 import sys, html
 src = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
 print("الحجم: %d حرفًا | عدد الوسوم: %d" % (len(src), src.count("<")))
@@ -605,7 +635,7 @@ PYEOF
     ;;
 
   *.css|*.scss|*.less)
-    python3 - "$file" <<'PYEOF'
+    "${MAHDI_PY:-python3}" - "$file" <<'PYEOF'
 import sys, re
 src = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
 rules = len(re.findall(r"\{", src))
@@ -711,11 +741,11 @@ PYEOF
 
   # ——— 4.1.0: حِزَم تشغيل جاهزة (zipapp/Java/…) ———
   *.pyz|*.zipapp)
-    if ! command_exists python3; then
+    if ! command_exists "${MAHDI_PY:-python3}"; then
       install_package "python3"
     fi
     mahdi_auto_deps "$file"
-    mahdi_run_heal python "$file" python3 "$file"
+    mahdi_run_heal python "$file" "${MAHDI_PY:-python3}" "$file"
     ;;
 
   *.jar)

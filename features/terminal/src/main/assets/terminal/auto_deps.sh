@@ -75,7 +75,7 @@ mahdi_deps_net_ok() {
   elif mahdi_have wget; then
     wget -q --spider --timeout=4 "$url" >/dev/null 2>&1 && ok=0
   else
-    python3 -c 'import socket,sys;socket.setdefaulttimeout(4);socket.create_connection((sys.argv[1],443)).close()' "$host" >/dev/null 2>&1 && ok=0
+    "${MAHDI_PY:-python3}" -c 'import socket,sys;socket.setdefaulttimeout(4);socket.create_connection((sys.argv[1],443)).close()' "$host" >/dev/null 2>&1 && ok=0
   fi
   if [ "$ok" -eq 0 ]; then
     MAHDI_NET_STATE=ok
@@ -189,10 +189,10 @@ mahdi_apt_install() {
 
 # تثبيت pip في مجلد المستخدم بلا apt وبلا أقفال (الأسرع والأكثر أمانًا)
 mahdi_bootstrap_pip() {
-  python3 -m pip --version >/dev/null 2>&1 && return 0
+  "${MAHDI_PY:-python3}" -m pip --version >/dev/null 2>&1 && return 0
 
-  python3 -m ensurepip --upgrade --user >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1 && return 0
-  python3 -m ensurepip --default-pip >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1 && return 0
+  "${MAHDI_PY:-python3}" -m ensurepip --upgrade --user >/dev/null 2>&1 && "${MAHDI_PY:-python3}" -m pip --version >/dev/null 2>&1 && return 0
+  "${MAHDI_PY:-python3}" -m ensurepip --default-pip >/dev/null 2>&1 && "${MAHDI_PY:-python3}" -m pip --version >/dev/null 2>&1 && return 0
 
   info "تنزيل get-pip.py (بلا apt)…"
   if mahdi_have curl || mahdi_have wget; then
@@ -203,14 +203,14 @@ mahdi_bootstrap_pip() {
       wget -q -T 120 -O "${TMPDIR:-/tmp}/get-pip.py" https://bootstrap.pypa.io/get-pip.py || true
     fi
     if [ -s "${TMPDIR:-/tmp}/get-pip.py" ]; then
-      python3 "${TMPDIR:-/tmp}/get-pip.py" --user --no-warn-script-location >/dev/null 2>&1 || true
-      python3 -m pip --version >/dev/null 2>&1 && return 0
+      "${MAHDI_PY:-python3}" "${TMPDIR:-/tmp}/get-pip.py" --user --no-warn-script-location >/dev/null 2>&1 || true
+      "${MAHDI_PY:-python3}" -m pip --version >/dev/null 2>&1 && return 0
     fi
   fi
 
   # آخر خيار: apt بمهلة محدودة
   mahdi_apt_install python3-pip >/dev/null 2>&1 || true
-  python3 -m pip --version >/dev/null 2>&1
+  "${MAHDI_PY:-python3}" -m pip --version >/dev/null 2>&1
 }
 
 mahdi_pip_env() {
@@ -240,26 +240,26 @@ mahdi_ensure_pip() {
     *) export PATH="$HOME/.local/bin:$PATH" ;;
   esac
 
-  if ! python3 -m pip --version >/dev/null 2>&1; then
+  if ! "${MAHDI_PY:-python3}" -m pip --version >/dev/null 2>&1; then
     info "pip غير مثبّت — جاري تجهيزه بلا انتظار أقفال النظام…"
     mahdi_bootstrap_pip || true
   fi
 
   # بعض السكربتات تستدعي «python» بدل «python3»، وبعضها «pip» بدل «pip3»
   if ! mahdi_have python; then
-    printf '#!/bin/sh\nexec python3 "$@"\n' > "$HOME/.local/bin/python" 2>/dev/null || true
+    printf '#!/bin/sh\nexec %s "$@"\n' "${MAHDI_PY:-python3}" > "$HOME/.local/bin/python" 2>/dev/null || true
     chmod +x "$HOME/.local/bin/python" 2>/dev/null || true
   fi
 
   local shim
   for shim in pip pip3; do
     if ! mahdi_have "$shim"; then
-      printf '#!/bin/sh\nexec python3 -m pip "$@"\n' > "$HOME/.local/bin/$shim" 2>/dev/null || true
+      printf '#!/bin/sh\nexec %s -m pip "$@"\n' "${MAHDI_PY:-python3}" > "$HOME/.local/bin/$shim" 2>/dev/null || true
       chmod +x "$HOME/.local/bin/$shim" 2>/dev/null || true
     fi
   done
   hash -r 2>/dev/null || true
-  python3 -m pip --version >/dev/null 2>&1
+  "${MAHDI_PY:-python3}" -m pip --version >/dev/null 2>&1
 }
 
 # ————————————————————————— تثبيت حزم بايثون (متوازٍ) —————————————————————————
@@ -282,7 +282,7 @@ mahdi_pip_run() {
   if [ -f "$script" ]; then
     local rc=0
     # || rc=$? : المشغّل يعمل بـ set -e، فأي رمز فشل غير مُختبَر يُنهي الجلسة
-    python3 "$script" --name "$name" "$@" || rc=$?
+    "${MAHDI_PY:-python3}" "$script" --name "$name" "$@" || rc=$?
     [ "$rc" -eq 0 ] && return 0
     # 6.1.0: رمز ٢ = لا يوجد اتصال. لا نكرّر المحاولة بعشر رسائل pip فاشلة.
     [ "$rc" -eq 2 ] && return 2
@@ -303,7 +303,7 @@ mahdi_pip_run() {
   # 6.1.0: كل ضجيج pip إلى ملف مؤقت — الطرفية تعرض سطرًا واحدًا فقط عند الفشل
   local log="${TMPDIR:-/tmp}/mahdi-pip-$$.log"
   local _prc=0
-  python3 -m pip install --upgrade --prefer-binary --disable-pip-version-check \
+  "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --disable-pip-version-check \
     --quiet --no-input --retries 3 --timeout 20 "$@" >"$log" 2>&1 || _prc=$?
   declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
   if [ "$_prc" -eq 0 ]; then
@@ -326,12 +326,12 @@ mahdi_pip_one() {
   # 8.3.0: إن تأكّد انقطاع الشبكة، لا تُجرب pip مرتين إضافيتين بلا جدوى
   [ "${MAHDI_OFFLINE:-0}" = "1" ] && { mahdi_deps_mark_failed "$pkg"; return 2; }
   # إعادة محاولة صامتة عبر المصدر الرسمي
-  python3 -m pip install --upgrade --prefer-binary --no-input --quiet \
+  "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --no-input --quiet \
     --disable-pip-version-check --retries 2 --timeout 20 "$pkg" >"$log" 2>&1 && {
     rm -f "$log" 2>/dev/null || true
     return 0
   }
-  python3 -m pip install --upgrade --prefer-binary --no-input --quiet \
+  "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --no-input --quiet \
     --disable-pip-version-check --retries 2 --timeout 20 \
     -i "https://pypi.org/simple" "$pkg" >"$log" 2>&1 && {
     rm -f "$log" 2>/dev/null || true
@@ -642,6 +642,17 @@ mahdi_py_deps() {
     return 0
   }
 
+  # 8.4.0: فحص وقائي — مكتبة موجودة لكنها تفتقر ميزة يستخدمها السكربت
+  # (مثل telebot بلا AsyncTeleBot). نُصلحها قبل أول تشغيل فلا يظهر الخطأ أصلًا.
+  local preflight_helper="${LOCAL:-/home}/bin/mahdi_heal.py"
+  if [ -f "$preflight_helper" ] && declare -f mahdi_heal_repair >/dev/null 2>&1; then
+    local preflight
+    preflight="$("${MAHDI_PY:-python3}" "$preflight_helper" --preflight --file "$file" 2>/dev/null || true)"
+    if [ -n "$preflight" ]; then
+      mahdi_heal_repair "$preflight" || true
+    fi
+  fi
+
   local dir
   dir=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || dir="$(dirname "$file")"
 
@@ -655,7 +666,7 @@ mahdi_py_deps() {
   local -a missing=()
   while IFS= read -r line; do
     [ -n "$line" ] && missing+=("$line")
-  done < <(python3 /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
+  done < <("${MAHDI_PY:-python3}" /tmp/mahdi_py_plan.py "$file" 2>/dev/null)
 
   # 3.0.0: صمت تام — لا تُطبع أي رسالة إذا كانت كل المكتبات موجودة
   if [ ${#missing[@]} -eq 0 ]; then

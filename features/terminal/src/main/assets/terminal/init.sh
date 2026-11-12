@@ -123,11 +123,9 @@ ensure_packages_once() {
 ensure_packages_once
 unset -f ensure_packages_once
 
-# 8.0.0: أمر غير موجود ⇒ سطر عربي واحد + اسم الحزمة، بلا نصّ إنجليزي طويل.
-#
-# كان يظهر نصّ command-not-found الإنجليزي كاملًا (خمسة أسطر) في تطبيق عربي.
-# الآن: سبب مختصر بالعربية، ثم سطر واحد يقول الحزمة المطلوبة. ولمن يريد
-# التثبيت التلقائي: MAHDI_AUTO_INSTALL=1 (يُثبَّت الأمر ثم يٌعاد تشغيله).
+# 8.4.0: أمر غير موجود ⇒ لا سؤال، ولا «apt install» إنجليزي، ولا انتظار يدوي.
+# يُثبَّت تلقائيًا بلا تفاعل (DEBIAN_FRONTEND=noninteractive) ثم يُعاد الأمر،
+# وإن تعذّر يبقى سطر عربي واحد يذكر الحزمة. للتعطيل: MAHDI_AUTO_INSTALL=0
 function command_not_found_handle {
   local cmd="$1"
   shift || true
@@ -142,7 +140,7 @@ function command_not_found_handle {
   printf "${M_CORAL}✖${M_RESET}  الأمر غير موجود: ${M_BOLD}%s${M_RESET}\n" "$cmd" >&2
 
   if [ -n "$hint" ]; then
-    if [ "${MAHDI_AUTO_INSTALL:-0}" = "1" ] && declare -f apt_fast >/dev/null 2>&1; then
+    if [ "${MAHDI_AUTO_INSTALL:-1}" = "1" ] && declare -f apt_fast >/dev/null 2>&1; then
       printf "${M_SKY}↳${M_RESET}  تثبيت ${M_BOLD}%s${M_RESET} تلقائيًا…\n" "$hint" >&2
       if apt_fast $hint >/dev/null 2>&1; then
         hash -r 2>/dev/null || true
@@ -150,7 +148,7 @@ function command_not_found_handle {
         return $?
       fi
     fi
-    printf "${M_SKY}↳${M_RESET}  يمكن تثبيته: ${M_BOLD}apt install %s${M_RESET}\n" "$hint" >&2
+    printf "${M_SKY}↳${M_RESET}  الحزمة المطلوبة: ${M_BOLD}%s${M_RESET}  ${M_MUTED}· ثبّتها من: اللغات ← المشغّلات${M_RESET}\n" "$hint" >&2
   else
     printf "${M_MUTED}  تحقّق من الاسم أو ثبّته من: اللغات ← المشغّرات${M_RESET}\n" >&2
   fi
