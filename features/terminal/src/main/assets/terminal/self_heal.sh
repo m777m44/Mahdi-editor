@@ -18,6 +18,12 @@
 
 MAHDI_HEAL="${MAHDI_HEAL:-1}"
 
+# 9.3.0: سلاسل التثبيت البديلة (نفس المحرّك المستخدم في auto_deps وinit)
+if [ -f "${LOCAL:-/home}/bin/rescue" ]; then
+  # shellcheck disable=SC1091
+  . "${LOCAL:-/home}/bin/rescue"
+fi
+
 if ! declare -f mahdi_bar_start >/dev/null 2>&1; then
   mahdi_bar_start() { :; }
   mahdi_bar_set() { :; }
@@ -127,7 +133,7 @@ mahdi_heal_report() {
   if [ -n "$mod" ]; then
     tone="$M_CORAL"
     title="المكتبة «$mod» غير مثبّتة"
-    hint="وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات"
+    hint="سيُعاد التثبيت تلقائيًا بطرق أخرى — أعد التشغيل بعد وصل الإنترنت"
     MAHDI_FAIL_REASON="مكتبة ناقصة: $mod"
   else
     case "$line" in
@@ -162,7 +168,7 @@ mahdi_heal_report() {
         MAHDI_FAIL_REASON="إيقاف من المستخدم" ;;
       ModuleNotFoundError:*|ImportError:*)
         tone="$M_CORAL"; title="مكتبة ناقصة"
-        hint="وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات"
+        hint="سيُعاد التثبيت تلقائيًا بطرق أخرى — أعد التشغيل بعد وصل الإنترنت"
         MAHDI_FAIL_REASON="مكتبة ناقصة" ;;
       TypeError:*|ValueError:*|KeyError:*|NameError:*|IndexError:*|ZeroDivisionError:*|RuntimeError:*|OSError:*|Exception:*)
         tone="$M_VIOLET"; title="خطأ في السكربت"
@@ -310,6 +316,11 @@ mahdi_heal_install() {
   case "$lang" in
     python)
       label="pip install $pkg"
+      # 9.3.0: السلسلة الكاملة أولًا (ويل ← إصدارات أقدم ← بناء ← حزمة نظام ← مصدر بديل)
+      if declare -f mahdi_py_install_any >/dev/null 2>&1; then
+        mahdi_py_install_any "$pkg" && return 0
+        return 1
+      fi
       if declare -f mahdi_pip_run >/dev/null 2>&1; then
         # المثبّت الذكي يرسم النسبة الحقيقية بنفسه
         local rc=0
@@ -332,6 +343,10 @@ mahdi_heal_install() {
 
     node)
       label="npm install $pkg"
+      # 9.3.0: node/npm يُثبَّتان عند الحاجة، ثم أربع محاولات لكل حزمة
+      if declare -f mahdi_npm_install_any >/dev/null 2>&1; then
+        mahdi_npm_install_any "$pkg" "${PWD:-/}" >/dev/null 2>&1 && return 0
+      fi
       mahdi_bar_start "$label"
       # 8.0.0: البطاقة وحدها تعرض التقدّم — نبدأ عملية ونُشغّل النبضة
       if declare -f mahdi_prog_start >/dev/null 2>&1; then
@@ -423,6 +438,33 @@ mahdi_run_heal() {
     fi
     [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
     [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
+
+    # ————————————————————— 9.3.0: سبب «الانهيار» الأشهر عند تشغيل مشاريع GitHub —————
+    # سكربت يستدعي أمرًا غير موجود (npm · node · git · curl · ffmpeg …) كان يفشل
+    # فورًا بلا أي محاولة تثبيت، ويُعرض كأن المشروع «منهار».
+    local missing_cmd=""
+    # (الصيغ الثلاث: «npm: command not found» · «bash: line 3: npm: command not found»
+    #  · «sh: 1: npm: not found») — نأخذ الكلمة الأخيرة قبل العبارة نفسها.
+    missing_cmd="$(grep -oE '[A-Za-z0-9_.+-]+: (command )?not found' "$errfile" 2>/dev/null |
+      head -n 1 | sed 's/:.*//')"
+    if [ -n "$missing_cmd" ] && declare -f mahdi_install_command >/dev/null 2>&1; then
+      printf "${M_SKY}↻  الأمر «%s» غير مثبَّت — تجهيزه ثم إعادة التشغيل…${M_RESET}\n" "$missing_cmd"
+      if mahdi_install_command "$missing_cmd" >/dev/null 2>&1; then
+        hash -r 2>/dev/null || true
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
+
+    # صلاحية التنفيذ: مشاريع GitHub تأتي غالبًا بلا +x بعد فكّ الضغط
+    if grep -qiE 'permission denied' "$errfile" 2>/dev/null && [ -f "$script" ]; then
+      if [ ! -x "$script" ]; then
+        chmod +x "$script" 2>/dev/null || true
+        printf "${M_SKY}↻  منح صلاحية التنفيذ ثم إعادة التشغيل…${M_RESET}\n"
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
 
     # 8.4.0: مكتبة موجودة لكنها قديمة أو خاطئة (مثل telebot بلا AsyncTeleBot).
     # لا يظهر ModuleNotFoundError، فلا يلتقطها كاشف الحزم — نصلحها هنا مرة واحدة.

@@ -44,6 +44,8 @@ fun setupTerminalFiles() {
             "aliases",
             // 5.5.0: محرّك «ثبّت المكتبة الناقصة وأعد التشغيل»
             "self_heal",
+            // 9.3.0: محرّك «ثبّتها بأي طريقة» — pkg · Node · pip بسلاسل بدائل
+            "rescue",
         )
     internalFiles.forEach { setupAssetFile(it) }
 

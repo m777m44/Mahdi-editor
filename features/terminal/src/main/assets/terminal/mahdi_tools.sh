@@ -26,6 +26,12 @@ if [ -f "$LOCAL/bin/utils" ]; then
   . "$LOCAL/bin/utils" >/dev/null 2>&1
 fi
 
+# 9.3.0: محرّك التثبيت الشامل (mh fix · mh install · pkg)
+if [ -f "$LOCAL/bin/rescue" ]; then
+  # shellcheck disable=SC1091
+  . "$LOCAL/bin/rescue" >/dev/null 2>&1
+fi
+
 # بدائل إن كان التثبيت قديمًا وبلا utils — الأمر يبقى صالحًا للعمل
 if ! declare -f mahdi_heading >/dev/null 2>&1; then
   M_RESET='' M_BOLD='' M_DIM='' M_SKY='' M_TEAL='' M_MINT='' M_GOLD=''
@@ -689,6 +695,138 @@ mh_cache() {
   esac
 }
 
+# ————————————————— 9.3.0: إصلاح البيئة وتجهيز المشاريع —————————————————
+
+# حزم الأساس التي تحتاجها ٩٩٪ من سكربتات GitHub (‏`curl | sh`، `git clone`، `npm i`)
+_MH_BASE_PKGS="curl wget git ca-certificates unzip zip tar xz-utils file less nano tree jq procps"
+
+mh_fix() {
+  printf '\n'
+  mahdi_rule 34
+  mahdi_heading "إصلاح البيئة"
+
+  # ١) أدوات الشبكة والمستودعات
+  local missing=() p
+  for p in $_MH_BASE_PKGS; do
+    dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p")
+  done
+  if [ "${#missing[@]}" -gt 0 ]; then
+    info "تثبيت أدوات الأساس: ${missing[*]}"
+    if declare -f mahdi_apt_install_soft >/dev/null 2>&1; then
+      mahdi_apt_install_soft "${missing[@]}" >/dev/null 2>&1 || true
+    else
+      apt-get -o DPkg::Lock::Timeout=60 install -y --no-install-recommends "${missing[@]}" >/dev/null 2>&1 || true
+    fi
+    missing=()
+    for p in $_MH_BASE_PKGS; do
+      dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    if [ "${#missing[@]}" -eq 0 ]; then
+      success "أدوات الأساس جاهزة"
+    else
+      warn "تعذّر تجهيز: ${missing[*]} — ستُجرَّب تلقائيًا عند الحاجة"
+    fi
+  else
+    success "أدوات الأساس جاهزة"
+  fi
+
+  # ٢) بايثون وpip
+  if command -v "${MAHDI_PY:-python3}" >/dev/null 2>&1; then
+    if [ -n "$(_mh_pip_version)" ]; then
+      success "بايثون وpip جاهزان"
+    elif declare -f mahdi_ensure_pip >/dev/null 2>&1 && mahdi_ensure_pip >/dev/null 2>&1; then
+      success "أُصلح pip"
+    else
+      warn "pip غير جاهز — سيُعاد تجهيزه عند أول تثبيت مكتبة"
+    fi
+  else
+    warn "بايثون غير مثبّت — mh doctor --fix يجهّزه"
+  fi
+
+  # ٣) Node.js وnpm — سبب رسالة «الأمر غير موجود: npm» المتكرّرة
+  if declare -f mahdi_node_ensure >/dev/null 2>&1 && mahdi_node_ensure >/dev/null 2>&1; then
+    success "Node.js وnpm جاهزان · $(node -v 2>/dev/null)"
+  else
+    warn "تعذّر تجهيز Node الآن — سيُعاد تلقائيًا عند أول أمر يحتاجه"
+  fi
+
+  # ٤) الاختصارات وmh نفسه
+  if [ -f "$LOCAL/bin/aliases" ]; then
+    # shellcheck disable=SC1091
+    . "$LOCAL/bin/aliases" >/dev/null 2>&1 || true
+  fi
+  declare -f mahdi_install_shims >/dev/null 2>&1 && mahdi_install_shims
+  success "الاختصارات وأدوات pkg · sudo · termux-* جاهزة"
+
+  printf '\n'
+  printf "  ${M_SKY}↳${M_RESET}  %s\n" "أعد تشغيل السكربت الآن — لن يشتكي من أمر ناقص"
+  printf '\n'
+  return 0
+}
+
+mh_install() {
+  local dir="${1:-.}"
+  if [ ! -d "$dir" ]; then
+    error "المجلد غير موجود: $dir"
+    return 2
+  fi
+  dir="$(cd "$dir" 2>/dev/null && pwd)" || dir="$1"
+
+  mahdi_heading "تجهيز المشروع"
+  mahdi_kv "المجلد" "$dir"
+
+  local found=0 f
+  for f in requirements.txt pyproject.toml setup.py package.json Gemfile composer.json go.mod Cargo.toml; do
+    [ -f "$dir/$f" ] && found=$((found + 1))
+  done
+  if [ "$found" -eq 0 ]; then
+    warn "لا توجد ملفات اعتماديات في هذا المجلد (requirements.txt · package.json · …)"
+    printf "  ${M_MUTED}%s${M_RESET}\n" "إن كان المشروع على GitHub فاستنسخه أولًا: git clone <الرابط>"
+    return 0
+  fi
+
+  rm -f "$dir/.mahdi_deps_ready" 2>/dev/null || true
+  mahdi_project_bootstrap "$dir"
+
+  success "اكتمل التجهيز — شغّل الملف الآن: mh run <ملف>"
+  printf '\n'
+  return 0
+}
+
+mh_clone() {
+  local url="${1:-}"
+  if [ -z "$url" ]; then
+    error "اكتب رابط المستودع: mh clone https://github.com/owner/repo"
+    return 2
+  fi
+  declare -f mahdi_install_command >/dev/null 2>&1 && mahdi_install_command git >/dev/null 2>&1
+  if ! command -v git >/dev/null 2>&1; then
+    error "تعذّر تجهيز git — أعد المحاولة بعد وصل الإنترنت"
+    return 2
+  fi
+
+  local name
+  name="$(basename "$url" .git)"
+  mahdi_heading "استنساخ المشروع"
+  mahdi_kv "المستودع" "$url"
+
+  if [ -d "$name/.git" ] || [ -d "$name" ]; then
+    info "المجلد موجود — تحديثه"
+    (cd "$name" && git pull --ff-only) || warn "تعذّر التحديث — نكمل بالمجلد الحالي"
+  else
+    git clone --depth 1 "$url" "$name" || {
+      error "تعذّر الاستنساخ — تحقّق من الرابط والاتصال"
+      return 1
+    }
+  fi
+
+  printf "\n  ${M_SKY}↳${M_RESET}  ${M_BOLD}cd %s${M_RESET}\n" "$name"
+  (cd "$name" && mahdi_project_bootstrap "$(pwd)")
+  success "المشروع جاهز"
+  printf '\n'
+  return 0
+}
+
 mh_version() {
   mahdi_heading "الإصدارات"
   mahdi_kv "التطبيق" "$(cat "$LOCAL/bin/.mahdi_version" 2>/dev/null || printf '—')"
@@ -750,6 +888,9 @@ mh_help() {
   printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh pip" "pip عبر أحدث مفسّر وبمخزن دائم"
   printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh new" "مشروع جاهز: py · bot · web · api · html · node"
   printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh run" "تشغيل ملف — أو نقطة بداية المشروع بلا وسائط"
+  printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh fix" "إصلاح البيئة: أدوات · pip · Node · اختصارات"
+  printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh install" "تجهيز اعتماديات مشروع كامل (requirements · package.json)"
+  printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh clone" "استنساخ مشروع من GitHub ثم تجهيزه تلقائيًا"
   printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh cache" "أحجام المخازن الدائمة"
   printf "  ${M_BOLD}%-14s${M_RESET} %s\n" "mh version" "إصدارات التطبيق والأدوات"
   printf '\n'
@@ -789,6 +930,7 @@ mh_home() {
   printf '\n'
   printf "  ${M_SKY}mh doctor${M_RESET}  ${M_MUTED}فحص شامل${M_RESET}      ${M_SKY}mh new py app${M_RESET}  ${M_MUTED}مشروع جديد${M_RESET}\n"
   printf "  ${M_SKY}mh pip -V${M_RESET}  ${M_MUTED}مدير الحزم${M_RESET}     ${M_SKY}mh run main.py${M_RESET}  ${M_MUTED}تشغيل ملف${M_RESET}\n"
+  printf "  ${M_SKY}mh fix${M_RESET}     ${M_MUTED}إصلاح البيئة${M_RESET}     ${M_SKY}mh clone <رابط>${M_RESET}  ${M_MUTED}مشروع من GitHub${M_RESET}\n"
   printf "  ${M_MUTED}mh help — كل الأوامر${M_RESET}\n"
   printf '\n'
 }
@@ -816,6 +958,25 @@ case "${1:-}" in
   run | تشغيل)
     shift
     mh_run "$@"
+    ;;
+  fix | إصلاح | repair)
+    mh_fix
+    ;;
+  install | تجهيز | تثبيت)
+    shift
+    mh_install "$@"
+    ;;
+  clone | استنساخ)
+    shift
+    mh_clone "$@"
+    ;;
+  pkg | حزم)
+    shift
+    if declare -f mahdi_pkg >/dev/null 2>&1; then
+      mahdi_pkg "$@"
+    else
+      apt "$@"
+    fi
     ;;
   cache | مخزن)
     shift

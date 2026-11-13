@@ -85,6 +85,12 @@ mahdi_deps_net_ok() {
   return 1
 }
 
+# 9.3.0: محرّك التثبيت الشامل (سلاسل بدائل لكل مكتبة)
+if [ -f "${LOCAL:-/home}/bin/rescue" ]; then
+  # shellcheck disable=SC1091
+  . "${LOCAL:-/home}/bin/rescue"
+fi
+
 # في حال تشغيل الملف مستقلة دون utils
 if ! declare -f info >/dev/null 2>&1; then
   info() { printf '\n[INFO] %s\n' "$*"; }
@@ -104,12 +110,14 @@ mahdi_have() { command -v "$1" >/dev/null 2>&1; }
 
 mahdi_deps_offline() {
   printf '\033[33m⚠ لا يوجد اتصال بالإنترنت — لم تُثبَّت المكتبات: %s\033[0m\n' "$1" >&2
-  printf '\033[2m  وصّل الإنترنت ثم أعد التشغيل، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+  printf '\033[2m  وصّل الإنترنت ثم أعد التشغيل — سيُعاد التثبيت تلقائيًا\033[0m\n' >&2
 }
 
 mahdi_deps_missing() {
   printf '\033[31m✖ تعذّر تجهيز المكتبات: %s\033[0m\n' "$1" >&2
-  printf '\033[2m  تحقّق من الاتصال ثم أعد المحاولة، أو ثبّتها من: اللغات ← المشغّلات\033[0m\n' >&2
+  # 9.3.0: «ثبّتها من: اللغات ← المشغّلات» لم تكن إجراءً لأي مكتبة بايثون،
+  # فاستبدلناها بأمر يعمل فعلًا ويعيد المحاولة بكل الطرق.
+  printf '\033[2m  جرّب: mh fix ثم mh install . — يكرّر المحاولة بطرق وأصدور أخرى\033[0m\n' >&2
 }
 
 # ————————————————————————————— أدوات مساعدة —————————————————————————————
@@ -693,6 +701,27 @@ mahdi_py_deps() {
 
   local pip_rc=0
   mahdi_pip_install_many "${fresh[@]}" || pip_rc=$?
+
+  # 9.3.0: «إن فشل إصدار ثبّته بغيره». كل حزمة فشلت في الدفعة تُمرَّر على سلسلة
+  # البدائل وحدها: ويل فقط ← إصدارات أقدم ← بناء من المصدر ← حزمة النظام ←
+  # مصدر بديل. كانت الدفعة الفاشلة تُعلَن فشلًا نهائيًا بلا محاولة أخرى.
+  if [ "$pip_rc" -ne 0 ] && [ "$pip_rc" -ne 2 ] && declare -f mahdi_py_install_any >/dev/null 2>&1; then
+    local pkg_name rescued=0 still=()
+    for pkg_name in "${fresh[@]}"; do
+      if mahdi_py_install_any "$pkg_name" >/dev/null 2>&1; then
+        rescued=$((rescued + 1))
+      else
+        still+=("$pkg_name")
+      fi
+    done
+    if [ "${#still[@]}" -eq 0 ]; then
+      pip_rc=0
+    else
+      fresh=("${still[@]}")
+    fi
+    [ "$rescued" -gt 0 ] && [ "${#still[@]}" -eq 0 ] && success "أُعيد تجهيز المكتبات بطريقة أخرى" 2>/dev/null || true
+  fi
+
   if [ "$pip_rc" -ne 0 ]; then
     mahdi_deps_mark_failed "${fresh[@]}"
     # رمز ٢ = لا اتصال؛ الرسالة العربية طُبعت من المثبّت، لا نكرّرها
@@ -749,6 +778,14 @@ mahdi_node_deps() {
   local file="$1"
   [ "$MAHDI_AUTO_DEPS" = "0" ] && return 0
   [ -z "$file" ] && return 0
+
+  # 9.3.0: كان السطر `mahdi_have node || return 0` يترك كل مشروع Node على
+  # جهاز بلا Node بلا أي محاولة تثبيت — فيفشل السكربت بـ«الأمر غير موجود».
+  if ! mahdi_have node; then
+    if declare -f mahdi_node_ensure >/dev/null 2>&1; then
+      mahdi_node_ensure >/dev/null 2>&1 || true
+    fi
+  fi
   mahdi_have node || return 0
 
   local dir
@@ -797,8 +834,16 @@ mahdi_node_deps() {
     export NODE_PATH="$(npm root -g 2>/dev/null):${NODE_PATH:-}"
   fi
 
-  local -a left=()
+  # 9.3.0: أي حزمة بقيت غير مثبَّتة تُمرَّر على السلسلة البديلة وحدها
   local name
+  for name in "${missing[@]}"; do
+    mahdi_node_installed "$name" "$dir" && continue
+    if declare -f mahdi_npm_install_any >/dev/null 2>&1; then
+      mahdi_npm_install_any "$name" "$dir" >/dev/null 2>&1 || true
+    fi
+  done
+
+  local -a left=()
   for name in "${missing[@]}"; do
     mahdi_node_installed "$name" "$dir" || left+=("$name")
   done

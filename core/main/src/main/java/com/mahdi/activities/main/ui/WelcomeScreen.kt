@@ -64,7 +64,6 @@ import com.mahdi.commands.ActionContext
 import com.mahdi.commands.Command
 import com.mahdi.commands.CommandProvider
 import com.mahdi.drawer.DrawerViewModel
-import com.mahdi.file.FileObject
 import com.mahdi.file.FileWrapper
 import com.mahdi.filetree.FileTreeTab
 import com.mahdi.filetree.getAppropriateName
@@ -191,14 +190,8 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                 }
             }
 
-            // 9.0.0: «مساحة العمل» — ملفات المشروع الحالي في الصفحة نفسها، بجانب
-            // «آخر الملفات» وأزرار التشغيل والطرفية: كل ما يحتاجه المستخدم لبدء
-            // العمل في مكان واحد، بلا تنقّل بين ثلاث شاشات.
-            currentProject?.let { project ->
-                Spacer(Modifier.height(10.dp))
-                ProjectFilesRow(root = project)
-            }
-
+            // 9.3.0: «ملفات المشروع» أُزيلت من الرئيسية بطلب المستخدم — بقيت
+            // «آخر الملفات» وحدها، وشجرة المشروع الكاملة في الدُرج (Ctrl+B).
             if (recentFiles.size > 1) {
                 Spacer(Modifier.height(12.dp))
                 RecentFilesRow(
@@ -515,80 +508,6 @@ private fun RecentFilesRow(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
                         }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * ملفات المشروع الحالي (9.0.0) — «شجرة مصغّرة» في الرئيسية: أول عشرة ملفات في
- * جذر المشروع، بلمسة واحدة تُفتح في المحرّر.
- *
- * لا مجلدات ولا مستويات هنا (الشجرة الكاملة في الدُرج)؛ الهدف أن يرى المستخدم
- * ما في مشروعه فور فتح التطبيق، وأن يبدأ بلمسة، بلا أي شرح نصّي إضافي.
- */
-@Composable
-private fun ProjectFilesRow(root: FileObject) {
-    val scope = rememberCoroutineScope()
-    var files by remember(root) { mutableStateOf<List<FileObject>>(emptyList()) }
-
-    LaunchedEffect(root) {
-        files =
-            runCatching {
-                    root.listFiles()
-                        .filter { it.isFile() }
-                        .sortedBy { it.getName().lowercase() }
-                        .take(10)
-                }
-                .getOrDefault(emptyList())
-    }
-
-    if (files.isEmpty()) return
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(strings.workspace_project_files),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
-        )
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp),
-        ) {
-            items(files.size) { index ->
-                val file = files[index]
-                Card(
-                    modifier =
-                        Modifier.widthIn(max = 200.dp)
-                            .clickable {
-                                scope.launch {
-                                    runCatching {
-                                        MainActivity.instance?.viewModel?.editorManager?.openFile(file)
-                                    }
-                                        .onFailure { toast(it.message ?: "تعذّر فتح الملف") }
-                                }
-                            },
-                    shape = RoundedCornerShape(14.dp),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = Color(0xFF00E5FF),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        FileNameText(name = file.getName(), maxLines = 1)
                     }
                 }
             }

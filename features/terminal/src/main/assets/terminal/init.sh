@@ -9,7 +9,24 @@ export LANG="${LANG:-C.UTF-8}"
 export LC_ALL="${LC_ALL:-C.UTF-8}"
 export PYTHONIOENCODING=utf-8
 export PYTHONUTF8=1
+# 9.3.0: كل apt بلا سؤال، وكل سكربت قادم من الإنترنت يجد ما يحتاجه
+export DEBIAN_FRONTEND=noninteractive
+export APT_LISTCHANGES_FRONTEND=none
 source "$LOCAL/bin/utils"
+
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.3.0 — محرّك «ثبّتها بأي طريقة» + أدوات بيئة أندرويد الناقصة
+#
+# كان `npm` يُطبع «الأمر غير موجود» أربع مرات متتالية ثم يقول «ثبّتها بنفسك»،
+# لأن محاولة التثبيت الوحيدة كانت `apt install npm` بلا بدائل. الآن كل أمر
+# ناقص يمرّ على سلاسل بدائل حقيقية (مستودع ← NodeSource ← حزمة رسمية)، وكل
+# مكتبة بايثون على سبع محاولات، والمشاريع القادمة من GitHub تُجهَّز تلقائيًا.
+# ——————————————————————————————————————————————————————————————————————————————
+if [ -f "$LOCAL/bin/rescue" ]; then
+    # shellcheck disable=SC1091
+    source "$LOCAL/bin/rescue"
+    declare -f mahdi_rescue_init >/dev/null 2>&1 && mahdi_rescue_init
+fi
 
 # 8.3.0: «groups: cannot find name for group ID 99909997»
 # أندرويد يمنح التطبيق مجموعات تكميلية بلا أسماء داخل /etc/group، و`/etc/bash.bashrc`
@@ -90,7 +107,9 @@ _mahdi_prompt() {
         fi
         [ -n "$branch" ] && branch="\[\e[95m\]${branch}\[\e[0m\] "
     fi
-    PS1="\[\e[1;96m\]▌\[\e[0m\] \[\e[94m\]\u@\h\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] ${status}${branch}${arrow}"
+    # 9.3.0: بدل `root@localhost` (الذي كان يظهر من تنسيق \u@\h) نعرض هوية
+    # التطبيق نفسها: MAHDI-EDITOR — كما طلبه المستخدم بالنصّ.
+    PS1="\[\e[1;96m\]▌\[\e[0m\] \[\e[1;94m\]MAHDI-EDITOR\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] ${status}${branch}${arrow}"
 }
 # نحترم أي PROMPT_COMMAND سابق (من bashrc) بدل إلغائه، ونتجنّب تكرار أنفسنا
 case "${PROMPT_COMMAND:-}" in
@@ -104,7 +123,12 @@ ensure_packages_once() {
     # 8.3.0: لا apt ولا dpkg عند فتح طرفية بعد انتهاء سكربت
     [ "${MAHDI_SKIP_INIT_SETUP:-0}" = "1" ] && return 0
     local marker_file="/.cache/.packages_ensured"
-    local PACKAGES=("command-not-found" "sudo" "xkb-data" "libjemalloc-dev")
+    # 9.3.0: أدوات الأساس التي تحتاجها سكربتات GitHub (‏curl | sh · git clone ·
+    # npm install) تُثبَّت مع أول تجهيز بدل أن تفشل عند أول استخدام.
+    local PACKAGES=(
+        "command-not-found" "sudo" "xkb-data" "libjemalloc-dev"
+        "curl" "ca-certificates" "git" "unzip" "zip" "xz-utils" "less" "file"
+    )
 
     # Exit early if already done
     [[ -f "$marker_file" ]] && return 0
@@ -171,6 +195,18 @@ function command_not_found_handle {
       ;;
   esac
 
+  # 9.3.0: أولًا المثبّت الشامل (مستودع النظام ثم NodeSource ثم الحزمة الرسمية
+  # ثم npm). كان هذا السطر غائبًا، فطُبعت «الأمر غير موجود» أربع مرات بلا أن
+  # يُثبَّت شيء، وبقي السكربت يفشل عند أول أمر.
+  if [ "${MAHDI_AUTO_INSTALL:-1}" != "0" ] && declare -f mahdi_install_command >/dev/null 2>&1; then
+    printf "${M_SKY}↳${M_RESET}  تجهيز ${M_BOLD}%s${M_RESET} تلقائيًا…\n" "$cmd" >&2
+    if mahdi_install_command "$cmd" >/dev/null 2>&1; then
+      hash -r 2>/dev/null || true
+      "$cmd" "$@"
+      return $?
+    fi
+  fi
+
   if [ -x /usr/lib/command-not-found ]; then
     hint=$(/usr/lib/command-not-found -- "$cmd" 2>&1 | sed -n 's/.*apt install \(.*\)/\1/p' | head -1)
   elif [ -x /usr/share/command-not-found/command-not-found ]; then
@@ -187,10 +223,16 @@ function command_not_found_handle {
         "$cmd" "$@"
         return $?
       fi
+      # محاولة أخيرة بالسلاسل البديلة (حزمة معطوبة أو اسم مختلف)
+      if declare -f mahdi_pkg_install >/dev/null 2>&1 && mahdi_pkg_install "$hint" >/dev/null 2>&1; then
+        hash -r 2>/dev/null || true
+        "$cmd" "$@"
+        return $?
+      fi
     fi
-    printf "${M_SKY}↳${M_RESET}  الحزمة المطلوبة: ${M_BOLD}%s${M_RESET}  ${M_MUTED}· ثبّتها من: اللغات ← المشغّلات${M_RESET}\n" "$hint" >&2
+    printf "${M_SKY}↳${M_RESET}  لم يكتمل تجهيز ${M_BOLD}%s${M_RESET} — نفّذ ${M_BOLD}mh fix${M_RESET} ثم أعد المحاولة\n" "$hint" >&2
   else
-    printf "${M_MUTED}  تحقّق من الاسم أو ثبّته من: اللغات ← المشغّرات${M_RESET}\n" >&2
+    printf "${M_MUTED}  لم يُعثر على حزمة بهذا الاسم — تحقّق من الإملاء أو نفّذ ${M_RESET}${M_BOLD}mh fix${M_RESET}\n" >&2
   fi
   return 127
 }
@@ -200,7 +242,7 @@ alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
-alias pkg='apt'
+# 9.3.0: `pkg` صار أداة حقيقية في $LOCAL/bin — تعمل داخل السكربتات أيضًا
 
 if [[ -f /initrc ]]; then
     # shellcheck disable=SC1090
