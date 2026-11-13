@@ -40,12 +40,11 @@ object Python : ScriptedLspServer() {
     }
 
     override fun getConnectionConfig(): LspConnectionConfig {
-        return
-            LspConnectionConfig.Process(
-                command = arrayOf("/usr/bin/node", "/usr/bin/$serverName", "--stdio"),
-                // 9.1.0: حدّ ذاكرة صريح — وإلا كبر V8 حتى يجعل قاتل الذاكرة
-                // يقتل العملية (إشارة ٩) على أجهزة ٣–٤ غيغابايت.
-                env = NodeMemoryLimits.ENV,
-            )
+        return LspConnectionConfig.Process(
+            command = arrayOf("/usr/bin/node", "/usr/bin/$serverName", "--stdio"),
+            // 9.1.0: حدّ ذاكرة صريح — وإلا كبر V8 حتى يجعل قاتل الذاكرة
+            // يقتل العملية (إشارة ٩) على أجهزة ٣–٤ غيغابايت.
+            env = NodeMemoryLimits.ENV,
+        )
     }
 }
