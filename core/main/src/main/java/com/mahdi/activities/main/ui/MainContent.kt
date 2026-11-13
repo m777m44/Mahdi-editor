@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
@@ -337,6 +338,21 @@ private fun TabItemContent(
                 calculatedTabWidth?.let { width -> modifier.width(with(density) { width.toDp() }) } ?: modifier
             }
             .let { if (isDraggableContent) it.background(backgroundColor.copy(alpha = 0.4f)) else it }
+            // 9.2.0: التبويب النشط يتلوّن بتدرّج خفيف بلون نوع الملف، فيُعرف
+            // «أين أنا» من نظرة، وتبدو الشريط حيًّا لا صفًّا رماديًّا مسطّحًا.
+            .let {
+                if (isSelected && !isDraggableContent)
+                    it.background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                (getFileColor(tab.file) ?: MaterialTheme.colorScheme.primary)
+                                    .copy(alpha = 0.16f),
+                                androidx.compose.ui.graphics.Color.Transparent,
+                            )
+                        )
+                    )
+                else it
+            }
             .let {
                 if (tab is EditorTab && !tab.editorState.editable)
                     it.background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f))

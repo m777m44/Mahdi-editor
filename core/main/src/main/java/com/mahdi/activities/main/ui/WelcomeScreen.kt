@@ -85,6 +85,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -213,7 +214,7 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                     },
                     // 9.2.0: ✕ بجانب كل ملف في الرئيسية يُغلقه ويُزيله من القائمة.
                     onClose = { path ->
-                        closeFromHome(path) { scope.launch { reloadRecent() } }
+                        closeFromHome(path, scope) { scope.launch { reloadRecent() } }
                     },
                 )
             }
@@ -700,16 +701,20 @@ private fun tabsOpenPaths(): Set<String> {
  * 9.2.0 — إغلاق ملف من الرئيسية: يُزال تبويبه (بتأكيد واحد فقط إن كان
  * معدَّلًا وغير محفوظ) ثم يُنسى من «آخر الملفات» فلا يعود إلى الرئيسية.
  */
-private fun closeFromHome(path: String, onDone: () -> Unit) {
+private fun closeFromHome(path: String, scope: CoroutineScope, onDone: () -> Unit) {
     val viewModel = MainActivity.instance?.viewModel
     val tab =
         viewModel?.tabs
             ?.filterIsInstance<EditorTab>()
             ?.firstOrNull { it.file?.getAbsolutePath() == path }
 
+    // `RecentFiles.forget` معلَّقة (suspend) — نُشغّلها على نطاق الشاشة نفسه
     val finish = {
-        RecentFiles.forget(path)
-        onDone()
+        scope.launch {
+            runCatching { RecentFiles.forget(path) }
+            onDone()
+        }
+        Unit
     }
 
     if (viewModel == null || tab == null) {

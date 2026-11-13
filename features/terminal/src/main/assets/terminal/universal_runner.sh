@@ -65,8 +65,12 @@ mahdi_run_footer() {
     if [ -n "${MAHDI_FAIL_REASON:-}" ]; then
       printf "${M_VIOLET}  ↳ %s${M_RESET}\n" "$MAHDI_FAIL_REASON" || true
     fi
-    local _hint
-    _hint="$(mahdi_exit_hint "$rc")"
+    # 9.2.0: إن كان هناك سبب محدّد (صياغة/مكتبة/صلاحية) لا نُضيف تلميحًا عامًّا
+    # فوقه — تكرار التشخيص يُشوّش بدل أن يشرح.
+    local _hint=""
+    if [ -z "${MAHDI_FAIL_REASON:-}" ]; then
+      _hint="$(mahdi_exit_hint "$rc")"
+    fi
     if [ -n "$_hint" ]; then
       printf "${M_MUTED}  ↳ %s${M_RESET}\n" "$_hint" || true
     fi
@@ -138,6 +142,7 @@ fi
 # 8.4.0: تفسير رموز الخروج الشائعة بدل رقم بلا معنى
 mahdi_exit_hint() {
   case "$1" in
+    1) printf '%s' 'خطأ داخل السكربت — اقرأ الرسالة أعلاه، فهي تحمل السطر المذنب' ;;
     2) printf '%s' 'وسائط ناقصة أو استخدام خاطئ' ;;
     126) printf '%s' 'الملف غير قابل للتنفيذ' ;;
     127) printf '%s' 'المفسّر أو الأمر غير موجود' ;;
