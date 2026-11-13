@@ -3,6 +3,12 @@ file="$1"
 
 source "$LOCAL/bin/utils"
 
+# 9.3.0: محرّك التثبيت الشامل — مشترك مع init.sh وauto_deps وself_heal
+if [ -f "$LOCAL/bin/rescue" ]; then
+  # shellcheck disable=SC1091
+  source "$LOCAL/bin/rescue"
+fi
+
 # 3.1.0: شعار MAHDI في بداية كل تشغيل سكربت — داخليًا كان أو خارجيًا،
 # حتى لو كان التشغيل غير تفاعلي (bash -lc …) كما طُلب.
 if [ -f "$LOCAL/bin/banner" ]; then
@@ -401,6 +407,18 @@ install_kotlin() {
     success "Kotlin جاهز في /opt/kotlinc"
 }
 
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.3.0 — تجهيز المشروع نفسه قبل تشغيل أي ملف بداخله.
+#
+# أغلب مشاريع GitHub لا تفشل لأن ملفها معطوب، بل لأن اعتمادياتها لم تُثبَّت:
+# requirements.txt أو package.json أو pyproject… شغّلنا الملف فانهار عند أول
+# import. هنا نكتشف نوع المشروع ونجهّزه مرة واحدة (بعلامة داخل المجلد).
+# ——————————————————————————————————————————————————————————————————————————————
+_mahdi_proj_dir="$(cd "$(dirname "$file")" 2>/dev/null && pwd)" || _mahdi_proj_dir=""
+if [ -n "$_mahdi_proj_dir" ] && declare -f mahdi_project_bootstrap >/dev/null 2>&1; then
+  mahdi_project_bootstrap "$_mahdi_proj_dir" || true
+fi
+
 case "$file" in
   *.py)
     if ! command_exists "${MAHDI_PY:-python3}"; then
@@ -418,7 +436,11 @@ case "$file" in
 
   *.js|*.mjs|*.cjs)
     if ! command_exists node; then
-      install_nodejs
+      # 9.3.0: سلسلة كاملة (مستودع ← NodeSource ← حزمة رسمية) بدل محاولة واحدة
+      if declare -f mahdi_node_ensure >/dev/null 2>&1; then
+        mahdi_node_ensure >/dev/null 2>&1 || true
+      fi
+      command_exists node || install_nodejs
     fi
     mahdi_auto_deps "$file"
     mahdi_run_heal node "$file" node "$file"
@@ -426,7 +448,10 @@ case "$file" in
 
   *.ts|*.tsx)
     if ! command_exists node; then
-      install_nodejs
+      if declare -f mahdi_node_ensure >/dev/null 2>&1; then
+        mahdi_node_ensure >/dev/null 2>&1 || true
+      fi
+      command_exists node || install_nodejs
     fi
 
     mahdi_auto_deps "$file"

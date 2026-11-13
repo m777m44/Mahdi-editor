@@ -134,7 +134,11 @@ object UniversalRunner : FileRunner() {
     /** يمنع أسماء فيها مسارات أو أحرف غريبة عند النسخ إلى مجلد التشغيل. */
     private fun sanitizeName(name: String): String {
         val base = name.substringAfterLast('/').substringAfterLast('\\')
-        val cleaned = base.replace(Regex("[^A-Za-z0-9._-]"), "_").trim('_', '.')
+        // 9.3.0: الحروف العربية ليست «أحرفًا غريبة». كان الاستبدال يحوّل
+        // `بيانات.py` إلى `py` (بلا امتداد!) فيفشل التعرّف على اللغة.
+        // الآن نُزيل فقط ما يفسد المسارات ومحارف التحكّم، ونُبقي كل حرف آخر.
+        val cleaned =
+            base.replace(Regex("[\\p{Cntrl}/\\\\:*?\"<>|\u0000]"), "_").trim().trim('.')
         return if (cleaned.isBlank()) "mahdi_script" else cleaned
     }
 
@@ -154,22 +158,60 @@ object UniversalRunner : FileRunner() {
     suspend fun launchFromSandboxHome(activity: Activity, fileObject: FileObject) {
         val name = fileObject.getName()
         val runDir = sandboxHomeDir().child("mahdi-run").also { it.mkdirs() }
-        val target = File(runDir, name)
 
-        val copied =
+        // 9.3.0 — «المشروع لا الملف»:
+        //
+        // كان النسخ ينقل **ملفًا واحدًا** إلى /home/mahdi-run، فمشروع من GitHub
+        // (‏main.py + utils.py + requirements.txt + data/) يُشغَّل وحده فينهار عند
+        // أول `import utils` أو أوّل قراءة ملف مجاور — ويبدو كأن التطبيق «ينهار
+        // عند تشغيل أي مشروع». الآن ننسخ مجلد المشروع كاملًا (بحدود آمنة) ونشغّل
+        // الملف داخل نسخته، فتعمل الواردات النسبية والملفات المرجعية.
+        val parent = runCatching { fileObject.getParentFile() }.getOrNull()
+        val folderName =
+            runCatching { parent?.getName().orEmpty() }.getOrDefault("").ifBlank { "project" }
+        val projectName = sanitizeName(folderName).ifBlank { "project" }
+        val projectDir = File(runDir, projectName)
+
+        val copiedProject =
             withContext(Dispatchers.IO) {
                 runCatching {
-                    fileObject.getInputStream().use { input ->
-                        target.outputStream().use { output -> input.copyTo(output) }
+                    if (parent == null || !parent.isDirectory()) {
+                        false
+                    } else {
+                        projectDir.deleteRecursively()
+                        projectDir.mkdirs()
+                        val budget = CopyBudget()
+                        copyProjectTree(parent, projectDir, budget, depth = 0) &&
+                            budget.files > 0 &&
+                            File(projectDir, name).exists()
                     }
-                    target.exists()
                 }.getOrDefault(false)
             }
 
-        if (!copied) {
-            // تعذّر النسخ: نشغّل الملف الأصلي كما هو
-            launchUniversalRunner(activity, fileObject)
-            return
+        // مسار التشغيل: نسخة المشروع إن نجحت، وإلا الملف وحده (سلوك 4.2.0)
+        val runPath: String
+        val workDir: String
+        if (copiedProject) {
+            runPath = "/home/mahdi-run/$projectName/$name"
+            workDir = "/home/mahdi-run/$projectName"
+        } else {
+            val target = File(runDir, name)
+            val copied =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        fileObject.getInputStream().use { input ->
+                            target.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        target.exists()
+                    }.getOrDefault(false)
+                }
+            if (!copied) {
+                // تعذّر النسخ: نشغّل الملف الأصلي كما هو
+                launchUniversalRunner(activity, fileObject)
+                return
+            }
+            runPath = "/home/mahdi-run/$name"
+            workDir = "/home/mahdi-run"
         }
 
         launchTerminal(
@@ -178,12 +220,65 @@ object UniversalRunner : FileRunner() {
                 TerminalCommand(
                     sandbox = true,
                     exe = "/bin/bash",
-                    args = arrayOf(localBinDir().child("universal_runner").absolutePath, "/home/mahdi-run/$name"),
+                    args = arrayOf(localBinDir().child("universal_runner").absolutePath, runPath),
                     id = strings.universal_runner.getString(),
                     terminatePreviousSession = true,
-                    workingDir = "/home/mahdi-run",
+                    workingDir = workDir,
                 ),
         )
+    }
+
+    /** حدود نسخ المشروع: لا ننسخ مستودعًا ضخمًا بلا سقف. */
+    private class CopyBudget(
+        var files: Int = 0,
+        var bytes: Long = 0,
+    ) {
+        val exhausted: Boolean
+            get() = files >= MAX_COPY_FILES || bytes >= MAX_COPY_BYTES
+    }
+
+    /**
+     * ينسخ شجرة مشروع صغيرة إلى مجلد التشغيل، مع تجاهل المجلدات الثقيلة
+     * (‏node_modules · .git · __pycache__ · venv) والملفات الضخمة.
+     *
+     * @return false إن تعذّر النسخ أو استُنفدت الميزانية.
+     */
+    private suspend fun copyProjectTree(
+        source: FileObject,
+        target: File,
+        budget: CopyBudget,
+        depth: Int,
+    ): Boolean {
+        if (depth > MAX_COPY_DEPTH || budget.exhausted) return false
+
+        val children =
+            runCatching { source.listFiles() }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return true
+
+        for (child in children) {
+            if (budget.exhausted) return false
+            val childName = runCatching { child.getName() }.getOrNull().orEmpty()
+            if (childName.isEmpty() || childName in SKIP_NAMES) continue
+
+            val destination = File(target, childName)
+            val isDir = runCatching { child.isDirectory() }.getOrDefault(false)
+
+            if (isDir) {
+                destination.mkdirs()
+                if (!copyProjectTree(child, destination, budget, depth + 1)) return false
+            } else {
+                val size = runCatching { child.length() }.getOrDefault(0L)
+                if (size > MAX_COPY_FILE_BYTES) continue
+                if (budget.bytes + size > MAX_COPY_BYTES) return false
+                runCatching {
+                    child.getInputStream().use { input ->
+                        destination.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }.getOrElse { return false }
+                budget.files += 1
+                budget.bytes += size
+            }
+        }
+        return true
     }
 
     suspend fun launchUniversalRunner(activity: Activity, fileObject: FileObject) {
@@ -203,6 +298,20 @@ object UniversalRunner : FileRunner() {
 
     override fun getIcon(context: Context): Icon {
         return Icon.ResourceIcon(drawables.run)
+    }
+
+    /** سقوف نسخ المشروع إلى مجلد التشغيل (9.3.0). */
+    private companion object {
+        const val MAX_COPY_FILES = 400
+        const val MAX_COPY_BYTES = 60L * 1024 * 1024
+        const val MAX_COPY_FILE_BYTES = 12L * 1024 * 1024
+        const val MAX_COPY_DEPTH = 4
+
+        val SKIP_NAMES =
+            setOf(
+                "node_modules", ".git", "__pycache__", ".venv", "venv", "env",
+                "build", "dist", ".gradle", ".idea", ".vscode", "target", ".next",
+            )
     }
 
     /** امتدادات إضافية عملية تُشغَّل عبر المحرّك الموحّد. */
