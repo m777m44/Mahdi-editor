@@ -19,7 +19,7 @@ import com.mahdi.runner.RunnerUI
  * إن كانت الحافظة تحتوي رابطًا (أو نطاقًا) يُملأ المربّع به تلقائيًا، فتصبح
  * العملية ضغطتين: انسخ الرابط من أي تطبيق ← «فتح رابط» ← «فتح».
  */
-class OpenLinkCommand : GlobalCommand() {
+object OpenLinkCommand : GlobalCommand() {
     override val id: String = "global.open_link"
 
     override fun getLabel(): String = strings.open_link.getString()
