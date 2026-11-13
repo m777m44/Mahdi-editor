@@ -428,8 +428,48 @@ mahdi_install_command() {
       ;;
   esac
 
-  local pkgs
-  pkgs="$(_mahdi_pkg_translate "$cmd")"
+  # بعض الأوامر الشائعة في سكربتات التثبيت تأتي من حزم بأسماء مختلفة تمامًا
+  local pkgs=""
+  case "$cmd" in
+    add-apt-repository | apt-add-repository) pkgs="software-properties-common" ;;
+    systemctl | systemd | journalctl)
+      # لا systemd داخل الحاوية — نُوضّح بلا ضجيج كي يكمل السكربت
+      printf '%s▸%s  systemd غير متاح داخل الحاوية — تم تجاوز الأمر.\n' "$M_MUTED" "$M_RESET" >&2
+      return 1
+      ;;
+    service) pkgs="init-system-helpers" ;;
+    crontab | cron) pkgs="cron" ;;
+    ifconfig | route | netstat) pkgs="net-tools" ;;
+    ping) pkgs="iputils-ping" ;;
+    ps | pstree | top) pkgs="procps" ;;
+    ss) pkgs="iproute2" ;;
+    ssh | scp) pkgs="openssh-client" ;;
+    convert | magick) pkgs="imagemagick" ;;
+    ffmpeg | ffprobe) pkgs="ffmpeg" ;;
+    openssl) pkgs="openssl" ;;
+    gcc) pkgs="gcc" ;;
+    g++) pkgs="g++" ;;
+    cmake) pkgs="cmake" ;;
+    ninja) pkgs="ninja-build" ;;
+    pkg-config) pkgs="pkg-config" ;;
+    zip | unzip) pkgs="$cmd" ;;
+    dig | nslookup | host) pkgs="dnsutils" ;;
+    rsync) pkgs="rsync" ;;
+    tmux) pkgs="tmux" ;;
+    screen) pkgs="screen" ;;
+    vim | nano | less | tree | jq | htop | file) pkgs="$cmd" ;;
+    virtualenv | pipenv | poetry | black | ruff)
+      if mahdi_have pip || declare -f mahdi_ensure_pip >/dev/null 2>&1; then
+        declare -f mahdi_ensure_pip >/dev/null 2>&1 && mahdi_ensure_pip >/dev/null 2>&1
+        "${MAHDI_PY:-python3}" -m pip install --disable-pip-version-check --no-input --quiet "$cmd" \
+          >/dev/null 2>&1 || true
+        hash -r 2>/dev/null || true
+        mahdi_have "$cmd" && return 0
+      fi
+      pkgs="$cmd"
+      ;;
+  esac
+  [ -z "$pkgs" ] && pkgs="$(_mahdi_pkg_translate "$cmd")"
   [ -z "$pkgs" ] && pkgs="$cmd"
   mahdi_apt_install_soft $pkgs >/dev/null 2>&1 || true
   hash -r 2>/dev/null || true

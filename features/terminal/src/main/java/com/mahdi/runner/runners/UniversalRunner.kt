@@ -25,6 +25,34 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * سقوف نسخ المشروع إلى مجلد التشغيل (9.3.0).
+ *
+ * `object` لا يقبل `companion object` في Kotlin، فالثوابت هنا على مستوى الملف.
+ */
+private const val MAX_COPY_FILES = 400
+private const val MAX_COPY_BYTES = 60L * 1024 * 1024
+private const val MAX_COPY_FILE_BYTES = 12L * 1024 * 1024
+private const val MAX_COPY_DEPTH = 4
+
+/** مجلدات ثقيلة لا تُنسخ مع المشروع. */
+private val SKIP_NAMES =
+    setOf(
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "env",
+        "build",
+        "dist",
+        ".gradle",
+        ".idea",
+        ".vscode",
+        "target",
+        ".next",
+    )
+
 object UniversalRunner : FileRunner() {
 
     override val id = "universal"
@@ -298,20 +326,6 @@ object UniversalRunner : FileRunner() {
 
     override fun getIcon(context: Context): Icon {
         return Icon.ResourceIcon(drawables.run)
-    }
-
-    /** سقوف نسخ المشروع إلى مجلد التشغيل (9.3.0). */
-    private companion object {
-        const val MAX_COPY_FILES = 400
-        const val MAX_COPY_BYTES = 60L * 1024 * 1024
-        const val MAX_COPY_FILE_BYTES = 12L * 1024 * 1024
-        const val MAX_COPY_DEPTH = 4
-
-        val SKIP_NAMES =
-            setOf(
-                "node_modules", ".git", "__pycache__", ".venv", "venv", "env",
-                "build", "dist", ".gradle", ".idea", ".vscode", "target", ".next",
-            )
     }
 
     /** امتدادات إضافية عملية تُشغَّل عبر المحرّك الموحّد. */
