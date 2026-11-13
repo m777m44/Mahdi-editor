@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 6.1.0: خلفيات أيقونات الشخصيات العشر — لون مستخرج من خلفية كل عمل فني
-         الجديد (شخصيات كرتونية ثلاثية الأبعاد تحمل حرف M) -->
+    <!-- 6.1.0: خلفيات أيقونات الشخصيات — لون مستخرج من خلفية كل عمل فني
+         الجديد (شخصيات كرتونية ثلاثية الأبعاد تحمل حرف M).
+         9.1.0: ستّ شخصيات جديدة بنفس النمط (راكون · سلحفاة · ذئب · نحلة · أخطبوط · نمر) -->
     <color name="ic_bg_anime_fox">#15213B</color>
     <color name="ic_bg_anime_cat">#0E1947</color>
     <color name="ic_bg_anime_robot">#0F2148</color>
@@ -13,6 +14,12 @@
     <color name="ic_bg_anime_axolotl">#0E1D41</color>
     <color name="ic_bg_anime_hamster">#0D1433</color>
     <color name="ic_bg_anime_mark">#060C1E</color>
+    <color name="ic_bg_anime_raccoon">#0B1A37</color>
+    <color name="ic_bg_anime_turtle">#1B2339</color>
+    <color name="ic_bg_anime_wolf">#12203A</color>
+    <color name="ic_bg_anime_bee">#06162C</color>
+    <color name="ic_bg_anime_octopus">#232A3E</color>
+    <color name="ic_bg_anime_tiger">#252C41</color>
 
     <!-- 6.1.0: خلفية الأيقونة الافتراضية الجديدة (الروبوت المبرمج) — هي التي
          تُستخدم في شاشة البدء وورقة المصغّرات -->

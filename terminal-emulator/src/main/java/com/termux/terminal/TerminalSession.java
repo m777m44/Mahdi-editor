@@ -380,15 +380,34 @@ public final class TerminalSession extends TerminalOutput {
                 int exitCode = (Integer) msg.obj;
                 cleanupResources(exitCode);
 
-                String exitDescription = "\r\n[Process completed";
+                // 9.1.0: رسالة نهاية الجلسة كانت إنجليزية خالصة:
+                //   [Process completed (signal 9) - press Enter]
+                // وهي أول ما يراه المستخدم بعد كل توقّف، وفي واجهة عربية كاملة
+                // كانت تبدو كخطأ نظام غامض. صارت عربية وتشرح **سبب** التوقّف
+                // الأشهر (نفاد الذاكرة) بدل رمز لا معنى له، مع اسم الإشارة نفسها
+                // بين قوسين لمن يحتاجها تقنيًا.
+                String exitDescription = "\r\n[انتهت الجلسة";
                 if (exitCode > 0) {
-                    // Non-zero process exit.
-                    exitDescription += " (code " + exitCode + ")";
+                    // خروج عادي برمز
+                    exitDescription += " — الرمز " + exitCode;
                 } else if (exitCode < 0) {
-                    // Negated signal.
-                    exitDescription += " (signal " + (-exitCode) + ")";
+                    int signal = -exitCode;
+                    switch (signal) {
+                        case 9:
+                            exitDescription += " — أُوقفت لقلة الذاكرة (إشارة 9)";
+                            break;
+                        case 15:
+                            exitDescription += " — أُوقفت طبيعيًا (إشارة 15)";
+                            break;
+                        case 2:
+                            exitDescription += " — أُوقفت بطلب الإيقاف (إشارة 2)";
+                            break;
+                        default:
+                            exitDescription += " — أُوقفت (إشارة " + signal + ")";
+                            break;
+                    }
                 }
-                exitDescription += " - press Enter]";
+                exitDescription += " · اضغط Enter للعودة]";
 
                 byte[] bytesToWrite = exitDescription.getBytes(StandardCharsets.UTF_8);
                 mEmulator.append(bytesToWrite, bytesToWrite.length);

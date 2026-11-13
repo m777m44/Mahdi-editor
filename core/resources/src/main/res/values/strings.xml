@@ -117,6 +117,7 @@
     <string name="github" translatable="false">GitHub</string>
     <string name="git_commit">بصمة التزام Git</string>
     <string name="check_for_updates">التحقق من التحديثات</string>
+    <string name="check_for_updates_always">الفحص تلقائيًا عند كل فتح للتطبيق — لا يمكن إيقافه</string>
     <string name="check_for_updates_desc">التحقق الدوري من وجود تحديثات</string>
     <string name="click_open">اضغط هنا لفتح الملف</string>
     <string name="run">تشغيل</string>
@@ -1086,7 +1087,7 @@
     <string name="available_languages">لغات متاحة</string>
     <string name="no_extra_languages">لم تُثبّت لغات إضافية بعد — اختر لغة من «لغات متاحة».</string>
     <string name="app_icon_title">أيقونة التطبيق</string>
-    <string name="app_icon_desc">عشر أيقونات أنمي ثلاثية الأبعاد بحرف M — تُطبَّق فورًا</string>
+    <string name="app_icon_desc">سبع عشرة أيقونة كرتونية ثلاثية الأبعاد بحرف M — تُطبَّق فورًا</string>
     <string name="app_icon_applied">تم تغيير الأيقونة: %1$s</string>
     <string name="app_icon_current">الحالية</string>
     <string name="app_icon_failed">تعذّر تغيير الأيقونة على هذا الجهاز</string>

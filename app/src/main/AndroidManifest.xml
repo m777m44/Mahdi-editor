@@ -267,6 +267,96 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- الراكون المبرمج · أزرق — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق (9.1.0) -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeRaccoon"
+            android:theme="@style/Theme.Karbon.Icon.Raccoon"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_raccoon"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- السلحفاة السريعة · أخضر — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق (9.1.0) -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeTurtle"
+            android:theme="@style/Theme.Karbon.Icon.Turtle"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_turtle"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- الذئب التقني · أزرق رمادي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق (9.1.0) -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeWolf"
+            android:theme="@style/Theme.Karbon.Icon.Wolf"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_wolf"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- النحلة الذكية · ذهبي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق (9.1.0) -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeBee"
+            android:theme="@style/Theme.Karbon.Icon.Bee"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_bee"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- الأخطبوط المبرمج · بنفسجي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق (9.1.0) -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeOctopus"
+            android:theme="@style/Theme.Karbon.Icon.Octopus"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_octopus"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- النمر المبرمج · برتقالي — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق (9.1.0) -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeTiger"
+            android:theme="@style/Theme.Karbon.Icon.Tiger"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_tiger"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- ═══════════════════════════════════════════════════════════════════════
          4.3.0 — المكوّنات التي يجب أن تبقى دائمًا.
          (حُذفت خطأً في 4.3.0 عند استبدال كتلة الأيقونات، فصار التطبيق يخرج

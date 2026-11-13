@@ -106,6 +106,10 @@ object LspManager {
 
         if (degraded.contains(key)) return false
 
+        // 9.1.0: أثناء تشغيل سكربت تكون الخوادم موقوفة عمدًا لتوفير الذاكرة —
+        // لا نحاول إحياءها في ذلك الوقت، وإلا عدنا إلى نفس ضغط الذاكرة.
+        if (LspMemoryGuard.isFrozen) return true
+
         val n = attempts.merge(key, 1) { current, _ -> current + 1 } ?: 1
         if (n > MAX_SILENT_ATTEMPTS) {
             degrade(server)

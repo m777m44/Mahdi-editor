@@ -13,6 +13,7 @@ import com.mahdi.file.localBinDir
 import com.mahdi.file.sandboxHomeDir
 import com.mahdi.icons.Icon
 import com.mahdi.lang.LanguageRegistry
+import com.mahdi.lsp.LspMemoryGuard
 import com.mahdi.resources.drawables
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
@@ -53,6 +54,12 @@ object UniversalRunner : FileRunner() {
         // مثبّت بايثون الذكي + المخزن الدائم (يعمل حتى قبل إنشاء جلسة طرفية جديدة)
         setupPythonFile("mahdi_pip")
         setupPythonFile("mahdi_heal")
+
+        // 9.1.0: تفريغ الذاكرة قبل التشغيل — خوادم اللغة (Pyright وNode) تستهلك
+        // مئات الميغابايتات، وكان قاتل الذاكرة يقتل جلسة الطرفية بعد ثوانٍ من
+        // تشغيل سكربت ثقيل (‏`[Process completed (signal 9)]`).
+        // الإيقاف مؤقت، محميّ، ولا يتوقّف تشغيل السكربت إن فشل.
+        runCatching { LspMemoryGuard.freezeForRun() }
 
         // 4.2.0: أي ملف من أي مكان — بما فيه مستندات فُتحت من تطبيق آخر (content://)
         if (fileObject !is FileWrapper) {

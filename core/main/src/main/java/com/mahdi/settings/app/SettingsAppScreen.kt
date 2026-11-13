@@ -101,11 +101,13 @@ fun SettingsAppScreen(activity: SettingsActivity, navController: NavController) 
                 sideEffect = { navController.navigate(SettingsRoutes.Updates.route) },
             )
 
+            // 9.1.0: المفتاح مفعّل دائمًا ومقفل — الفحص عند كل فتح للتطبيق.
             SettingsItem(
                 label = stringResource(strings.check_for_updates),
-                description = stringResource(strings.check_for_updates_desc),
-                default = Settings.check_for_update,
-                sideEffect = { Settings.check_for_update = it },
+                description = stringResource(strings.check_for_updates_always),
+                default = true,
+                isSwitchLocked = true,
+                sideEffect = { Settings.check_for_update = true },
             )
 
             SettingsItem(

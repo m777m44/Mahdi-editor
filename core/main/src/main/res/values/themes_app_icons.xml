@@ -99,4 +99,53 @@
         <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_mark</item>
         <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
     </style>
+
+    <style name="Theme.Karbon.Icon.Raccoon" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_raccoon</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_raccoon</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_raccoon</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_raccoon</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Turtle" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_turtle</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_turtle</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_turtle</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_turtle</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Wolf" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_wolf</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_wolf</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_wolf</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_wolf</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Bee" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_bee</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_bee</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_bee</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_bee</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Octopus" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_octopus</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_octopus</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_octopus</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_octopus</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <style name="Theme.Karbon.Icon.Tiger" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_tiger</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_tiger</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_tiger</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_tiger</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
 </resources>

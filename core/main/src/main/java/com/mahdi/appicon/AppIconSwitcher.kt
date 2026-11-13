@@ -14,9 +14,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * لكل أيقونة: كل alias يحمل `icon` خاصًا وفلتر LAUNCHER. التبديل الحقيقي = تمكين
  * الـ alias المختار وتعطيل السابق عبر `PackageManager.setComponentEnabledSetting`.
  *
- * 6.1.0: أُعيد رسم كل الصور — **إحدى عشرة أيقونة كرتونية ثلاثية الأبعاد** بحرف M
+ * 6.1.0: أُعيد رسم كل الصور — **سبع عشرة أيقونة كرتونية ثلاثية الأبعاد** بحرف M
  * (روبوت مبرمج، والحرف M المجسّم، وثعلب، وقط، وباندا، وتنين، وبومة، وبطريق،
- * وأرنب، وهمستر، وأكسولوتل). كل صورة أيقونة تكيّفية كاملة: خلفية لونها مستخرج من
+ * وأرنب، وهمستر، وأكسولوتل) — ثم في 9.1.0 ستّ شخصيات أخرى: راكون، وسلحفاة،
+ * وذئب، ونحلة، وأخطبوط، ونمر. كل صورة أيقونة تكيّفية كاملة: خلفية لونها مستخرج من
  * العمل الفني + صورة أمامية بمقاس 108dp مع منطقة آمنة (66٪) فلا يُقصّ الرسم على
  * أي مشغّل. الافتراضية الآن **الروبوت المبرمج**، والمصغّرة الداخلية تتبعه.
  *
@@ -61,6 +62,13 @@ object AppIconSwitcher {
             AppIcon("anime_bunny", "IconAnimeBunny", "الأرنب الوردي", "Pink Bunny", R.mipmap.ic_launcher_anime_bunny, 0xFF0E1842),
             AppIcon("anime_hamster", "IconAnimeHamster", "الهمستر الذهبي", "Golden Hamster", R.mipmap.ic_launcher_anime_hamster, 0xFF0D1433),
             AppIcon("anime_axolotl", "IconAnimeAxolotl", "الأكسولوتل الأخضر", "Green Axolotl", R.mipmap.ic_launcher_anime_axolotl, 0xFF0E1D41),
+            // 9.1.0: ستّ شخصيات جديدة بنفس النمط — 3D كرتونية، حرف M، وحاسوب أو تقنية
+            AppIcon("anime_raccoon", "IconAnimeRaccoon", "الراكون المبرمج", "Coder Raccoon", R.mipmap.ic_launcher_anime_raccoon, 0xFF0B1A37),
+            AppIcon("anime_turtle", "IconAnimeTurtle", "السلحفاة السريعة", "Speedy Turtle", R.mipmap.ic_launcher_anime_turtle, 0xFF1B2339),
+            AppIcon("anime_wolf", "IconAnimeWolf", "الذئب التقني", "Tech Wolf", R.mipmap.ic_launcher_anime_wolf, 0xFF12203A),
+            AppIcon("anime_bee", "IconAnimeBee", "النحلة الذكية", "Smart Bee", R.mipmap.ic_launcher_anime_bee, 0xFF06162C),
+            AppIcon("anime_octopus", "IconAnimeOctopus", "الأخطبوط المبرمج", "Coder Octopus", R.mipmap.ic_launcher_anime_octopus, 0xFF232A3E),
+            AppIcon("anime_tiger", "IconAnimeTiger", "النمر المبرمج", "Coder Tiger", R.mipmap.ic_launcher_anime_tiger, 0xFF252C41),
         )
 
     /** الأيقونة الافتراضية (المعلنة `enabled=true` في البيان). */

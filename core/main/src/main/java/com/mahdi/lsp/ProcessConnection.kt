@@ -11,8 +11,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-class ProcessConnection(private val cmd: Array<String>, instance: LspServerInstance) :
-    BaseLspConnectionProvider(instance) {
+class ProcessConnection(
+    private val cmd: Array<String>,
+    private val env: Map<String, String> = emptyMap(),
+    instance: LspServerInstance,
+) : BaseLspConnectionProvider(instance) {
 
     private var process: Process? = null
     private var loggingInput: InputStream? = null
@@ -34,7 +37,7 @@ class ProcessConnection(private val cmd: Array<String>, instance: LspServerInsta
         scope = CoroutineScope(Dispatchers.IO)
         val provider =
             SandboxedProcessRegistry.provider ?: throw IllegalStateException("PRoot Sandbox is not registered")
-        runBlocking { process = provider(cmd.toList(), null, listOf()) }
+        runBlocking { process = provider(cmd.toList(), null, listOf(), env) }
 
         loggingInput =
             LoggingInputStream(process!!.inputStream) { json ->

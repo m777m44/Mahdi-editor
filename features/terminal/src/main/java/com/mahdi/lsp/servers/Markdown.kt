@@ -8,6 +8,7 @@ import com.mahdi.file.child
 import com.mahdi.file.localBinDir
 import com.mahdi.file.sandboxDir
 import com.mahdi.lsp.LspConnectionConfig
+import com.mahdi.lsp.NodeMemoryLimits
 import com.mahdi.lsp.ScriptedLspServer
 
 object Markdown : ScriptedLspServer() {
@@ -33,6 +34,11 @@ object Markdown : ScriptedLspServer() {
     }
 
     override fun getConnectionConfig(): LspConnectionConfig {
-        return LspConnectionConfig.Process(arrayOf("/usr/bin/node", "/usr/bin/$serverName", "--stdio"))
+        return LspConnectionConfig.Process(
+            command = arrayOf("/usr/bin/node", "/usr/bin/$serverName", "--stdio"),
+            // 9.1.0: حدّ ذاكرة صريح — وإلا كبر V8 حتى يجعل قاتل الذاكرة
+            // يقتل العملية (إشارة ٩) على أجهزة ٣–٤ غيغابايت.
+            env = NodeMemoryLimits.ENV,
+        )
     }
 }

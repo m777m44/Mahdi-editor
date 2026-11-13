@@ -1,6 +1,7 @@
 package com.mahdi.editor.status
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
@@ -33,6 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mahdi.editor.Editor
+import com.mahdi.file.child
+import com.mahdi.file.sandboxHomeDir
 import com.mahdi.lsp.LspConnectionStatus
 import com.mahdi.lsp.LspConnector
 import com.mahdi.text.BidiText
@@ -66,6 +70,8 @@ fun EditorStatusBar(
 ) {
     // حالة الخادم تُجمَع من مصدرها الحقيقي (StateFlow) لا تُقرأ قراءةً واحدة:
     // فتظهر `يُعاد…` أثناء الإحياء الصامت ثم `يعمل` بانتهائه بلا أي تدخّل.
+    val context = LocalContext.current
+
     val lspStatus by
         produceState<LspConnectionStatus?>(initialValue = null, lspConnector) {
             val server = lspConnector?.primaryServer()
@@ -81,6 +87,21 @@ fun EditorStatusBar(
                     instance.status.collect { value = it }
                 }
             }
+        }
+
+    // 9.1.0: هل الخادم مثبَّت أصلًا؟ خادم غير مثبَّت **ليس خطأً**، ولا يجوز أن
+    // يُعرض كعطل. يُقرأ مرة واحدة عند ظهور الشريط (فحص ملف واحد على القرص).
+    val lspInstalled by
+        produceState<Boolean?>(initialValue = null, lspConnector) {
+            val server = lspConnector?.primaryServer()
+            value =
+                if (server == null) {
+                    false
+                } else {
+                    withContext(Dispatchers.IO) {
+                        runCatching { server.isInstalled(context) }.getOrDefault(false)
+                    }
+                }
         }
 
     // إصدار بايثون يُقرأ على خيط خلفي مرة واحدة (تنفيذ عملية عملية على الخيط
@@ -153,7 +174,11 @@ fun EditorStatusBar(
                     StatusText("Python $version", Color(0xFF2DD4BF))
                     VerticalDot(divider)
                 }
-                LspChip(status = lspStatus)
+                LspChip(
+                    status = lspStatus,
+                    installed = lspInstalled,
+                    onClick = { lspConnector?.openLspSettings() },
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -189,19 +214,26 @@ private fun VerticalDot(color: Color) {
     Spacer(Modifier.width(6.dp))
 }
 
-/** نقطة حالة + كلمة واحدة. لا تفاصيل تقنية ولا رابط. */
+/**
+ * نقطة حالة + كلمة واحدة، وبلمسة واحدة تُفتح «إدارة خوادم اللغة».
+ *
+ * 9.1.0: هذا هو **البديل الوحيد** لرسالة «تعذّر الاتصال بخادم اللغة» التي كانت
+ * تظهر كـSnackbar وتغطّي أسفل المحرّر. الحالة هنا دائمة الظهور وهادئة وغير
+ * مقاطِعة، واللمسة عليها تقود إلى مكان الإصلاح — بلا نصّ تقني ولا Traceback.
+ */
 @Composable
-private fun LspChip(status: LspConnectionStatus?) {
+private fun LspChip(status: LspConnectionStatus?, installed: Boolean?, onClick: () -> Unit) {
     val (color, label) =
-        when (status) {
-            LspConnectionStatus.RUNNING -> Color(0xFF34D399) to "LSP يعمل"
-            LspConnectionStatus.STARTING,
-            LspConnectionStatus.RESTARTING,
-            LspConnectionStatus.STOPPING -> Color(0xFFF5D76E) to "LSP يبدأ…"
-            LspConnectionStatus.CRASHED,
-            LspConnectionStatus.TIMEOUT -> Color(0xFFFB923C) to "LSP يُعاد…"
-            LspConnectionStatus.NOT_RUNNING -> Color(0xFF94A3B8) to "LSP خامل"
-            null -> Color(0xFF94A3B8) to "LSP غير متاح"
+        when {
+            installed == false -> Color(0xFF94A3B8) to "LSP غير مثبّت"
+            status == LspConnectionStatus.RUNNING -> Color(0xFF34D399) to "LSP يعمل"
+            status == LspConnectionStatus.STARTING ||
+                status == LspConnectionStatus.RESTARTING ||
+                status == LspConnectionStatus.STOPPING -> Color(0xFFF5D76E) to "LSP يبدأ…"
+            status == LspConnectionStatus.CRASHED ||
+                status == LspConnectionStatus.TIMEOUT -> Color(0xFFFB923C) to "LSP يُعاد…"
+            status == LspConnectionStatus.NOT_RUNNING -> Color(0xFF94A3B8) to "LSP خامل"
+            else -> Color(0xFF94A3B8) to "LSP —"
         }
 
     Row(
@@ -209,6 +241,7 @@ private fun LspChip(status: LspConnectionStatus?) {
         modifier =
             Modifier.clip(RoundedCornerShape(50))
                 .background(color.copy(alpha = 0.12f))
+                .clickable(onClick = onClick)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
         Box(Modifier.size(5.dp).clip(CircleShape).background(color))
@@ -218,24 +251,39 @@ private fun LspChip(status: LspConnectionStatus?) {
 }
 
 /**
- * إصدار بايثون داخل الحاوية يُقرأ مرة واحدة فقط لكل عملية تطبيق (لا لكل ملف،
- * ولا مع كل إعادة تركيب)، فالقراءة من القرص مكلفة نسبيًا وبلا فائدة هنا.
+ * إصدار بايثون داخل الحاوية — يُقرأ **من ملف** لا بتشغيل عملية.
+ *
+ * ## الخطأ الذي أصلحته 9.1.0
+ * كان يُنفَّذ `ProcessBuilder("sh","-c","python3 -c …")` من **عملية التطبيق**
+ * مباشرة. وبايثون لا يوجد على أندرويد خارج الحاوية، فكانت النتيجة رسالة
+ * أندرويد نفسها تُعرض مكان الرقم في شريط الحالة:
+ *
+ * > Python sh: python3: inaccessible or not found
+ *
+ * وهي بالضبط السطر الأحمر الذي ظهر أسفل اللقطة.
+ *
+ * ## البديل
+ * سكربتات الطرفية تكتب الإصدار الحقيقي في `~/.mahdi/python_version` لحظة اختيار
+ * المفسّر (انظر `mahdi_python_bin` في `utils.sh`). نقرأ الملف — عملية إدخال/إخراج
+ * واحدة لا أكثر — ونتحقّق من صيغته قبل عرضه. إن لم يوجد (المستخدم لم يفتح
+ * الطرفية بعد) لا نعرض رقمًا إطلاقًا، فلا رقم وهمي ولا رسالة خطأ.
  */
 internal object PythonVersion {
     @Volatile private var cached: String? = null
 
-    val short: String
-        get() = cached ?: synchronized(this) { cached ?: detect().also { cached = it } }
+    /** `3.12.3` أو `null` إن لم يُعرف بعد. */
+    val short: String?
+        // لا نُخزّن `null`: قد يُفتح الملف قبل أول طرفية، ثم يوجد بعدها.
+        get() = cached ?: detect()?.also { cached = it }
 
-    private fun detect(): String =
+    private val VERSION_REGEX = Regex("^\\d+\\.\\d+(\\.\\d+)?$")
+
+    private fun detect(): String? =
         runCatching {
-                val process =
-                    ProcessBuilder("sh", "-c", "python3 -c 'import sys;print(\"%d.%d\" % sys.version_info[:2])'")
-                        .redirectErrorStream(true)
-                        .start()
-                val text = process.inputStream.bufferedReader().readText().trim()
-                process.waitFor()
-                text.ifBlank { "3" }
+                val file = sandboxHomeDir().child(".mahdi").child("python_version")
+                if (!file.exists()) return@runCatching null
+                val text = file.readText().trim().lineSequence().firstOrNull().orEmpty().trim()
+                text.takeIf { it.matches(VERSION_REGEX) }
             }
-            .getOrDefault("3")
+            .getOrNull()
 }

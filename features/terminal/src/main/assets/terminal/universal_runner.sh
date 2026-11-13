@@ -109,6 +109,25 @@ _mahdi_now="$(printf '%(%H:%M)T' -1)"
 _mahdi_fsi=$'\u2068'
 _mahdi_pdi=$'\u2069'
 printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s%s%s${M_RESET}\n" "$_mahdi_fsi" "$_mahdi_name" "$_mahdi_pdi" || true
+
+# ———————————————————— تحذير الذاكرة (9.1.0) ————————————————————
+# اللقطة أظهرت `[Process completed (signal 9)]` بعد ثوانٍ من تشغيل سكربت ثقيل:
+# إشارة ٩ هي SIGKILL التي يرسلها قاتل ذاكرة أندرويد، وهي ليست خطأً في السكربت.
+# تحذير واحد مبكر — بلا إيقاف ولا سؤال — يشرح للمستخدم ما يجري قبل أن يقع.
+_mahdi_mem_kb=0
+set +e
+if [ -r /proc/meminfo ]; then
+  _mahdi_mem_kb="$(awk '/^MemAvailable:/{print $2; exit}' /proc/meminfo 2>/dev/null)"
+fi
+set -e
+case "${_mahdi_mem_kb:-}" in
+  ''|*[!0-9]*) _mahdi_mem_kb=0 ;;
+esac
+if [ "$_mahdi_mem_kb" -gt 0 ] && [ "$_mahdi_mem_kb" -lt 300000 ]; then
+  printf "${M_GOLD}⚠${M_RESET}  ${M_MUTED}الذاكرة المتاحة %s م.ب — أغلق التطبيقات الأخرى إن توقّف السكربت (إشارة 9)${M_RESET}\n" \
+    "$((_mahdi_mem_kb / 1024))" || true
+fi
+unset _mahdi_mem_kb
 if [ -n "$_mahdi_badge" ]; then
   printf "   ${M_TEAL}%s${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%s${M_RESET}\n" \
     "$_mahdi_badge" "$_mahdi_now" || true
@@ -123,7 +142,7 @@ mahdi_exit_hint() {
     126) printf '%s' 'الملف غير قابل للتنفيذ' ;;
     127) printf '%s' 'المفسّر أو الأمر غير موجود' ;;
     130) printf '%s' 'أُوقف بـ Ctrl+C' ;;
-    137) printf '%s' 'أُنهي لقلة الذاكرة' ;;
+    137) printf '%s' 'أُنهي لقلة الذاكرة (إشارة 9) — أعد التشغيل بعد إغلاق التطبيقات الثقيلة' ;;
     139) printf '%s' 'انهيار في مكتبة أصلية' ;;
     *) printf '%s' '' ;;
   esac

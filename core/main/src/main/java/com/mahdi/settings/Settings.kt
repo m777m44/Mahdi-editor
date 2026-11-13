@@ -58,7 +58,21 @@ object Settings {
     var show_color_previews by CachedPreference("show_color_previews", true)
     var quick_deletion by CachedPreference("fast_delete", true)
     var auto_save by CachedPreference("auto_save", false)
-    var check_for_update by CachedPreference("check_update", false)
+    /**
+     * فحص التحديثات — **مفعّل دائمًا** منذ 9.1.0.
+     *
+     * كان مفتاحًا افتراضيًا «مطفأ»، فلا يعرف المستخدم بوجود إصدار جديد إلا إذا
+     * فتح «مركز التحديثات» بنفسه. صار الفحص تلقائيًا عند كل فتح للتطبيق، والمفتاح
+     * في الإعدادات يُعرض مقفلًا على «مفعّل» لأنه جزء من عمل التطبيق لا خيار فيه
+     * (التعطيل كان يعني البقاء على إصدار قديم فيه أخطاء مُصلحة).
+     */
+    var check_for_update: Boolean
+        get() = true
+        set(_) {
+            if (!Preference.getBoolean("check_update", true)) {
+                Preference.setBoolean("check_update", true)
+            }
+        }
     var is_editor_font_asset by CachedPreference("is_font_asset", false)
     var is_app_font_asset by CachedPreference("is_app_font_asset", false)
     var is_terminal_font_asset by CachedPreference("is_terminal_font_asset", false)

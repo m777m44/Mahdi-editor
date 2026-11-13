@@ -162,11 +162,28 @@ mahdi_python_bin() {
   done
   mkdir -p "${HOME:-/home}/.mahdi" 2>/dev/null || true
   printf '%s %s\n' "$now" "$best" >"$cache" 2>/dev/null || true
+  # 9.1.0: إصدار المفسّر المختار — يقرأه شريط حالة المحرّر بلا تشغيل عملية
+  local _ver
+  _ver="$("$best" -c 'import sys;print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null)" || _ver=""
+  if [ -n "$_ver" ]; then
+    printf '%s\n' "$_ver" >"${HOME:-/home}/.mahdi/python_version" 2>/dev/null || true
+  fi
   printf '%s' "$best"
 }
 
+# 9.1.0: يكتب الإصدار في ~/.mahdi/python_version ليقرأه شريط حالة المحرّر.
+# قبل ذلك كان الشريط يشغّل `python3` من **عملية التطبيق** — حيث لا يوجد بايثون
+# خارج الحاوية — فيعرض رسالة أندرويد نفسها: «python3: inaccessible or not found».
 mahdi_python_version() {
-  "${MAHDI_PY:-python3}" -c 'import sys;print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null || printf '—'
+  local _v
+  _v="$("${MAHDI_PY:-python3}" -c 'import sys;print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null)" || _v=""
+  if [ -n "$_v" ]; then
+    mkdir -p "${HOME:-/home}/.mahdi" 2>/dev/null || true
+    printf '%s\n' "$_v" >"${HOME:-/home}/.mahdi/python_version" 2>/dev/null || true
+    printf '%s' "$_v"
+  else
+    printf '—'
+  fi
 }
 
 MAHDI_PY="${MAHDI_PY:-$(mahdi_python_bin)}"

@@ -1,12 +1,9 @@
 package com.mahdi.lsp
 
 import android.content.Intent
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarResult
 import com.google.gson.JsonParser
 import com.mahdi.DefaultScope
 import com.mahdi.activities.main.MainActivity
-import com.mahdi.activities.main.ui.snackbarHostStateRef
 import com.mahdi.activities.settings.SettingsActivity
 import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.editor.Editor
@@ -14,9 +11,6 @@ import com.mahdi.events.Events
 import com.mahdi.events.LSPEvent
 import com.mahdi.file.FileObject
 import com.mahdi.file.FileTypeManager
-import com.mahdi.resources.getFilledString
-import com.mahdi.resources.getString
-import com.mahdi.resources.strings
 import com.mahdi.settings.Preference
 import com.mahdi.tabs.editor.EditorTab
 import com.mahdi.utils.logError
@@ -66,7 +60,6 @@ class LspConnector(
 
     companion object {
         private val projectCache = ConcurrentHashMap<String, LspProject>()
-
     }
 
     /**
@@ -75,36 +68,13 @@ class LspConnector(
      */
     fun primaryServer(): LspServer? = servers.firstOrNull()
 
-    init {
-        // 9.0.0: التنبيه الوحيد المسموح — بعد استنفاد ثلاث محاولات صامتة.
-        // فحص الحالة بعد كل محاولة كان يُبقي الرسالة حبيسة `finally` (تُنفَّذ مرة
-        // واحدة قبل بدء المحاولات)، فلا تظهر أبدًا. الآن يُبَثّ حدث عند البلوغ
-        // إلى الحد، وتستقبله كل المحرّرات، ويُعرض مرة واحدة لكل خادم كل ٣٠ ثانية.
-        DefaultScope.launch {
-            LspManager.degradedEvents.collect { server ->
-                if (!LspManager.shouldNotify(server)) return@collect
-                val snackbarHost = snackbarHostStateRef.get() ?: return@collect
-                val message =
-                    strings.lsp_connection_failed_names.getFilledString(server.languageName) +
-                        " · " + strings.lsp_connection_failed_hint.getString()
-                val result =
-                    snackbarHost.showSnackbar(
-                        message = message,
-                        actionLabel = strings.manage.getString(),
-                        duration = SnackbarDuration.Long,
-                    )
-                if (result == SnackbarResult.ActionPerformed) {
-                    openLspSettings()
-                }
-            }
-        }
-    }
-
     /**
      * يفتح شاشة إدارة خوادم اللغة. `MainActivity.instance` قد تكون null بعد دوران
      * الشاشة أو إغلاق المحرّر: لا NPE ولا انهيار.
+     *
+     * 9.1.0: صار المدخل الوحيد لإدارة الخوادم — انظر [primaryServer] وشريط الحالة.
      */
-    private fun openLspSettings() {
+    fun openLspSettings() {
         val activity = MainActivity.instance ?: return
         val intent = Intent(activity, SettingsActivity::class.java)
         intent.putExtra("route", SettingsRoutes.LspSettings.route)
@@ -118,6 +88,9 @@ class LspConnector(
 
     suspend fun connect(wrapperLanguage: TextMateLanguage?) =
         withContext(Dispatchers.IO) {
+            // 9.1.0: فتح ملف = نهاية «تجميد الذاكرة» الذي سبق تشغيل سكربت
+            LspMemoryGuard.release()
+
             if (isConnected()) {
                 logInfo("LSP servers already connected skipping...")
                 return@withContext

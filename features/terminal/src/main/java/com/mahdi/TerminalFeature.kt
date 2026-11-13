@@ -142,8 +142,8 @@ class TerminalFeature : Feature {
         }
 
         // Register SandboxedProcessRegistry provider
-        SandboxedProcessRegistry.provider = { command, workingDir, excludeMounts ->
-            ubuntuProcess(excludeMounts, workingDir = workingDir, command = command)
+        SandboxedProcessRegistry.provider = { command, workingDir, excludeMounts, env ->
+            ubuntuProcess(excludeMounts, workingDir = workingDir, command = command, extraEnv = env)
         }
 
         // Register global command
