@@ -54,6 +54,7 @@
     <string name="close_current_project">هل أنت متأكد من إغلاق المشروع «%s»؟</string>
     <string name="file_name">اسم الملف</string>
     <string name="path">المسار</string>
+    <string name="open_link">فتح رابط</string>
     <string name="open">فتح</string>
     <string name="permission_denied">تم رفض الإذن</string>
     <string name="manage_storage">إدارة التخزين</string>

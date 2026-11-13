@@ -1,6 +1,8 @@
 package com.mahdi.activities.main.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,8 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.DropdownMenu
@@ -32,8 +36,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -317,6 +325,8 @@ private fun TabItemContent(
 
     val context = LocalContext.current
     val density = LocalDensity.current
+    // 9.2.0: نُقرأ الاهتزاز داخل التركيب (لا داخل onClick — قراءة Local* هناك غير مسموحة)
+    val haptics = LocalHapticFeedback.current
 
     val drawerViewModel = (context as MainActivity).drawerViewModel
 
@@ -328,6 +338,21 @@ private fun TabItemContent(
                 calculatedTabWidth?.let { width -> modifier.width(with(density) { width.toDp() }) } ?: modifier
             }
             .let { if (isDraggableContent) it.background(backgroundColor.copy(alpha = 0.4f)) else it }
+            // 9.2.0: التبويب النشط يتلوّن بتدرّج خفيف بلون نوع الملف، فيُعرف
+            // «أين أنا» من نظرة، وتبدو الشريط حيًّا لا صفًّا رماديًّا مسطّحًا.
+            .let {
+                if (isSelected && !isDraggableContent)
+                    it.background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                (getFileColor(tab.file) ?: MaterialTheme.colorScheme.primary)
+                                    .copy(alpha = 0.16f),
+                                androidx.compose.ui.graphics.Color.Transparent,
+                            )
+                        )
+                    )
+                else it
+            }
             .let {
                 if (tab is EditorTab && !tab.editorState.editable)
                     it.background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f))
@@ -373,6 +398,37 @@ private fun TabItemContent(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.addIf(underlineColor != null) { drawErrorUnderline(underlineColor!!) },
             )
+
+            // 9.2.0 — زرّ ✕ ظاهر بجانب اسم كل ملف مفتوح.
+            // كان الإغلاق مخفيًا في نافذة الضغط المطوّل فقط، فبدا التبويب بلا زرّ
+            // إغلاق إطلاقًا. الآن: ✕ صغير **داخل** التبويب، بضغطة واحدة يُغلق
+            // الملف (مع تأكيد واحد فقط إن كانت هناك تعديلات غير محفوظة).
+            Spacer(Modifier.width(2.dp))
+            Box(
+                modifier =
+                    Modifier.size(24.dp)
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            // بلا موجة: التبويب نفسه صغير، والموجة تُشوّه النصّ المجاور
+                            indication = null,
+                            role = null,
+                            onClick = {
+                                runCatching { haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
+                                onCloseThis()
+                            },
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(drawables.close),
+                    contentDescription = stringResource(strings.close_this),
+                    modifier = Modifier.size(14.dp),
+                    tint =
+                        if (isSelected) TabCloseSelected
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                )
+            }
         }
 
         DropdownMenu(expanded = showTabMenu, onDismissRequest = { showTabMenu = false }) {
@@ -510,3 +566,11 @@ private fun TabItemContent(
         )
     }
 }
+
+/**
+ * 9.2.0 — لون ✕ التبويب المحدَّد.
+ *
+ * ورديّ فاقع (`#FB7185`) على خلفية التبويب المحدَّد (سطحية داكنة أو فاتحة):
+ * يتميّز عن النصّ الأزرق السماوي، ويُقرأ بلا لبس على كل الثيمات الأربعة.
+ */
+private val TabCloseSelected = androidx.compose.ui.graphics.Color(0xFFFB7185)

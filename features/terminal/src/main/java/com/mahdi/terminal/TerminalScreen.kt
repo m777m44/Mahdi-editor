@@ -152,6 +152,33 @@ fun TerminalScreen(modifier: Modifier = Modifier, terminalActivity: Terminal) {
  * الشاشة، بلا عنوان كبير ولا مساحات مهدورة — فتكسب الطرفية ١٨dp من الارتفاع
  * في كل لقطة، ويبقى الشريط محترمًا لمساحة شريط الحالة عبر statusBarsPadding.
  */
+
+/**
+ * 9.2.0 — الخروج الصلب من الطرفية.
+ *
+ * `finishIfRunning()` يُنهي جلسة واحدة فقط، ويترك خدمة الطرفية حيّة إن كانت
+ * هناك جلسة أخرى أو إن كان السكربت قد انتهى إلى صدفة تفاعلية. النتيجة: ✕ يُغلق
+ * الشاشة ويبقى شيء يعمل في الخلفية — وهو ما شكا منه المستخدم («يغلق كلشي»).
+ *
+ * هنا: إنهاء كل جلسة (وقتل عملياتها)، إيقاف الخدمة، ثم إغلاق النشاط نهائيًا.
+ */
+private fun hardExitTerminal(activity: Terminal) {
+    // 1) الجلسة المعروضة حاليًا (أسرع مسار لقتل العملية الأمامية)
+    runCatching { terminalView.get()?.currentSession?.finishIfRunning() }
+        .onFailure { logError(it) }
+
+    // 2) كل الجلسات + الخدمة نفسها
+    runCatching {
+            activity.sessionBinder?.get()?.getService()?.actionExit()
+        }
+        .onFailure { logError(it) }
+
+    // 3) إغلاق الشاشة وإزالتها من قائمة المهام (لا أثر متبقٍّ)
+    runCatching { activity.finishAndRemoveTask() }.onFailure {
+        runCatching { activity.finish() }.onFailure { e -> logError(e) }
+    }
+}
+
 @Composable
 private fun CompactTopBar(
     title: String,
@@ -307,13 +334,12 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                                     .onFailure { logError(it) }
                             },
                             onExit = {
-                                // إغلاق الجلسة الحالية كاملةً (العملية والطرفية) بلا سؤال
-                                runCatching {
-                                        terminalView.get()?.currentSession?.finishIfRunning()
-                                    }
-                                    .onFailure { logError(it) }
-                                runCatching { terminalActivity.finish() }
-                                    .onFailure { logError(it) }
+                                // 9.2.0 — «✕ يُغلق كل شيء»:
+                                // كان ✕ يُنهي الجلسة الحالية فقط ثم يُغلق الشاشة، فتبقى
+                                // خدمة الطرفية وعمليات proot حيّة في الخلفية (يسمعها
+                                // المستخدم ولا يراها). الآن: نُنهي **كل** الجلسات،
+                                // نُوقف الخدمة، ثم نُغلق شاشة الطرفية بلا سؤال.
+                                hardExitTerminal(terminalActivity)
                             },
                         )
                     }

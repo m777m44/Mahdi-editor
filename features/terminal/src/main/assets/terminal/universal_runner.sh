@@ -65,8 +65,12 @@ mahdi_run_footer() {
     if [ -n "${MAHDI_FAIL_REASON:-}" ]; then
       printf "${M_VIOLET}  ↳ %s${M_RESET}\n" "$MAHDI_FAIL_REASON" || true
     fi
-    local _hint
-    _hint="$(mahdi_exit_hint "$rc")"
+    # 9.2.0: إن كان هناك سبب محدّد (صياغة/مكتبة/صلاحية) لا نُضيف تلميحًا عامًّا
+    # فوقه — تكرار التشخيص يُشوّش بدل أن يشرح.
+    local _hint=""
+    if [ -z "${MAHDI_FAIL_REASON:-}" ]; then
+      _hint="$(mahdi_exit_hint "$rc")"
+    fi
     if [ -n "$_hint" ]; then
       printf "${M_MUTED}  ↳ %s${M_RESET}\n" "$_hint" || true
     fi
@@ -138,6 +142,7 @@ fi
 # 8.4.0: تفسير رموز الخروج الشائعة بدل رقم بلا معنى
 mahdi_exit_hint() {
   case "$1" in
+    1) printf '%s' 'خطأ داخل السكربت — اقرأ الرسالة أعلاه، فهي تحمل السطر المذنب' ;;
     2) printf '%s' 'وسائط ناقصة أو استخدام خاطئ' ;;
     126) printf '%s' 'الملف غير قابل للتنفيذ' ;;
     127) printf '%s' 'المفسّر أو الأمر غير موجود' ;;
@@ -146,6 +151,69 @@ mahdi_exit_hint() {
     139) printf '%s' 'انهيار في مكتبة أصلية' ;;
     *) printf '%s' '' ;;
   esac
+}
+
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.2.0 — فحص صياغة بايثون **قبل** التشغيل.
+#
+# اللقطة أظهرت: تشغيل سكربت ← خمس ثوانٍ ← «✖ توقّف السكربت (الرمز 1)» و
+# «SyntaxError: invalid decimal literal» بلا سطر ولا رقم. المشكلة الحقيقية:
+# بايثون كان يُشغَّل بعد محرّك الاعتماديات (فحص imports، تنزيل، ‹pip›) كلّه،
+# ثم يموت في أوّل سطر. الآن نفحص الصياغة أولًا بتجميع (compile) في الذاكرة —
+# سريع، بلا ملفات .pyc، وقبل أي عمل شبكي — ونعرض السطر المذنب ومؤشّره.
+#
+# يعيد 3 عند وجود خطأ صياغة، و0 في كل ما عدا ذلك (لا نُعطّل التشغيل لسبب آخر).
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_py_syntax_check() {
+  local file="$1"
+  local py="${MAHDI_PY:-python3}"
+  command -v "$py" >/dev/null 2>&1 || return 0
+  [ -f "$file" ] || return 0
+
+  local out rc=0
+  out="$(
+    "$py" - "$file" 2>&1 <<'PYCHK'
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        source = handle.read()
+except OSError:
+    sys.exit(0)
+
+try:
+    compile(source, path, "exec")
+except SyntaxError as exc:
+    text = (exc.text or "").rstrip("\n")
+    if text.startswith("    "):
+        text = text[4:]
+    offset = max((exc.offset or 1) - 1, 0)
+    print("%d\t%s\t%s" % (exc.lineno or 0, text, " " * offset + "^"))
+    sys.exit(3)
+except Exception:
+    sys.exit(0)
+sys.exit(0)
+PYCHK
+  )" || rc=$?
+
+  [ "$rc" -eq 3 ] || return 0
+
+  local line_num="" src_line="" caret_line=""
+  IFS=$'\t' read -r line_num src_line caret_line <<<"$out" || true
+  [ -n "$line_num" ] || return 0
+
+  local _fsi _pdi
+  _fsi="$(printf '\342\201\250')"
+  _pdi="$(printf '\342\201\251')"
+
+  printf "${M_GOLD}✖${M_RESET}  ${M_BOLD}خطأ في صياغة الملف${M_RESET}\n" || true
+  printf "${M_SKY}  %s%s%s${M_RESET}\n" "$_fsi" "$(basename "$file")" "$_pdi" || true
+  printf "${M_GOLD}  السطر %s${M_RESET}\n" "$line_num" || true
+  [ -n "$src_line" ] && printf "${M_WHITE}  %s${M_RESET}\n" "$src_line" || true
+  [ -n "$caret_line" ] && printf "${M_CORAL}  %s${M_RESET}\n" "$caret_line" || true
+  printf "${M_MUTED}  ↳ صحّح السطر %s في المحرّر ثم أعد التشغيل${M_RESET}\n" "$line_num" || true
+  return 3
 }
 
 # ——————————————— 4.1.0: بيئة تشغيل موحّدة ———————————————
@@ -337,6 +405,11 @@ case "$file" in
   *.py)
     if ! command_exists "${MAHDI_PY:-python3}"; then
       install_package "python3 python3-pip python3-venv"
+    fi
+    # 9.2.0: الصياغة أولًا. سكربت لا يُترجم لا يستحق انتظار تثبيت مكتبات.
+    if ! mahdi_py_syntax_check "$file"; then
+      MAHDI_FAIL_REASON="خطأ في الصياغة — لم يُشغَّل الملف"
+      exit 1
     fi
     # 1) يكتشف كل import في الملف + أوامر pip المكتوبة داخله، 2) يثبّت الناقص بآخر إصدار، 3) يشغّل
     mahdi_auto_deps "$file"

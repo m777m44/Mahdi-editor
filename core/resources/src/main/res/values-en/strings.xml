@@ -50,6 +50,7 @@
     <string name="close_current_project">Are you sure you want to close the project \'%s\'?</string>
     <string name="file_name">File name</string>
     <string name="path">Path</string>
+    <string name="open_link">Open link</string>
     <string name="open">Open</string>
     <string name="permission_denied">Permission denied</string>
     <string name="manage_storage">Manage storage</string>
