@@ -38,6 +38,7 @@ object SandboxedProcessRegistry {
             command: List<String>,
             workingDir: String?,
             excludeMounts: List<String>,
+            env: Map<String, String>,
         ) -> Process)? =
         null
 }

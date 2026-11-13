@@ -226,7 +226,7 @@ object RuntimeInstaller {
             scope.launch {
                 val exitCode =
                     runCatching {
-                            val process = provider(listOf("/bin/bash", "-lc", command), null, emptyList())
+                            val process = provider(listOf("/bin/bash", "-lc", command), null, emptyList(), emptyMap())
                                 ?: return@runCatching -1
                             // لا أحد يقرأ المخرجات: أغلِق المدخل حتى لا ينتظر أي أمر إدخالًا
                             runCatching { process.outputStream.close() }

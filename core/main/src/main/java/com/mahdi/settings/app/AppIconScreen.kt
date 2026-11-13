@@ -80,7 +80,7 @@ fun AppIconScreen(modifier: Modifier = Modifier) {
         modifier = modifier,
         backArrowVisible = true,
     ) {
-        // 6.1.0: ١١ أيقونة — الصفّ الأخير يُكمَّل بفراغات بنفس الوزن حتى تبقى
+        // 9.1.0: ١٧ أيقونة — الصفّ الأخير يُكمَّل بفراغات بنفس الوزن حتى تبقى
         // الأحجام متساوية (بدون وزن، تتمدد أيقونات الصفّ الناقص وتصير أكبر).
         all.chunked(4).forEach { rowIcons ->
             Row(

@@ -88,6 +88,7 @@ import com.mahdi.file.sandboxDir
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
+import com.mahdi.lsp.LspMemoryGuard
 import com.mahdi.utils.logError
 import com.mahdi.settings.editor.DEFAULT_TERMINAL_FONT_PATH
 import com.mahdi.settings.editor.TerminalFontScreen
@@ -261,6 +262,24 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
     val currentTheme = LocalThemeHolder.current
 
     DisposableEffect(Unit) { onDispose { keyboardController?.hide() } }
+
+    // 9.1.0: «حارس الذاكرة» — أثناء فتح الطرفية تتوقّف خوادم اللغة مؤقتًا.
+    //
+    // اللقطة أظهرت `[Process completed (signal 9)]` بعد ٩ ثوانٍ من تشغيل سكربت
+    // بايثون ثقيل. الإشارة ٩ هي SIGKILL من قاتل الذاكرة في أندرويد، وأكبر مستهلك
+    // في التطبيق ليس السكربت بل Pyright/Node في الخلفية (مئات الميغابايتات).
+    // الطرفية هي المكان الذي تُشغَّل فيه الأحمال الثقيلة، فإيقاف الخوادم هنا
+    // (لا حذفها ولا تعطيلها) يترك ذاكرةً كافية للسكربت. تعود تلقائيًا عند فتح
+    // ملف في المحرّر — بلا رسالة ولا إعداد.
+    LaunchedEffect(Unit) {
+        runCatching { LspMemoryGuard.freezeForRun() }
+            .onFailure { logError(it) }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching { LspMemoryGuard.release() }
+        }
+    }
 
     Box(modifier = Modifier.imePadding()) {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)

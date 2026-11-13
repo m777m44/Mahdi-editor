@@ -15,8 +15,19 @@ sealed interface LspConnectionConfig {
         override fun providerFactory() = ConnectionProviderFactory { SocketConnection(port, host, it) }
     }
 
-    data class Process(val command: Array<String>) : LspConnectionConfig {
-        override fun providerFactory() = ConnectionProviderFactory { ProcessConnection(command, it) }
+    /**
+     * خادم يعمل داخل الحاوية عبر `proot`.
+     *
+     * 9.1.0: أُضيفت [env] لأن خوادم Node (Pyright · TypeScript · ESLint …) كانت
+     * تعمل بحدّ الذاكرة الافتراضي لـV8 (يكبر حتى ~٢ غيغابايت). على هاتف بذاكرة
+     * ٣–٤ غيغابايت كان ذلك يجعل قاتل الذاكرة يقتل الجلسة (SIGKILL / إشارة ٩)
+     * أثناء تشغيل سكربت. الآن يُمرَّر حدّ صريح هادئ.
+     */
+    data class Process(
+        val command: Array<String>,
+        val env: Map<String, String> = emptyMap(),
+    ) : LspConnectionConfig {
+        override fun providerFactory() = ConnectionProviderFactory { ProcessConnection(command, env, it) }
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -24,11 +35,11 @@ sealed interface LspConnectionConfig {
 
             other as Process
 
-            return command.contentEquals(other.command)
+            return command.contentEquals(other.command) && env == other.env
         }
 
         override fun hashCode(): Int {
-            return command.contentHashCode()
+            return 31 * command.contentHashCode() + env.hashCode()
         }
     }
 

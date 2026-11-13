@@ -63,9 +63,9 @@ abstract class LspServer {
 
     open val expectedCapabilities: ServerCapabilities? = null
 
-    suspend fun startAllInstances(): List<EditorTab> {
+    suspend fun startAllInstances(quiet: Boolean = false): List<EditorTab> {
         val connectedEditors = mutableListOf<EditorTab>()
-        _instances.value.forEach { connectedEditors.addAll(it.start()) }
+        _instances.value.forEach { connectedEditors.addAll(it.start(quiet)) }
         return connectedEditors
     }
 

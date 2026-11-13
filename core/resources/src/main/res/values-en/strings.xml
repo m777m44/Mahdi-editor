@@ -117,6 +117,7 @@
     <string name="github">GitHub</string>
     <string name="git_commit">Git commit hash</string>
     <string name="check_for_updates">Check for updates</string>
+    <string name="check_for_updates_always">Checks automatically every time the app opens — always on</string>
     <string name="check_for_updates_desc">Periodically check for updates</string>
     <string name="click_open">Click here to open file</string>
     <string name="run">Run</string>
@@ -1061,7 +1062,7 @@ Thank you for using Mahdi-Editor.</string>
     <string name="available_languages">Available languages</string>
     <string name="no_extra_languages">No extra languages installed yet — pick one from Available languages.</string>
     <string name="app_icon_title">App icon</string>
-    <string name="app_icon_desc">Ten 3D anime icons with an embossed M — applied instantly</string>
+    <string name="app_icon_desc">Seventeen 3D cartoon icons with the letter M — applied instantly</string>
     <string name="app_icon_applied">Icon changed: %1$s</string>
     <string name="app_icon_current">Current</string>
     <string name="app_icon_failed">Could not change the icon on this device</string>

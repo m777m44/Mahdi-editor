@@ -184,6 +184,30 @@ data class LspServerInstance(
         }
     }
 
+    /**
+     * إيقاف مؤقت لتوفير الذاكرة (9.1.0) — يُستدعى من [LspMemoryGuard] وحده.
+     *
+     * يختلف عن [stop] في نقطة واحدة حاسمة: **لا يُسجّل الخادم في
+     * [DefinitionPrevention]**. التسجيل هناك يعني «المستخدم أوقفه يدويًا»، فيُحذف
+     * تعريف الخادم من المشروع ولا يعود حتى يُعاد تسجيله يدويًا — وهو عكس المطلوب
+     * تمامًا: نحن نريد إيقافًا مؤقتًا تعود بعده الخوادم وحدها.
+     */
+    suspend fun pauseForMemory() {
+        withContext(Dispatchers.IO) {
+            val wrapper = getWrapper() ?: return@withContext
+            addLog(
+                LspLogEntry(
+                    MessageSource.Client,
+                    MessageType.Info,
+                    "Language server paused to free memory for a script run",
+                )
+            )
+            runCatching { wrapper.stop(true) }
+                .onFailure { logError(it, "pause ${server.serverName}") }
+            setStatus(LspConnectionStatus.NOT_RUNNING)
+        }
+    }
+
     /** Restarts this language server instance */
     suspend fun restart() {
         logInfo("Restarting LSP instance: $id for server: ${server.serverName}")
@@ -249,14 +273,20 @@ data class LspServerInstance(
      *
      * @return List of editors that were reconnected
      */
-    suspend fun start(): List<EditorTab> {
+    suspend fun start(quiet: Boolean = false): List<EditorTab> {
         logInfo("Starting LSP instance: $id for server: ${server.serverName}")
         return withContext(Dispatchers.IO) {
             addLog(
                 LspLogEntry(
                     MessageSource.Client,
                     MessageType.Info,
-                    "User started language server instance...",
+                    // 9.1.0: الاستئناف بعد «حارس الذاكرة» ليس فعلًا من المستخدم،
+                    // فلا يُكتب في السجلّ ما لم يفعله.
+                    if (quiet) {
+                        "Language server resumed after the memory guard"
+                    } else {
+                        "User started language server instance..."
+                    },
                 )
             )
             val wrapper = getWrapper() ?: return@withContext emptyList()

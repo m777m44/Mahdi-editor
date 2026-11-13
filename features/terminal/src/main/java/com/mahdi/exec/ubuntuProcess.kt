@@ -110,6 +110,8 @@ suspend fun ubuntuProcess(
     root: File = sandboxDir(),
     workingDir: String? = null,
     command: List<String>,
+    /** 9.1.0: متغيّرات إضافية من طالب العملية (مثل حدّ ذاكرة Node لخوادم اللغة). */
+    extraEnv: Map<String, String> = emptyMap(),
 ): Process =
     withContext(Dispatchers.IO) {
         if (!root.exists()) throw NoSuchFileException(root)
@@ -213,6 +215,9 @@ suspend fun ubuntuProcess(
                 "yes" -> env["SECCOMP"] = "1"
                 "no" -> env["PROOT_NO_SECCOMP"] = "1"
             }
+
+            // 9.1.0: ما يطلبه المستدعي يعلو على الافتراضي (حدّ ذاكرة Node مثلًا)
+            extraEnv.forEach { (key, value) -> env[key] = value }
         }
 
         return@withContext processBuilder.start()

@@ -26,10 +26,6 @@ object UpdateChecker {
     fun checkForUpdates(branch: String) {
         GlobalScope.launch(Dispatchers.IO) {
             try {
-                if (Settings.check_for_update.not()) {
-                    return@launch
-                }
-
                 val lastUpdate = Settings.last_update_check_timestamp
                 val timeDifferenceInMillis =
                     if (lastUpdate > 0) {
