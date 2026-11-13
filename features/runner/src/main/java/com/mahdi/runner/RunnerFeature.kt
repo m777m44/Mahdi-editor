@@ -7,6 +7,7 @@ import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.commands.CommandProvider
 import com.mahdi.commands.ToolbarConfiguration
 import com.mahdi.commands.editor.RunCommand
+import com.mahdi.commands.global.OpenLinkCommand
 import com.mahdi.components.DialogProvider
 import com.mahdi.components.DialogRegistry
 import com.mahdi.extension.api.DynamicRoute
@@ -33,6 +34,12 @@ class RunnerFeature : Feature {
                 val showRunnerDialog by RunnerUI.showRunnerDialog.collectAsStateWithLifecycle()
                 if (showRunnerDialog) {
                     RunnerSheet()
+                }
+
+                // 9.2.0 — «معاينة رابط»: نافذة إدخال العنوان للمتصفّح الداخلي
+                val showLinkDialog by RunnerUI.showLinkDialog.collectAsStateWithLifecycle()
+                if (showLinkDialog) {
+                    LinkPreviewSheet()
                 }
             }
                 .also { DialogRegistry.register(it) }
@@ -61,6 +68,10 @@ class RunnerFeature : Feature {
         // Register Run command
         CommandProvider.registerCommand(RunCommand)
         ToolbarConfiguration.addGlobalToolbarCommand(RunCommand, 0)
+
+        // 9.2.0: «فتح رابط» — متصفّح داخلي كما في المتصفحات (لا متصفّح ثانٍ:
+        // يُستخدم PreviewBrowserActivity نفسه الذي يعرض ملفات HTML).
+        CommandProvider.registerCommand(OpenLinkCommand)
     }
 
     override fun dispose(application: Application) {
@@ -69,6 +80,7 @@ class RunnerFeature : Feature {
         runnersRoute?.let { SettingsRegistry.unregisterRoute(it) }
         htmlRunnersRoute?.let { SettingsRegistry.unregisterRoute(it) }
 
+        CommandProvider.unregisterCommand(OpenLinkCommand)
         CommandProvider.unregisterCommand(RunCommand)
         ToolbarConfiguration.removeGlobalToolbarCommand(RunCommand)
     }

@@ -49,9 +49,75 @@ mahdi_heal_strip_noise() {
 # واضح: مكتبة قديمة، صياغة، ملف مفقود، صلاحية، شبكة، إلخ.
 # MAHDI_TRACE=1 يعرض أثر بايثون كاملًا بعد منقي الضجيج (للمطوّرين).
 # ——————————————————————————————————————————————————————————————————————————————
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.2.0 — سياق خطأ الصياغة: السطر المذنب نفسه، لا اسم الخطأ وحده.
+#
+# كانت اللقطة تُظهر:
+#     ✖ خطأ في صياغة الملف
+#     SyntaxError: invalid decimal literal
+#     ↳ خطأ في الصياغة
+# ولا سطر ولا رقم — فيبقى المستخدم يفتح الملف ويبحث بعينه عن الخطأ. بايثون
+# يُرسل السياق كاملًا في stderr:
+#       File "x.py", line 3
+#         x = 09abc
+#             ^
+# نستخرجه هنا (رقم السطر + نصّ السطر + مؤشّر ^) ونعرضه عربيًّا مرتّبًا.
+# يضع النتيجة في MAHDI_SYN_LINE / _SOURCE / _CARET / _FILE ويعيد 0 عند النجاح.
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_heal_syntax_ctx() {
+  local errfile="$1"
+  MAHDI_SYN_LINE="" MAHDI_SYN_SOURCE="" MAHDI_SYN_CARET="" MAHDI_SYN_FILE=""
+  [ -s "$errfile" ] || return 1
+
+  local parsed
+  parsed="$(
+    awk '
+      /^[[:space:]]*File ".*", (physical )?line [0-9]+/ {
+        loc = NR
+        line = $0
+        sub(/.*, (physical )?line /, "", line)
+        sub(/[^0-9].*$/, "", line)
+        if (match($0, /File "[^"]*"/)) {
+          name = substr($0, RSTART + 6, RLENGTH - 7)
+        }
+      }
+      { rows[NR] = $0 }
+      END {
+        if (loc == 0) exit
+        i = loc + 1
+        while (i <= NR && rows[i] ~ /^[[:space:]]*$/) i++
+        src = rows[i]
+        i++
+        while (i <= NR && rows[i] ~ /^[[:space:]]*$/) i++
+        car = rows[i]
+        # بايثون يُزيح السطر والمؤشّر بأربع مسافات لكلّيهما؛ نُزيلها من الاثنين
+        # معًا فيبقى المؤشّر محاذيًا تمامًا للحرف المقصود.
+        sub(/^    /, "", src)
+        sub(/^    /, "", car)
+        printf "%s\t%s\t%s\t%s", line, name, src, car
+      }
+    ' "$errfile" 2>/dev/null
+  )"
+  [ -n "$parsed" ] || return 1
+
+  local _line _name _src _car
+  IFS=$'\t' read -r _line _name _src _car <<<"$parsed" || true
+  [ -n "$_line" ] || return 1
+
+  MAHDI_SYN_LINE="$_line"
+  MAHDI_SYN_FILE="${_name##*/}"
+  MAHDI_SYN_SOURCE="$_src"
+  # المؤشّر ^ يُقصّ إلى بداية السطر كي يبقى محاذيًا للحرف المقصود
+  MAHDI_SYN_CARET="$(printf '%s' "$_car" | sed -e 's/[^[:space:]^].*$//' -e 's/^[[:space:]]\{0,2\}//')"
+  return 0
+}
+
 mahdi_heal_report() {
   local lang="$1" errfile="$2" rc="${3:-1}"
   local mod="" line="" tone="" title="" hint=""
+
+  # 9.2.0: تصفير سياق الصياغة — لا تتسرّب بيانات خطأ سابق إلى الخطأ الحالي
+  MAHDI_SYN_LINE="" MAHDI_SYN_SOURCE="" MAHDI_SYN_CARET="" MAHDI_SYN_FILE=""
 
   if [ -s "$errfile" ]; then
     mod="$(mahdi_heal_missing_module "$errfile")"
@@ -71,8 +137,13 @@ mahdi_heal_report() {
         MAHDI_FAIL_REASON="مكتبة غير متوافقة" ;;
       SyntaxError:*|IndentationError:*|TabError:*)
         tone="$M_GOLD"; title="خطأ في صياغة الملف"
-        hint="افتح الملف وصحّح السطر المشار إليه"
-        MAHDI_FAIL_REASON="خطأ في الصياغة" ;;
+        if mahdi_heal_syntax_ctx "$errfile"; then
+          hint="صحّح السطر $MAHDI_SYN_LINE ثم أعد التشغيل (الملف مفتوح في المحرّر)"
+          MAHDI_FAIL_REASON="خطأ في الصياغة — السطر $MAHDI_SYN_LINE"
+        else
+          hint="افتح الملف وصحّح السطر المشار إليه"
+          MAHDI_FAIL_REASON="خطأ في الصياغة"
+        fi ;;
       FileNotFoundError:*|IsADirectoryError:*|NotADirectoryError:*)
         tone="$M_GOLD"; title="ملف أو مجلد مفقود"
         hint="تحقّق من المسار ومن وجود الملفات بجانب السكربت"
@@ -111,7 +182,20 @@ mahdi_heal_report() {
   fi
 
   printf "%b✖  %s%b\n" "$tone" "$title" "$M_RESET" >&2
-  if [ -n "$line" ] && [ -z "$mod" ]; then
+
+  # 9.2.0: خطأ الصياغة يُعرض بسطر الملف ومؤشّره، لا باسم الخطأ الإنجليزي وحده.
+  if [ -n "${MAHDI_SYN_SOURCE:-}" ]; then
+    local _fsi _pdi
+    # FSI/PDI بالبايتات (U+2068 / U+2069): $'\u…' لا يُفسَّر في كل بناءات bash
+    _fsi="$(printf '\342\201\250')"
+    _pdi="$(printf '\342\201\251')"
+    # كل معلومة في سطرها: لا خلط عربي/لاتيني في سطر واحد (اتجاه واحد لكل سطر)
+    printf "${M_SKY}  %s%s%s${M_RESET}\n" "$_fsi" "${MAHDI_SYN_FILE:-}" "$_pdi" >&2
+    printf "${M_GOLD}  السطر %s${M_RESET}\n" "$MAHDI_SYN_LINE" >&2
+    printf "${M_WHITE}  %s${M_RESET}\n" "$MAHDI_SYN_SOURCE" >&2
+    [ -n "${MAHDI_SYN_CARET:-}" ] &&
+      printf "${M_CORAL}  %s${M_RESET}\n" "$MAHDI_SYN_CARET" >&2
+  elif [ -n "$line" ] && [ -z "$mod" ]; then
     printf "  ${M_WHITE}%s${M_RESET}\n" "$line" >&2
   fi
   if [ -n "$hint" ]; then

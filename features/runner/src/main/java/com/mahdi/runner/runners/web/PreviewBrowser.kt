@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.WebResourceRequest
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -226,6 +227,34 @@ fun BrowserScreen(initialUrl: String, onClose: () -> Unit) {
                         setupPreviewWebView(this)
                         webViewClient =
                             object : WebViewClient() {
+                                /**
+                                 * 9.2.0 — التنقّل داخل التطبيق.
+                                 *
+                                 * كل رابط http/https/‏file يُفتح **في نفس الشاشة**
+                                 * (رجوع/تقدّم يعملان)، وأي مخطط آخر (mailto:، tel:،
+                                 * intent:) يُسلَّم للنظام كي لا تظهر صفحة خطأ.
+                                 */
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView,
+                                    request: WebResourceRequest,
+                                ): Boolean {
+                                    val target = request.url
+                                    return when (target.scheme?.lowercase()) {
+                                        "http",
+                                        "https",
+                                        "file",
+                                        "about",
+                                        "data",
+                                        "javascript" -> false
+                                        else -> {
+                                            runCatching {
+                                                context.startActivity(Intent(Intent.ACTION_VIEW).setData(target))
+                                            }
+                                            true
+                                        }
+                                    }
+                                }
+
                                 override fun onPageFinished(view: WebView, url: String) {
                                     canGoBack = view.canGoBack()
                                     canGoForward = view.canGoForward()
@@ -285,6 +314,25 @@ private fun setupPreviewWebView(webView: WebView) {
     }
     // خلفية داكنة قبل رسم الصفحة: تمنع الوميض الأبيض المزعج في الوضع الداكن
     webView.setBackgroundColor(android.graphics.Color.parseColor("#0B1114"))
+}
+
+/**
+ * 9.2.0 — «افتح هذا الرابط داخل التطبيق».
+ *
+ * يقبل رابطًا كاملًا، أو نطاقًا (`example.com`)، أو **نصّ بحث** فيحوّله إلى بحث
+ * Google — فيعمل الزرّ نفسه كشريط عنوان وكشريط بحث (كما اعتاد المستخدم في
+ * المتصفحات)، بدل رفض أي نصّ لا يبدأ بـ http.
+ */
+fun openLinkInPreview(context: Context, raw: String) {
+    val text = raw.trim()
+    if (text.isEmpty()) return
+    val url =
+        when {
+            text.startsWith("http://") || text.startsWith("https://") || text.startsWith("file://") -> text
+            text.contains('.') && !text.contains(' ') -> normalizeUrl(text)
+            else -> "https://www.google.com/search?q=" + java.net.URLEncoder.encode(text, "UTF-8")
+        }
+    PreviewBrowserActivity.start(context, url)
 }
 
 private fun normalizeUrl(raw: String): String {
