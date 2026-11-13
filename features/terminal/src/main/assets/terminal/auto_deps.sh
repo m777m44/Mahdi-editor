@@ -560,14 +560,48 @@ def distribution_installed(spec):
         return False
 
 
+# 9.3.1 — أسماء تتكرّر في كل مشروع ولا تكون حزمة PyPI (‏`core` · `utils` …).
+# كانت تُرسَل إلى pip فتُنتج «المكتبة ”core“ غير مثبّتة» وهي وحدة داخل المشروع.
+LOCAL_NAMES = {
+    "core", "utils", "util", "helpers", "helper", "config", "configs", "settings",
+    "models", "model", "views", "controllers", "controller", "routes", "router",
+    "routers", "handlers", "handler", "services", "service", "api", "apis", "app",
+    "main", "run", "bot", "client", "server", "database", "db", "dao", "schemas",
+    "schema", "serializers", "forms", "admin", "auth", "lib", "libs", "src",
+    "source", "sources", "tests", "test", "scripts", "static", "templates",
+    "migrations", "plugins", "plugin", "modules", "module", "components",
+    "component", "engine", "engines", "agents", "agent", "tools", "tool",
+    "crawler", "scraper", "scrapers", "workers", "worker", "tasks", "task",
+    "jobs", "job", "pipelines", "pipeline", "storage", "cache", "logger",
+    "logging", "exceptions", "errors", "constants", "enums", "types", "shared",
+    "common", "middleware", "security", "session", "sessions", "user", "users",
+    "data", "dataset", "datasets", "train", "training", "inference", "predict",
+}
+
+
 def is_local(module, directory):
+    if not module:
+        return False
+    name = module.split(".")[0]
+    if name.lower() in LOCAL_NAMES:
+        return True
     if not directory:
         return False
-    candidates = [
-        os.path.join(directory, module + ".py"),
-        os.path.join(directory, module, "__init__.py"),
-    ]
-    return any(os.path.exists(p) for p in candidates)
+    # نفحص مجلد السكربت ثم مجلدين أعلى منه (‏src/ · project/ · …)
+    probe = os.path.abspath(directory)
+    for _ in range(3):
+        for candidate in (
+            os.path.join(probe, name + ".py"),
+            os.path.join(probe, name, "__init__.py"),
+            os.path.join(probe, name),
+        ):
+            if os.path.exists(candidate):
+                return True
+        parent = os.path.dirname(probe)
+        if not parent or parent == probe:
+            break
+        probe = parent
+    return False
 
 
 def main():
@@ -608,6 +642,47 @@ def main():
     parse_pip_lines(src, extra)
 
     directory = os.path.dirname(os.path.abspath(path))
+
+    # 9.3.1 — نفحص المشروع كله لا الملف وحده.
+    # مكتبة يستوردها `core/db.py` أو `handlers/start.py` لم تكن تُكتشف إطلاقًا
+    # (كان الفحص يقرأ الملف المُشغَّل فقط)، فينهار السكربت عند أول استيراد
+    # داخلي. الآن نقرأ ملفات المشروع حتى ٦٠ ملفًا وبحدّ حجم آمن.
+    if os.path.isdir(directory):
+        skip_dirs = {
+            "node_modules", ".git", "__pycache__", ".venv", "venv", "env",
+            "build", "dist", ".gradle", ".idea", ".vscode", "target", ".next",
+        }
+        scanned, budget = 0, 1_500_000
+        for dirpath, dirnames, filenames in os.walk(directory):
+            dirnames[:] = [
+                d for d in dirnames if d not in skip_dirs and not d.startswith(".")
+            ]
+            for fname in filenames:
+                if not fname.endswith(".py"):
+                    continue
+                full = os.path.join(dirpath, fname)
+                if full == os.path.abspath(path):
+                    continue
+                try:
+                    size = os.path.getsize(full)
+                except OSError:
+                    continue
+                if size > 400_000 or budget <= 0:
+                    continue
+                try:
+                    with open(full, encoding="utf-8", errors="ignore") as fh:
+                        other = fh.read()
+                except OSError:
+                    continue
+                budget -= size
+                scanned += 1
+                parse_imports(other, mods)
+                parse_pip_lines(other, extra)
+                if scanned >= 60:
+                    break
+            if scanned >= 60:
+                break
+
     needed = []
 
     for mod in sorted(mods):

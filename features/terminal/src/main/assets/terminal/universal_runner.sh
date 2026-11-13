@@ -66,19 +66,32 @@ mahdi_run_footer() {
   if [ "$rc" -eq 0 ]; then
     printf "${M_MINT}✔${M_RESET}  ${M_BOLD}تمّ التشغيل${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$dur" || true
   else
-    printf "${M_CORAL}✖${M_RESET}  ${M_BOLD}توقّف السكربت (الرمز %s)${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$rc" "$dur" || true
-    # 8.3.0: سبب الفشل كان يُخفى تمامًا خلف رمز الخروج وحده
-    if [ -n "${MAHDI_FAIL_REASON:-}" ]; then
-      printf "${M_VIOLET}  ↳ %s${M_RESET}\n" "$MAHDI_FAIL_REASON" || true
+    # ————————————————————————————————————————————————————————————————————————
+    # 9.3.1 — ترتيب الكلام: سطر نتيجة واحد، ثم سبب واحد، ثم إجراء واحد.
+    #
+    # كان السطر ✖ يُطبع **مرتين** لنفس السبب: مرة من تقرير المكتبة الناقصة قبل
+    # الخروج، ومرة من هنا. الآن التشخيص المفصّل يبدأ بـ ⚠ (أعلاه)، وهذا السطر
+    # هو الحكم الوحيد ✖، وبعده سطر سبب واحد فقط — لا تكرار.
+    # ————————————————————————————————————————————————————————————————————————
+    printf "${M_CORAL}✖${M_RESET}  ${M_BOLD}توقّف السكربت${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%ss${M_RESET}\n" "$dur" || true
+
+    local _reason="${MAHDI_FAIL_REASON:-}"
+    local _reported="${MAHDI_REPORTED:-0}"
+
+    # سبب واضح لم يُطبع بعد ⇒ نطبعه. وإن كان قد طُبع مفصّلًا أعلاه فلا نكرّره.
+    if [ -n "$_reason" ] && [ "$_reported" != "1" ]; then
+      printf "${M_VIOLET}   ↳ %s${M_RESET}\n" "$_reason" || true
     fi
-    # 9.2.0: إن كان هناك سبب محدّد (صياغة/مكتبة/صلاحية) لا نُضيف تلميحًا عامًّا
-    # فوقه — تكرار التشخيص يُشوّش بدل أن يشرح.
-    local _hint=""
-    if [ -z "${MAHDI_FAIL_REASON:-}" ]; then
+
+    if [ -z "$_reason" ] && [ "$_reported" != "1" ]; then
+      local _hint
       _hint="$(mahdi_exit_hint "$rc")"
+      [ -n "$_hint" ] && printf "${M_MUTED}   ↳ %s${M_RESET}\n" "$_hint" || true
     fi
-    if [ -n "$_hint" ]; then
-      printf "${M_MUTED}  ↳ %s${M_RESET}\n" "$_hint" || true
+
+    # إجراء واحد ينفع في الحالتين، بلا محاضرة
+    if [ "$_reported" = "1" ]; then
+      printf "${M_MUTED}   ↳ بعد الإصلاح: أعد التشغيل من زرّ ▶${M_RESET}\n" || true
     fi
   fi
 

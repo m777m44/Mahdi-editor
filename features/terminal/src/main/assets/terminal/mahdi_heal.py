@@ -212,28 +212,94 @@ def find_python_modules(text: str, script: str | None) -> list[str]:
     return found
 
 
-def local_modules(script: str | None) -> set[str]:
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.3.1 — «المكتبة ”core“ غير مثبّتة»
+#
+# اللقطة أظهرت سكربتًا يفشل بـ `ModuleNotFoundError: No module named 'core'`،
+# فاعتقد محرّك الإصلاح أن `core` حزمة من PyPI وبدأ يثبّتها — وهي وحدة **داخل
+# المشروع** (مجلد `core/` بجانب السكربت) لم تُنسخ مع الملف. النتيجة: انتظار
+# شبكة، ثم «أعد التشغيل بعد وصل الإنترنت» وهي رسالة خاطئة تمامًا.
+#
+# الحلّ: نعرف ما هو «محلي» قبل أي محاولة تثبيت، ونشرح السبب الحقيقي بدلًا من
+# إرسال المستخدم إلى الشبكة.
+# ——————————————————————————————————————————————————————————————————————————————
+
+# أسماء تتكرّر في كل مشروع تقريبًا ولا تكون حزمة PyPI أبدًا
+LOCAL_HINTS = {
+    "core", "utils", "util", "helpers", "helper", "config", "configs", "settings",
+    "models", "model", "views", "view", "controllers", "controller", "routes",
+    "router", "routers", "handlers", "handler", "services", "service", "api",
+    "apis", "app", "apps", "main", "run", "bot", "client", "server", "database",
+    "db", "dao", "schemas", "schema", "serializers", "forms", "admin", "auth",
+    "lib", "libs", "src", "source", "sources", "tests", "test", "scripts",
+    "static", "templates", "migrations", "plugins", "plugin", "modules", "module",
+    "components", "component", "engine", "engines", "agents", "agent", "tools",
+    "tool", "crawler", "scraper", "scrapers", "workers", "worker", "tasks",
+    "task", "jobs", "job", "pipelines", "pipeline", "storage", "cache", "logger",
+    "logging", "exceptions", "errors", "constants", "enums", "types", "shared",
+    "common", "middleware", "security", "session", "sessions", "user", "users",
+    "data", "dataset", "datasets", "train", "training", "inference", "predict",
+    "requirements", "setup", "conftest",
+}
+
+
+def _project_roots(script: str | None) -> list[str]:
+    """مجلدات المشروع التي قد تحتوي وحدات محلية: مجلد السكربت ثم أعلى منه."""
     if not script:
-        return set()
-    root = os.path.dirname(os.path.abspath(script))
-    names = set()
-    try:
-        for entry in os.listdir(root):
-            if entry.endswith(".py"):
-                names.add(entry[:-3])
-            elif os.path.isdir(os.path.join(root, entry)):
-                names.add(entry)
-    except OSError:
-        pass
+        return []
+    roots: list[str] = []
+    current = os.path.dirname(os.path.abspath(script))
+    for _ in range(3):
+        if not current or current in roots:
+            break
+        roots.append(current)
+        parent = os.path.dirname(current)
+        if parent in ("", "/", current):
+            break
+        current = parent
+    cwd = os.getcwd()
+    if cwd and cwd not in roots:
+        roots.append(cwd)
+    return roots
+
+
+def local_modules(script: str | None) -> set[str]:
+    """أسماء الوحدات الموجودة فعليًا كمجلدات/ملفات بجانب السكربت أو فوقه."""
+    names: set[str] = set()
+    for root in _project_roots(script):
+        try:
+            for entry in os.listdir(root):
+                if entry.startswith("."):
+                    continue
+                if entry.endswith(".py"):
+                    names.add(entry[:-3])
+                elif os.path.isdir(os.path.join(root, entry)):
+                    names.add(entry)
+        except OSError:
+            continue
     return names
+
+
+def is_local_module(module: str, script: str | None) -> bool:
+    """هل هذه الوحدة محلية (ليست حزمة تُثبَّت من PyPI)؟"""
+    name = module.split(".")[0].strip()
+    if not name:
+        return False
+    if name in local_modules(script):
+        return True
+    if name.lower() in LOCAL_HINTS:
+        return True
+    return False
 
 
 def to_packages(modules: list[str], script: str | None) -> list[str]:
     stdlib = python_stdlib()
-    locals_ = local_modules(script)
     packages: list[str] = []
     for module in modules:
-        if module in stdlib or module in locals_ or module.startswith("_"):
+        if module in stdlib or module.startswith("_"):
+            continue
+        # 9.3.1: الوحدة المحلية ليست حزمة ناقصة — لا تُرسَل إلى pip إطلاقًا
+        if is_local_module(module, script):
             continue
         dist = PY_DIST.get(module, module)
         if not dist:
@@ -368,6 +434,8 @@ def main() -> int:
     parser.add_argument("--file", dest="script", default="")
     parser.add_argument("--broken", action="store_true")
     parser.add_argument("--preflight", action="store_true")
+    # 9.3.1: يطبع أسماء الوحدات المفقودة التي هي **محلية** (لا تُثبَّت)
+    parser.add_argument("--locals", action="store_true")
     args = parser.parse_args()
 
     text = ""
@@ -386,6 +454,13 @@ def main() -> int:
     if args.broken:
         for action in broken_actions(text, args.script):
             print(action)
+        return 0
+
+    if args.locals:
+        # الوحدات التي يشكو المفسّر من غيابها وهي في الحقيقة داخل المشروع
+        for module in find_python_modules(text, args.script):
+            if is_local_module(module, args.script):
+                print(module)
         return 0
 
     if not text:

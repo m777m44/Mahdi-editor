@@ -41,6 +41,51 @@ mahdi_heal_missing_module() {
   grep -oE "No module named '[^']+'" "$1" 2>/dev/null | tail -n 1 | cut -d"'" -f2
 }
 
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.3.1 — «المكتبة ”core“ غير مثبّتة»: الوحدة المحلية ليست حزمة ناقصة.
+#
+# اللقطة أظهرت سكربتًا يفشل بـ `No module named 'core'`، فبدأ محرّك الإصلاح
+# يثبّت `core` من الشبكة (وهي وحدة **داخل المشروع**) ثم قال «أعد التشغيل بعد
+# وصل الإنترنت». الآن نعرف الوحدات المحلية من مساعد بايثون، ولا نلمس pip إطلاقًا.
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_heal_is_local() {
+  local module="$1" script="$2"
+  [ -z "$module" ] && return 1
+  case "$module" in
+    */* | *.py) return 1 ;;
+  esac
+  # ١) ملف أو مجلد بنفس الاسم بجانب السكربت أو فوقه
+  local dir
+  dir="$(dirname "$script" 2>/dev/null)"
+  local probe="$dir"
+  local i=0
+  while [ -n "$probe" ] && [ "$i" -lt 3 ]; do
+    if [ -e "$probe/$module.py" ] || [ -d "$probe/$module" ]; then
+      return 0
+    fi
+    probe="$(dirname "$probe" 2>/dev/null)"
+    [ "$probe" = "/" ] && break
+    i=$((i + 1))
+  done
+  # ٢) أسماء شائعة في كل مشروع (core · utils · config · models …)
+  case "$module" in
+    core | utils | util | helpers | helper | config | configs | settings | models | model | \
+      views | controllers | controller | routes | router | routers | handlers | handler | \
+      services | service | api | apis | app | main | run | bot | client | server | \
+      database | db | dao | schemas | schema | serializers | forms | admin | auth | lib | \
+      libs | src | source | sources | tests | test | scripts | static | templates | \
+      migrations | plugins | plugin | modules | module | components | component | engine | \
+      engines | agents | agent | tools | tool | crawler | scraper | scrapers | workers | \
+      worker | tasks | task | jobs | job | pipelines | pipeline | storage | cache | logger | \
+      logging | exceptions | errors | constants | enums | types | shared | common | \
+      middleware | security | session | sessions | user | users | data | dataset | datasets | \
+      train | training | inference | predict)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 # سطور لا تفيد المستخدم إطلاقًا (pip / urllib3 / npm)
 mahdi_heal_strip_noise() {
   grep -viE '^(WARNING: Retrying|WARNING: The repository|WARNING: You are using pip|WARNING: Value for|WARNING: There was an error|Looking in indexes|Collecting |  Downloading |  Using cached|  Preparing metadata|  Getting requirements|  Building wheel|  Created wheel|  Stored in|Requirement already satisfied|  Attempting uninstall|  Found existing installation|Successfully installed|Successfully built|note:|hint:|  error: subprocess-exited-with-error|Traceback \(most recent call last\)|  File "|npm ERR!|npm WARN)' "$1" 2>/dev/null |
@@ -119,7 +164,7 @@ mahdi_heal_syntax_ctx() {
 }
 
 mahdi_heal_report() {
-  local lang="$1" errfile="$2" rc="${3:-1}"
+  local lang="$1" errfile="$2" rc="${3:-1}" script_path="${4:-${script:-}}"
   local mod="" line="" tone="" title="" hint=""
 
   # 9.2.0: تصفير سياق الصياغة — لا تتسرّب بيانات خطأ سابق إلى الخطأ الحالي
@@ -130,7 +175,17 @@ mahdi_heal_report() {
     line="$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception|Interrupt):' "$errfile" | tail -n 1)"
   fi
 
-  if [ -n "$mod" ]; then
+  if [ -n "$mod" ] && mahdi_heal_is_local "$mod" "$script_path"; then
+    # 9.3.1: وحدة محلية — لا علاقة لها بالإنترنت ولا بـ pip
+    tone="$M_GOLD"
+    title="وحدة محلية مفقودة: $mod"
+    hint="مجلد «$mod» ليس بجانب الملف المشغَّل — شغّله من داخل مجلده، أو جهّز المشروع: mh install ."
+    MAHDI_FAIL_REASON="وحدة محلية مفقودة: $mod"
+    mod=""
+    # لا نطبع سطر بايثون الإنجليزي أدناه: اسم الوحدة واضح أعلاه،
+    # وتكراره بالإنجليزية يجعل الرسالة تبدو كخطأين.
+    line=""
+  elif [ -n "$mod" ]; then
     tone="$M_CORAL"
     title="المكتبة «$mod» غير مثبّتة"
     hint="سيُعاد التثبيت تلقائيًا بطرق أخرى — أعد التشغيل بعد وصل الإنترنت"
@@ -187,7 +242,12 @@ mahdi_heal_report() {
     esac
   fi
 
-  printf "%b✖  %s%b\n" "$tone" "$title" "$M_RESET" >&2
+  # 9.3.1: التشخيص يبدأ بعلامة هادئة (⚠) — العلامة ✖ محفوظة لسطر النتيجة
+  # النهائي في نهاية التشغيل، فلا يظهر خطأان متتاليان للسبب نفسه.
+  printf "%b⚠  %s%b\n" "$tone" "$title" "$M_RESET" >&2
+  # تعليم أن التشخيص المفصّل طُبع — نهايةُ التشغيل لا تُكرّره
+  MAHDI_REPORTED=1
+  export MAHDI_REPORTED
 
   # 9.2.0: خطأ الصياغة يُعرض بسطر الملف ومؤشّره، لا باسم الخطأ الإنجليزي وحده.
   if [ -n "${MAHDI_SYN_SOURCE:-}" ]; then
@@ -436,8 +496,8 @@ mahdi_run_heal() {
       rm -f "$errfile" 2>/dev/null || true
       return 0
     fi
-    [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
-    [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc"; break; }
+    [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc" "$script"; break; }
+    [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc" "$script"; break; }
 
     # ————————————————————— 9.3.0: سبب «الانهيار» الأشهر عند تشغيل مشاريع GitHub —————
     # سكربت يستدعي أمرًا غير موجود (npm · node · git · curl · ffmpeg …) كان يفشل
@@ -486,7 +546,7 @@ mahdi_run_heal() {
 
     # لا مكتبة ناقصة ⇒ الخطأ من السكربت نفسه: نعرضه ونقف.
     if [ -z "$pkgs" ]; then
-      mahdi_heal_report "$lang" "$errfile" "$rc"
+      mahdi_heal_report "$lang" "$errfile" "$rc" "$script"
       break
     fi
 
@@ -500,7 +560,7 @@ mahdi_run_heal() {
       all_failed=0
     done <<<"$pkgs"
     if [ "$all_failed" -eq 1 ]; then
-      mahdi_heal_report "$lang" "$errfile" "$rc"
+      mahdi_heal_report "$lang" "$errfile" "$rc" "$script"
       break
     fi
 
@@ -529,7 +589,7 @@ mahdi_run_heal() {
 
     if [ "$failed" -eq 1 ]; then
       # 8.3.0: كان يكتفي بسطر «تحقّق من الاتصال» ويُخفي خطأ السكربت الأصلي.
-      mahdi_heal_report "$lang" "$errfile" "$rc"
+      mahdi_heal_report "$lang" "$errfile" "$rc" "$script"
       break
     fi
 

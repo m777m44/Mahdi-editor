@@ -107,9 +107,24 @@ _mahdi_prompt() {
         fi
         [ -n "$branch" ] && branch="\[\e[95m\]${branch}\[\e[0m\] "
     fi
+    # 9.3.1 — مسار قصير كي لا يلتفّ المِحَثّ إلى سطرين.
+    # `~/mahdi-run` يبقى كما هو، والمسار الطويل يُختصر إلى «…/آخر مجلد».
+    # الاسم العربي معزول بين FSI/PDI فلا يُقلب ترتيبه على السطر.
+    local pwd_short="$PWD"
+    case "$pwd_short" in
+        "${HOME:-/root}") pwd_short="~" ;;
+        "${HOME:-/root}"/*) pwd_short="~${pwd_short#"${HOME:-/root}"}" ;;
+    esac
+    if [ "${#pwd_short}" -gt 22 ]; then
+        pwd_short="…/${pwd_short##*/}"
+    fi
+    local _fsi _pdi
+    _fsi="$(printf '\342\201\250')"
+    _pdi="$(printf '\342\201\251')"
+
     # 9.3.0: بدل `root@localhost` (الذي كان يظهر من تنسيق \u@\h) نعرض هوية
     # التطبيق نفسها: MAHDI-EDITOR — كما طلبه المستخدم بالنصّ.
-    PS1="\[\e[1;96m\]▌\[\e[0m\] \[\e[1;94m\]MAHDI-EDITOR\[\e[0m\] \[\e[1;97m\]\w\[\e[0m\] ${status}${branch}${arrow}"
+    PS1="\[\e[1;96m\]▌\[\e[0m\] \[\e[1;94m\]MAHDI-EDITOR\[\e[0m\] \[\e[1;97m\]${_fsi}${pwd_short}${_pdi}\[\e[0m\]${status}${branch} ${arrow}"
 }
 # نحترم أي PROMPT_COMMAND سابق (من bashrc) بدل إلغائه، ونتجنّب تكرار أنفسنا
 case "${PROMPT_COMMAND:-}" in
