@@ -209,9 +209,12 @@ object UniversalRunner : FileRunner() {
                         projectDir.deleteRecursively()
                         projectDir.mkdirs()
                         val budget = CopyBudget()
-                        copyProjectTree(parent, projectDir, budget, depth = 0) &&
-                            budget.files > 0 &&
-                            File(projectDir, name).exists()
+                        // 9.3.1: النسخ لم يعد «كل شيء أو لا شيء». كان أي ملف
+                        // واحد غير مقروء (أو تجاوز الحدّ) يُسقط النسخة كاملة،
+                        // فيُشغَّل الملف وحده وتضيع مجلدات المشروع (‏core/ ·
+                        // utils/) — وهو بالضبط سبب «المكتبة core غير مثبّتة».
+                        copyProjectTree(parent, projectDir, budget, depth = 0)
+                        File(projectDir, name).exists()
                     }
                 }.getOrDefault(false)
             }
@@ -269,21 +272,27 @@ object UniversalRunner : FileRunner() {
      * ينسخ شجرة مشروع صغيرة إلى مجلد التشغيل، مع تجاهل المجلدات الثقيلة
      * (‏node_modules · .git · __pycache__ · venv) والملفات الضخمة.
      *
-     * @return false إن تعذّر النسخ أو استُنفدت الميزانية.
+     * 9.3.1: **لا يُسقط النسخة بسبب ملف واحد.** أي عنصر يتعذّر قراءته أو
+     * يتجاوز الحدّ يُتجاوز، وما نُسخ يبقى. هذا هو الفرق بين مشروع يعمل ومشروع
+     * ينهار عند أول `import core`.
      */
     private suspend fun copyProjectTree(
         source: FileObject,
         target: File,
         budget: CopyBudget,
         depth: Int,
-    ): Boolean {
-        if (depth > MAX_COPY_DEPTH || budget.exhausted) return false
+    ) {
+        if (depth > MAX_COPY_DEPTH || budget.exhausted) return
 
+        // 9.3.1: المجلدات أولًا — حزم المشروع (‏core/ · utils/) تُنسخ قبل أن
+        // تستهلك الميزانية ملفات الصور والبيانات.
         val children =
-            runCatching { source.listFiles() }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return true
+            runCatching { source.listFiles() }.getOrNull()?.sortedWith(
+                compareBy({ child -> runCatching { !child.isDirectory() }.getOrDefault(true) })
+            ) ?: return
 
         for (child in children) {
-            if (budget.exhausted) return false
+            if (budget.exhausted) return
             val childName = runCatching { child.getName() }.getOrNull().orEmpty()
             if (childName.isEmpty() || childName in SKIP_NAMES) continue
 
@@ -292,21 +301,25 @@ object UniversalRunner : FileRunner() {
 
             if (isDir) {
                 destination.mkdirs()
-                if (!copyProjectTree(child, destination, budget, depth + 1)) return false
+                copyProjectTree(child, destination, budget, depth + 1)
             } else {
                 val size = runCatching { child.length() }.getOrDefault(0L)
                 if (size > MAX_COPY_FILE_BYTES) continue
-                if (budget.bytes + size > MAX_COPY_BYTES) return false
-                runCatching {
-                    child.getInputStream().use { input ->
-                        destination.outputStream().use { output -> input.copyTo(output) }
-                    }
-                }.getOrElse { return false }
-                budget.files += 1
-                budget.bytes += size
+                if (budget.bytes + size > MAX_COPY_BYTES) continue
+                val copied =
+                    runCatching {
+                            child.getInputStream().use { input ->
+                                destination.outputStream().use { output -> input.copyTo(output) }
+                            }
+                            true
+                        }
+                        .getOrDefault(false)
+                if (copied) {
+                    budget.files += 1
+                    budget.bytes += size
+                }
             }
         }
-        return true
     }
 
     suspend fun launchUniversalRunner(activity: Activity, fileObject: FileObject) {
