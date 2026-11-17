@@ -91,14 +91,6 @@
         <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
     </style>
 
-    <!-- 6.1.0: الحرف M المجسّم — أيقونة إضافية بنفس أسلوب الشخصيات -->
-    <style name="Theme.Karbon.Icon.Mark" parent="Theme.Karbon">
-        <item name="windowSplashScreenBackground">@color/ic_bg_anime_mark</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_mark</item>
-        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_mark</item>
-        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_mark</item>
-        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
-    </style>
 
     <style name="Theme.Karbon.Icon.Raccoon" parent="Theme.Karbon">
         <item name="windowSplashScreenBackground">@color/ic_bg_anime_raccoon</item>
@@ -145,6 +137,60 @@
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_tiger</item>
         <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_tiger</item>
         <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_tiger</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <!-- 9.4.0: أيقونة koala -->
+    <style name="Theme.Karbon.Icon.Koala" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_koala</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_koala</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_koala</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_koala</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <!-- 9.4.0: أيقونة lion -->
+    <style name="Theme.Karbon.Icon.Lion" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_lion</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_lion</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_lion</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_lion</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <!-- 9.4.0: أيقونة shark -->
+    <style name="Theme.Karbon.Icon.Shark" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_shark</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_shark</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_shark</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_shark</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <!-- 9.4.0: أيقونة deer -->
+    <style name="Theme.Karbon.Icon.Deer" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_deer</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_deer</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_deer</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_deer</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <!-- 9.4.0: أيقونة chameleon -->
+    <style name="Theme.Karbon.Icon.Chameleon" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_chameleon</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_chameleon</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_chameleon</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_chameleon</item>
+        <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
+    </style>
+
+    <!-- 9.4.0: أيقونة unicorn -->
+    <style name="Theme.Karbon.Icon.Unicorn" parent="Theme.Karbon">
+        <item name="windowSplashScreenBackground">@color/ic_bg_anime_unicorn</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_anime_unicorn</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/ic_bg_anime_unicorn</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher_anime_unicorn</item>
         <item name="postSplashScreenTheme">@style/Theme.Karbon</item>
     </style>
 

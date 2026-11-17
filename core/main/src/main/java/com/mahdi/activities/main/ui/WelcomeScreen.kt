@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -50,14 +51,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.activities.main.MainActivity
 import com.mahdi.commands.ActionContext
@@ -75,9 +79,14 @@ import com.mahdi.session.RecentFiles
 import com.mahdi.tabs.editor.EditorTab
 import com.mahdi.text.bidiNumbers
 import com.mahdi.ui.components.AppLogo
+import com.mahdi.ui.components.AppLogoHero
+import com.mahdi.ui.components.AuroraBackground
+import com.mahdi.ui.components.StaggeredAppear
+import com.mahdi.ui.components.bounceClick
 import com.mahdi.update.AppUpdateChecker
 import com.mahdi.update.UpdateDownloader
 import com.mahdi.text.FileNameText
+import com.mahdi.theme.SkyBadge
 import com.mahdi.utils.dialogRes
 import com.mahdi.utils.toast
 import java.io.File
@@ -97,6 +106,16 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
 
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // 9.4.0: رقم الإصدار كشارة أنيقة تحت اسم التطبيق (مصدره PackageManager).
+    val appVersion =
+        remember {
+            runCatching {
+                    context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                }
+                .getOrNull()
+        }
 
     // ————— «آخر ملف مفتوح» —————
     var lastFile by remember { mutableStateOf<RecentFile?>(null) }
@@ -119,18 +138,48 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // 9.4.0: خلفية «الشفق» المتحركة — ثلاث هالات (سماوي · بنفسجي · نعناعي)
+        // تنساب ببطء خلف المحتوى. شدّتها تتكيّف مع السمة: هادئة في الفاتح.
+        AuroraBackground(Modifier.matchParentSize())
+
         Column(
             modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp).widthIn(max = 560.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 6.1.0: بدل شعار النحلة/الثلج المتجه الرمادي، تظهر **أيقونة التطبيق
-            // الحقيقية** التي اختارها المستخدم (شخصية كرتونية ثلاثية الأبعاد بحرف M)
-            // بظلّ خفيف على شكل البطاقة — نفس ما يراه على الشاشة الرئيسية للهاتف.
-            AppLogo(
-                size = 74.dp,
-                cornerRadius = 20.dp,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
+            // 9.4.0: الشعار البطولي — أيقونة المستخدم مع هالة نابضة وطفو خفيف،
+            // وتحتها اسم التطبيق بتدرّج لوني (سماوي ⟶ بنفسجي) بدل الشعار الساكن.
+            StaggeredAppear(delayMillis = 0) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    AppLogoHero(size = 76.dp)
+
+                    val headline = MaterialTheme.typography.headlineSmall
+                    Text(
+                        text = "Mahdi-Editor",
+                        // التدرّج يُبنى في TextStyle مباشرةً: `copy()` لا يحمل حقل brush.
+                        style =
+                            TextStyle(
+                                brush =
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF7DD3FC), Color(0xFF38BDF8), Color(0xFFA78BFA)),
+                                    ),
+                                fontSize = headline.fontSize,
+                                lineHeight = headline.lineHeight,
+                                fontFamily = headline.fontFamily,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.4.sp,
+                                textAlign = TextAlign.Center,
+                            ),
+                        maxLines = 1,
+                    )
+
+                    appVersion?.let { version ->
+                        Spacer(Modifier.height(6.dp))
+                        SkyBadge(text = "v$version", showDot = false)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
 
             currentProject?.let { project ->
                 Text(
@@ -194,42 +243,46 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
             // «آخر الملفات» وحدها، وشجرة المشروع الكاملة في الدُرج (Ctrl+B).
             if (recentFiles.size > 1) {
                 Spacer(Modifier.height(12.dp))
-                RecentFilesRow(
-                    files = recentFiles,
-                    isArabic = isArabic,
-                    openPaths = openPaths,
-                    onOpen = { path ->
-                        scope.launch {
-                            runCatching {
-                                MainActivity.instance?.viewModel?.editorManager?.openFile(FileWrapper(File(path)))
+                StaggeredAppear(delayMillis = 110) {
+                    RecentFilesRow(
+                        files = recentFiles,
+                        isArabic = isArabic,
+                        openPaths = openPaths,
+                        onOpen = { path ->
+                            scope.launch {
+                                runCatching {
+                                    MainActivity.instance?.viewModel?.editorManager?.openFile(FileWrapper(File(path)))
+                                }
                             }
-                        }
-                    },
-                    // 9.2.0: ✕ بجانب كل ملف في الرئيسية يُغلقه ويُزيله من القائمة.
-                    onClose = { path ->
-                        closeFromHome(path, scope) { scope.launch { reloadRecent() } }
-                    },
-                )
+                        },
+                        // 9.2.0: ✕ بجانب كل ملف في الرئيسية يُغلقه ويُزيله من القائمة.
+                        onClose = { path ->
+                            closeFromHome(path, scope) { scope.launch { reloadRecent() } }
+                        },
+                    )
+                }
             }
 
             Spacer(Modifier.height(22.dp))
 
-            WelcomeActions(
-                commands =
-                    listOfNotNull(
-                        CommandProvider.BrowseProjectCommand,
-                        CommandProvider.NewFileCommand,
-                        CommandProvider.SearchFileFolderCommand,
-                        CommandProvider.getForId("editor.run"),
-                        CommandProvider.getForId("global.terminal"),
-                        // 9.2.0: المتصفّح الداخلي — فتح رابط أو بحث داخل التطبيق
-                        CommandProvider.getForId("global.open_link"),
-                        CommandProvider.getForId("global.store"),
-                        // 9.0.0: زرّ «التوثيق» أُزيل من الواجهة الرئيسية كما طُلب.
-                        // الدليل الكامل يبقى في «الإعدادات» (مكان واحد، آخر عنصر).
-                        CommandProvider.SettingsCommand,
-                    )
-            )
+            StaggeredAppear(delayMillis = 180) {
+                WelcomeActions(
+                    commands =
+                        listOfNotNull(
+                            CommandProvider.BrowseProjectCommand,
+                            CommandProvider.NewFileCommand,
+                            CommandProvider.SearchFileFolderCommand,
+                            CommandProvider.getForId("editor.run"),
+                            CommandProvider.getForId("global.terminal"),
+                            // 9.2.0: المتصفّح الداخلي — فتح رابط أو بحث داخل التطبيق
+                            CommandProvider.getForId("global.open_link"),
+                            CommandProvider.getForId("global.store"),
+                            // 9.0.0: زرّ «التوثيق» أُزيل من الواجهة الرئيسية كما طُلب.
+                            // الدليل الكامل يبقى في «الإعدادات» (مكان واحد، آخر عنصر).
+                            CommandProvider.SettingsCommand,
+                        )
+                )
+            }
         }
 
         // 6.1.0: شريط التحديث في أسفل الشاشة الرئيسية — بأيقونة التطبيق وزرّي
@@ -282,11 +335,13 @@ private fun HomeUpdateBar(modifier: Modifier = Modifier) {
         }
     }
 
+    // 9.4.0: حدّ سماوي رقيق + حشوة أكبر — الشريط يبدو «عائمًا» فوق خلفية الشفق.
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -460,9 +515,10 @@ private fun RecentFilesRow(
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
             items(files, key = { it.path }) { file ->
                 Card(
-                    modifier = Modifier.widthIn(max = 180.dp).clickable { onOpen(file.path) },
+                    modifier = Modifier.widthIn(max = 190.dp).bounceClick { onOpen(file.path) },
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -569,32 +625,50 @@ private fun WelcomeActionButton(command: Command, modifier: Modifier = Modifier)
     if (!command.isSupported() || !command.isEnabled()) return
     val activity = LocalActivity.current
     val accent = commandAccent(command.id)
+    val scheme = MaterialTheme.colorScheme
 
-    Surface(
-        modifier = modifier.clickable { activity?.let { command.execute(ActionContext(it)) } },
-        shape = RoundedCornerShape(14.dp),
-        color = accent.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.35f)),
+    // 9.4.0: بطاقة بتدرّج لوني (لون الميزة ⟶ سطح الشاشة) + ضغط مرن + أيقونة
+    // داخل قرص مضيء. الشكل الجديد يقرأ كـ«زرّ حقيقي» بدل مستطيل شفاف مسطّح.
+    Box(
+        modifier =
+            modifier
+                .bounceClick { activity?.let { command.execute(ActionContext(it)) } }
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            accent.copy(alpha = 0.24f),
+                            accent.copy(alpha = 0.08f),
+                            scheme.surfaceContainerHigh.copy(alpha = 0.32f),
+                        ),
+                    ),
+                )
+                .border(1.dp, accent.copy(alpha = 0.38f), RoundedCornerShape(16.dp)),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MahdiIcon(
-                icon = command.getIcon(),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = accent,
-            )
+            Box(
+                modifier = Modifier.size(30.dp).clip(CircleShape).background(accent.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                MahdiIcon(
+                    icon = command.getIcon(),
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = accent,
+                )
+            }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(9.dp))
 
             Text(
                 text = command.getLabel(),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = scheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

@@ -4,7 +4,14 @@ import android.content.Intent
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -228,7 +235,18 @@ fun DrawerContent(fullscreen: Boolean) {
                 VerticalDivider()
 
                 Surface {
-                    Crossfade(targetState = currentDrawerTab, label = "file tree") { tab ->
+                    // 9.4.0: تبديل تبويبات الدُرج ينتقل أفقيًا مع تلاشٍ ناعم بدل
+                    // التلاشي المتقاطع الساكن — إحساس «سحب» حقيقي بين الأقسام.
+                    AnimatedContent(
+                        targetState = currentDrawerTab,
+                        transitionSpec = {
+                            val forward = (targetState?.hashCode() ?: 0) >= (initialState?.hashCode() ?: 0)
+                            val dir = if (forward) 1 else -1
+                            (fadeIn(tween(200)) + slideInHorizontally(tween(240)) { dir * it / 6 }) togetherWith
+                                (fadeOut(tween(140)) + slideOutHorizontally(tween(200)) { -dir * it / 8 })
+                        },
+                        label = "file tree",
+                    ) { tab ->
                         if (currentServiceTab == null) {
                             if (tab != null) {
                                 tab.Content(modifier = Modifier.fillMaxSize())
