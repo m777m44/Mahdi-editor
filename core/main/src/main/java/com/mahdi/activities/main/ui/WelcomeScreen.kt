@@ -2,6 +2,8 @@ package com.mahdi.activities.main.ui
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -53,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -319,6 +322,12 @@ private fun HomeUpdateBar(modifier: Modifier = Modifier) {
     val info = update ?: return
     if (hiddenVersion == info.version) return
 
+    // 9.4.2: الشريط يدخل بأناقة (تلاشٍ + انزلاق من الأسفل) بدل الظهور المفاجئ.
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val barAlpha by animateFloatAsState(if (appeared) 1f else 0f, tween(320), label = "barAlpha")
+    val barOffset by animateFloatAsState(if (appeared) 0f else 28f, tween(420), label = "barOffset")
+
     val downloading = status is UpdateDownloader.Status.Downloading
     val failed = status as? UpdateDownloader.Status.Failed
 
@@ -337,7 +346,13 @@ private fun HomeUpdateBar(modifier: Modifier = Modifier) {
 
     // 9.4.0: حدّ سماوي رقيق + حشوة أكبر — الشريط يبدو «عائمًا» فوق خلفية الشفق.
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    alpha = barAlpha
+                    translationY = barOffset
+                },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
@@ -435,10 +450,24 @@ private fun ResumeCard(
     onDismiss: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // 9.4.2: تدرّج ناعم (سطح البطاقة ⟶ لون السمة) بدل لون مسطّح واحد، فيبدو
+    // «استئناف العمل» أبرز بطاقة في الشاشة دون صخب.
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            scheme.primaryContainer,
+                            scheme.surfaceContainerHigh,
+                            scheme.primaryContainer.copy(alpha = 0.75f),
+                        ),
+                    ),
+                    RoundedCornerShape(22.dp),
+                ),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.22f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
