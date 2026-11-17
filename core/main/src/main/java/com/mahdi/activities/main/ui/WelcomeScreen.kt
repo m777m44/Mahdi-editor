@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -150,19 +152,23 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     AppLogoHero(size = 76.dp)
 
+                    val headline = MaterialTheme.typography.headlineSmall
                     Text(
                         text = "Mahdi-Editor",
+                        // التدرّج يُبنى في TextStyle مباشرةً: `copy()` لا يحمل حقل brush.
                         style =
-                            MaterialTheme.typography.headlineSmall.copy(
+                            TextStyle(
                                 brush =
                                     Brush.linearGradient(
                                         listOf(Color(0xFF7DD3FC), Color(0xFF38BDF8), Color(0xFFA78BFA)),
                                     ),
-                                color = Color.Unspecified,
+                                fontSize = headline.fontSize,
+                                lineHeight = headline.lineHeight,
+                                fontFamily = headline.fontFamily,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.4.sp,
+                                textAlign = TextAlign.Center,
                             ),
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.4.sp,
-                        textAlign = TextAlign.Center,
                         maxLines = 1,
                     )
 
