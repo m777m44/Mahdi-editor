@@ -1,10 +1,17 @@
 package com.mahdi.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -15,12 +22,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mahdi.appicon.AppIconSwitcher
+import com.mahdi.theme.SkyAccent
+import com.mahdi.theme.SkyAccentSoft
 import com.mahdi.ui.graphics.rememberIconImage
 
 /**
@@ -83,5 +93,58 @@ fun AppLogo(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+}
+
+/**
+ * 9.4.0 — الشعار البطولي للرئيسية: شعار التطبيق مع **هالة نابضة** و**طفو خفيف**.
+ *
+ * - الهالة: قرص متدرّج الشفافية يزداد ويخفت بين ٠٫٣ و٠٫٧ كل ٢٫٦ ثانية.
+ * - الطفو: يعلو وينزل ٣dp كل ٣٫٤ ثانية — حركة تُشعر بالحياة بلا إزعاج.
+ * - الشعار نفسه يبقى [AppLogo] كما هو فيتبع أيقونة المستخدم المختارة.
+ */
+@Composable
+fun AppLogoHero(
+    size: Dp = 84.dp,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "logoHero")
+    val glow by
+        transition.animateFloat(
+            initialValue = 0.30f,
+            targetValue = 0.72f,
+            animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "heroGlow",
+        )
+    val floatY by
+        transition.animateFloat(
+            initialValue = -3f,
+            targetValue = 3f,
+            animationSpec = infiniteRepeatable(tween(3400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "heroFloat",
+        )
+
+    Box(
+        modifier = modifier.size(size * 1.6f),
+        contentAlignment = Alignment.Center,
+    ) {
+        // الهالة
+        Box(
+            modifier =
+                Modifier.size(size * 1.5f)
+                    .graphicsLayer { alpha = glow }
+                    .background(
+                        Brush.radialGradient(
+                            listOf(SkyAccent.copy(alpha = 0.55f), SkyAccentSoft.copy(alpha = 0.18f), Color.Transparent),
+                        ),
+                        CircleShape,
+                    )
+        )
+
+        AppLogo(
+            size = size,
+            cornerRadius = size / 3.6f,
+            modifier = Modifier.graphicsLayer { translationY = floatY },
+        )
     }
 }

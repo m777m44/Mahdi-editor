@@ -14,10 +14,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * لكل أيقونة: كل alias يحمل `icon` خاصًا وفلتر LAUNCHER. التبديل الحقيقي = تمكين
  * الـ alias المختار وتعطيل السابق عبر `PackageManager.setComponentEnabledSetting`.
  *
- * 6.1.0: أُعيد رسم كل الصور — **سبع عشرة أيقونة كرتونية ثلاثية الأبعاد** بحرف M
- * (روبوت مبرمج، والحرف M المجسّم، وثعلب، وقط، وباندا، وتنين، وبومة، وبطريق،
+ * 6.1.0: أُعيد رسم كل الصور — **أيقونات كرتونية ثلاثية الأبعاد** بحرف M
+ * (روبوت مبرمج، ثعلب، وقط، وباندا، وتنين، وبومة، وبطريق،
  * وأرنب، وهمستر، وأكسولوتل) — ثم في 9.1.0 ستّ شخصيات أخرى: راكون، وسلحفاة،
- * وذئب، ونحلة، وأخطبوط، ونمر. كل صورة أيقونة تكيّفية كاملة: خلفية لونها مستخرج من
+ * وذئب، ونحلة، وأخطبوط، ونمر — ثم في 9.4.0 ستّ شخصيات جديدة: كوالا، وأسد،
+ * وقرش، وغزال، وحرباء، ويونيكورن (وحُلّت محلّها أيقونة «الحرف M المجسّم»).
+ * كل صورة أيقونة تكيّفية كاملة: خلفية لونها مستخرج من
  * العمل الفني + صورة أمامية بمقاس 108dp مع منطقة آمنة (66٪) فلا يُقصّ الرسم على
  * أي مشغّل. الافتراضية الآن **الروبوت المبرمج**، والمصغّرة الداخلية تتبعه.
  *
@@ -52,7 +54,6 @@ object AppIconSwitcher {
     val icons: List<AppIcon> =
         listOf(
             AppIcon("anime_robot", "IconAnimeRobot", "الروبوت المبرمج", "Coder Robot", R.mipmap.ic_launcher_anime_robot, 0xFF0F2148),
-            AppIcon("anime_mark", "IconAnimeMark", "الحرف M المجسّم", "Glossy M", R.mipmap.ic_launcher_anime_mark, 0xFF060C1E),
             AppIcon("anime_fox", "IconAnimeFox", "الثعلب المبرمج", "Coder Fox", R.mipmap.ic_launcher_anime_fox, 0xFF15213B),
             AppIcon("anime_cat", "IconAnimeCat", "القط العبقري", "Genius Cat", R.mipmap.ic_launcher_anime_cat, 0xFF0E1947),
             AppIcon("anime_panda", "IconAnimePanda", "الباندا الفضائي", "Space Panda", R.mipmap.ic_launcher_anime_panda, 0xFF214D58),
@@ -69,6 +70,13 @@ object AppIconSwitcher {
             AppIcon("anime_bee", "IconAnimeBee", "النحلة الذكية", "Smart Bee", R.mipmap.ic_launcher_anime_bee, 0xFF06162C),
             AppIcon("anime_octopus", "IconAnimeOctopus", "الأخطبوط المبرمج", "Coder Octopus", R.mipmap.ic_launcher_anime_octopus, 0xFF232A3E),
             AppIcon("anime_tiger", "IconAnimeTiger", "النمر المبرمج", "Coder Tiger", R.mipmap.ic_launcher_anime_tiger, 0xFF252C41),
+            // 9.4.0: ستّ شخصيات جديدة — كوالا · أسد · قرش · غزال · حرباء · يونيكورن
+            AppIcon("anime_koala", "IconAnimeKoala", "الحيوان الكوالا", "Coder Koala", R.mipmap.ic_launcher_anime_koala, 0xFF041F47),
+            AppIcon("anime_lion", "IconAnimeLion", "الأسد المبرمج", "Coder Lion", R.mipmap.ic_launcher_anime_lion, 0xFF0B193F),
+            AppIcon("anime_shark", "IconAnimeShark", "القرش اللطيف", "Friendly Shark", R.mipmap.ic_launcher_anime_shark, 0xFF21607F),
+            AppIcon("anime_deer", "IconAnimeDeer", "الغزال المتوهج", "Glowing Deer", R.mipmap.ic_launcher_anime_deer, 0xFF1A3B58),
+            AppIcon("anime_chameleon", "IconAnimeChameleon", "الحرباء الملوّنة", "Colour Chameleon", R.mipmap.ic_launcher_anime_chameleon, 0xFF1E4972),
+            AppIcon("anime_unicorn", "IconAnimeUnicorn", "اليونيكورن", "Little Unicorn", R.mipmap.ic_launcher_anime_unicorn, 0xFF0F2494),
         )
 
     /** الأيقونة الافتراضية (المعلنة `enabled=true` في البيان). */

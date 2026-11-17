@@ -132,20 +132,6 @@
             </intent-filter>
         </activity-alias>
 
-        <!-- الحرف M المجسّم — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
-        <activity-alias
-            android:name="com.mahdi.application.icon.IconAnimeMark"
-            android:theme="@style/Theme.Karbon.Icon.Mark"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_anime_mark"
-            android:label="@string/app_name"
-            android:targetActivity="com.mahdi.activities.main.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
 
         <!-- الروبوت المبرمج · الافتراضية — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
         <activity-alias
@@ -388,5 +374,96 @@
         <activity
             android:name="com.mahdi.extension.api.ExtensionActivity"
             android:exported="false" />
+
+        <!-- 9.4.0: أيقونة koala — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeKoala"
+            android:theme="@style/Theme.Karbon.Icon.Koala"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_koala"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 9.4.0: أيقونة lion — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeLion"
+            android:theme="@style/Theme.Karbon.Icon.Lion"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_lion"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 9.4.0: أيقونة shark — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeShark"
+            android:theme="@style/Theme.Karbon.Icon.Shark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_shark"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 9.4.0: أيقونة deer — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeDeer"
+            android:theme="@style/Theme.Karbon.Icon.Deer"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_deer"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 9.4.0: أيقونة chameleon — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeChameleon"
+            android:theme="@style/Theme.Karbon.Icon.Chameleon"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_chameleon"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 9.4.0: أيقونة unicorn — تُفعَّل من: الإعدادات ‹ التطبيق ‹ أيقونة التطبيق -->
+        <activity-alias
+            android:name="com.mahdi.application.icon.IconAnimeUnicorn"
+            android:theme="@style/Theme.Karbon.Icon.Unicorn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_anime_unicorn"
+            android:label="@string/app_name"
+            android:targetActivity="com.mahdi.activities.main.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
     </application>
 </manifest>

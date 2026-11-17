@@ -1,11 +1,16 @@
 package com.mahdi.settings.app
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -22,6 +27,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,8 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -46,6 +54,7 @@ import com.mahdi.theme.SkyAccent
 import com.mahdi.ui.graphics.rememberIconImage
 import com.mahdi.utils.toast
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -80,9 +89,10 @@ fun AppIconScreen(modifier: Modifier = Modifier) {
         modifier = modifier,
         backArrowVisible = true,
     ) {
-        // 9.1.0: ١٧ أيقونة — الصفّ الأخير يُكمَّل بفراغات بنفس الوزن حتى تبقى
-        // الأحجام متساوية (بدون وزن، تتمدد أيقونات الصفّ الناقص وتصير أكبر).
-        all.chunked(4).forEach { rowIcons ->
+        // 9.1.0: الصفّ الأخير يُكمَّل بفراغات بنفس الوزن حتى تبقى الأحجام متساوية
+        // (بدون وزن، تتمدد أيقونات الصفّ الناقص وتصير أكبر).
+        // 9.4.0: كل صفّ يظهر متتابعًا (٥٥ ملّي ثانية بين صفّ وآخر) بدل ظهور مفاجئ.
+        all.chunked(4).forEachIndexed { rowIndex, rowIcons ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -91,6 +101,7 @@ fun AppIconScreen(modifier: Modifier = Modifier) {
                     IconTile(
                         icon = icon,
                         isArabic = isArabic,
+                        delayMillis = rowIndex * 55,
                         selected = icon.id == currentId,
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
@@ -135,34 +146,82 @@ private fun IconTile(
     selected: Boolean,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    delayMillis: Int = 0,
     onClick: () -> Unit,
 ) {
-    val scale by
+    // 9.4.0 — الظهور المتتابع: كل مربّع ينساب بمقدار ٢٢dp مع تلاشٍ ناعم.
+    var shown by remember { mutableStateOf(delayMillis == 0) }
+    LaunchedEffect(Unit) {
+        if (!shown) {
+            delay(delayMillis.toLong())
+            shown = true
+        }
+    }
+    val appear by
+        animateFloatAsState(
+            targetValue = if (shown) 1f else 0f,
+            animationSpec = tween(durationMillis = 360),
+            label = "tileAppear",
+        )
+    val offsetY by
+        animateFloatAsState(
+            targetValue = if (shown) 0f else 22f,
+            animationSpec = tween(durationMillis = 420),
+            label = "tileOffset",
+        )
+
+    // ضغط مرن: ٠٫٩٣ عند اللمس ثم ارتداد بنابض — إحساس زرّ حقيقي.
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by
+        animateFloatAsState(
+            targetValue = if (pressed) 0.93f else 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+            label = "tilePress",
+        )
+    val selectedScale by
         animateFloatAsState(
             targetValue = if (selected) 1f else 0.97f,
-            animationSpec = tween(150),
+            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
             label = "tileScale",
         )
 
     Box(
         modifier =
             modifier
-                .scale(scale)
+                .graphicsLayer {
+                    alpha = appear
+                    translationY = offsetY
+                    val s = pressScale * selectedScale
+                    scaleX = s
+                    scaleY = s
+                }
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(20.dp))
+                .shadow(if (selected) 14.dp else 5.dp, RoundedCornerShape(22.dp), clip = false)
+                .clip(RoundedCornerShape(22.dp))
                 .background(Color(icon.backgroundColor))
                 .then(
                     if (selected) {
-                        Modifier.border(2.5.dp, SkyAccent, RoundedCornerShape(20.dp))
+                        // حدّ متدرّج (سماوي ⟶ بنفسجي) بدل لون واحد — يبدو مضيئًا.
+                        Modifier.border(
+                            2.5.dp,
+                            Brush.linearGradient(listOf(SkyAccent, Color(0xFFA78BFA), SkyAccent)),
+                            RoundedCornerShape(22.dp),
+                        )
                     } else {
                         Modifier.border(
                             1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                            RoundedCornerShape(20.dp),
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                            RoundedCornerShape(22.dp),
                         )
                     },
                 )
-                .clickable(enabled = enabled, onClick = onClick),
+                .clickable(
+                    enabled = enabled,
+                    interactionSource = interaction,
+                    indication = LocalIndication.current,
+                    onClick = onClick,
+                ),
     ) {
         val bitmap = rememberIconImage(icon.previewRes, sizePx = 256)
         if (bitmap != null) {
@@ -170,7 +229,7 @@ private fun IconTile(
                 bitmap = bitmap,
                 contentDescription = icon.displayName(isArabic),
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)),
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)),
             )
         }
 

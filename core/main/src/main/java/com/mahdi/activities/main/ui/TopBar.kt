@@ -1,8 +1,15 @@
 package com.mahdi.activities.main.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.Icons
@@ -64,13 +71,24 @@ fun MahdiTopBar(
                 val title = tab?.title ?: strings.app_name.getString()
                 // 9.0.0: اسم الملف معزول بـFSI…PDI فلا ينفصل الامتداد `.py` عن الاسم
                 // العربي، وبخط أحادي العرض بلون سماوي كما في بيئات التطوير الاحترافية.
-                FileNameText(
-                    name = title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                // 9.4.0: تبديل التبويبات ينتقل بحركة انزلاق + تلاشٍ بدل قفزة نصّية،
+                // فيبدو الانتقال بين الملفات سلسًا كما في المحرّرات الاحترافية.
+                AnimatedContent(
+                    targetState = title,
+                    transitionSpec = {
+                        (fadeIn(tween(200)) + slideInVertically(tween(220)) { it / 3 }) togetherWith
+                            (fadeOut(tween(120)) + slideOutVertically(tween(160)) { -it / 3 })
+                    },
+                    label = "topBarTitle",
+                ) { animatedTitle ->
+                    FileNameText(
+                        name = animatedTitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             },
             navigationIcon = {
                 if (!isPermanentDrawer) {

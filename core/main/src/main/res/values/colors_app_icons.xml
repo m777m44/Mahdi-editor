@@ -13,11 +13,17 @@
     <color name="ic_bg_anime_panda">#214D58</color>
     <color name="ic_bg_anime_axolotl">#0E1D41</color>
     <color name="ic_bg_anime_hamster">#0D1433</color>
-    <color name="ic_bg_anime_mark">#060C1E</color>
     <color name="ic_bg_anime_raccoon">#0B1A37</color>
     <color name="ic_bg_anime_turtle">#1B2339</color>
     <color name="ic_bg_anime_wolf">#12203A</color>
     <color name="ic_bg_anime_bee">#06162C</color>
+    <!-- 9.4.0: ستّ شخصيات جديدة بنفس الأسلوب (كوالا · أسد · قرش · غزال · حرباء · يونيكورن) -->
+    <color name="ic_bg_anime_koala">#FF041F47</color>
+    <color name="ic_bg_anime_lion">#FF0B193F</color>
+    <color name="ic_bg_anime_shark">#FF21607F</color>
+    <color name="ic_bg_anime_deer">#FF1A3B58</color>
+    <color name="ic_bg_anime_chameleon">#FF1E4972</color>
+    <color name="ic_bg_anime_unicorn">#FF0F2494</color>
     <color name="ic_bg_anime_octopus">#232A3E</color>
     <color name="ic_bg_anime_tiger">#252C41</color>
 

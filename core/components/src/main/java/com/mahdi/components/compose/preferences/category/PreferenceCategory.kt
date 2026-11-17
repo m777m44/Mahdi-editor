@@ -69,12 +69,23 @@ fun PreferenceCategory(
             }
         },
         startWidget = {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
+            // 9.4.0: أيقونة القسم داخل مربّع ملوّن بحواف ناعمة بدل أيقونة عائمة —
+            // يوحّد شكل كل شاشات الإعدادات ويمنحها عمقًا بصريًا.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (isSelected) 0.22f else 0.12f)
+                        ),
+            ) {
                 if (iconResource != null) {
                     Icon(
                         painter = painterResource(id = iconResource),
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(22.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
