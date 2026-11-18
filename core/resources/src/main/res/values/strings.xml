@@ -1198,4 +1198,19 @@
     <string name="terminal_connection_failed">تعذّر الاتصال بخدمة الطرفية</string>
     <string name="terminal_connection_failed_desc">أعد الاتصال لتشغيل الخدمة من جديد؛ ملفاتك وجلساتك محفوظة.</string>
     <string name="terminal_status_connected">متصل</string>
+    <!-- 9.5.0: نوافذ الطرفية وإحصاءات المشروع -->
+    <string name="terminal_close_current_session">إغلاق النافذة الحالية</string>
+    <string name="terminal_sessions_windows">النوافذ</string>
+    <string name="project_stats_files">ملفات</string>
+    <string name="project_stats_folders">مجلدات</string>
+    <string name="project_stats_size">الحجم</string>
+    <string name="project_stats_more">أكثر من ذلك</string>
+    <string name="project_path_copied">تم نسخ مسار المشروع</string>
+    <string name="terminal_tool_copy">نسخ</string>
+    <string name="terminal_copied">تم نسخ مخرجات النافذة</string>
+    <string name="terminal_nothing_to_copy">لا يوجد مخرج بعد</string>
+    <string name="open_folder">فتح مجلد</string>
+    <string name="terminal_new_window">نافذة</string>
+    <string name="close_all_sessions">إغلاق كل النوافذ</string>
+    <string name="close_all_sessions_msg">ستُغلق كل نوافذ الطرفية وتُنهى عملياتها. هل تريد المتابعة؟</string>
 </resources>

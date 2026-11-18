@@ -3,7 +3,15 @@ package com.mahdi.terminal
 import android.graphics.Typeface
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,8 +25,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -44,6 +54,7 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -89,6 +100,7 @@ import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.lsp.LspMemoryGuard
+import com.mahdi.utils.dialogRes
 import com.mahdi.utils.logError
 import com.mahdi.settings.editor.DEFAULT_TERMINAL_FONT_PATH
 import com.mahdi.settings.editor.TerminalFontScreen
@@ -154,29 +166,96 @@ fun TerminalScreen(modifier: Modifier = Modifier, terminalActivity: Terminal) {
  */
 
 /**
- * 9.2.0 — الخروج الصلب من الطرفية.
+ * 9.5.0 — إغلاق **جلسة واحدة** فقط.
  *
- * `finishIfRunning()` يُنهي جلسة واحدة فقط، ويترك خدمة الطرفية حيّة إن كانت
- * هناك جلسة أخرى أو إن كان السكربت قد انتهى إلى صدفة تفاعلية. النتيجة: ✕ يُغلق
- * الشاشة ويبقى شيء يعمل في الخلفية — وهو ما شكا منه المستخدم («يغلق كلشي»).
+ * كانت 9.2.0 تُغلق كل الجلسات وتُوقف الخدمة عند ضغط ✕ (لأن ✕ القديم كان يترك
+ * عمليات في الخلفية). لكن الحال انقلب: صار لكل لغة نافذة (جلسة) خاصّة بها
+ * (`python` · `node` · `bash` …)، فصار ✕ يُدمّر نوافذ المستخدم الأخرى بلا رجعة.
  *
- * هنا: إنهاء كل جلسة (وقتل عملياتها)، إيقاف الخدمة، ثم إغلاق النشاط نهائيًا.
+ * الآن ✕ = «أغلق النافذة المعروضة فقط»:
+ * - إن بقي غيرها → يُنتقل تلقائيًا إلى الجلسة المجاورة وتبقى الطرفية مفتوحة،
+ * - إن كانت الأخيرة → تُغلق شاشة الطرفية (والخدمة تُوقف نفسها عند فراغها).
+ *
+ * لا تُلمس أي جلسة أخرى في الحالتين.
  */
-private fun hardExitTerminal(activity: Terminal) {
-    // 1) الجلسة المعروضة حاليًا (أسرع مسار لقتل العملية الأمامية)
-    runCatching { terminalView.get()?.currentSession?.finishIfRunning() }
-        .onFailure { logError(it) }
+private fun closeTerminalSession(activity: Terminal, sessionId: String) {
+    val binder = activity.sessionBinder?.get()
+    val service = binder?.getService()
+    if (binder == null || service == null) {
+        runCatching { activity.finish() }.onFailure { logError(it) }
+        return
+    }
 
-    // 2) كل الجلسات + الخدمة نفسها
+    val list = service.sessionList.value
+    if (list.isEmpty()) {
+        // لا نوافذ أصلًا: الشاشة بلا معنى، تُغلق.
+        runCatching { activity.finish() }.onFailure { logError(it) }
+        return
+    }
+    // الجلسة أُغلقت للتوّ (نقرتان سريعتان على ✕): لا نفعل شيئًا ولا نُغلق الشاشة.
+    if (sessionId !in list) return
+
+    val index = list.indexOf(sessionId)
+    val neighbor = list.getOrNull(index + 1) ?: list.getOrNull(index - 1)
+    val wasCurrent = service.currentSession.value == sessionId
+
+    runCatching { binder.terminateSession(sessionId) }.onFailure { logError(it) }
+
+    if (list.size <= 1 || neighbor == null) {
+        // آخر نافذة: تُغلق الشاشة بهدوء (الخدمة أوقفت نفسها في terminateSession)
+        runCatching { activity.finish() }.onFailure { logError(it) }
+        return
+    }
+
+    if (wasCurrent) {
+        runCatching { activity.changeSession(neighbor) }.onFailure { logError(it) }
+    }
+}
+
+/** يغلق النافذة المعروضة حاليًا فقط. */
+private fun closeCurrentTerminalSession(activity: Terminal) {
+    val current = activity.sessionBinder?.get()?.getService()?.currentSession?.value
+    if (current == null) {
+        runCatching { activity.finish() }.onFailure { logError(it) }
+        return
+    }
+    closeTerminalSession(activity, current)
+}
+
+/**
+ * 9.5.0 — «إغلاق كل النوافذ» صار إجراءً **صراحةً** في الدُرج بطلب تأكيد، لا مفاجأة
+ * من زرّ ✕. يُغلق كل جلسة على حدة (فتُحذف من القائمة وتُقتل عملياتها) ثم الشاشة.
+ */
+private fun closeAllTerminalSessions(activity: Terminal) {
+    val binder = activity.sessionBinder?.get()
+    if (binder == null) {
+        runCatching { activity.finish() }.onFailure { logError(it) }
+        return
+    }
+    binder.getService().sessionList.value.toList().forEach { id ->
+        runCatching { binder.terminateSession(id) }.onFailure { logError(it) }
+    }
+    runCatching { activity.finish() }.onFailure { logError(it) }
+}
+
+/** ينشئ نافذة طرفية جديدة باسم غير مكرّر وينتقل إليها (9.5.0). */
+private fun newTerminalSession(activity: Terminal) {
+    val binder = activity.sessionBinder?.get() ?: return
+    val service = binder.getService()
+    val existing = service.sessionList.value
+
+    var index = 1
+    var name: String
+    do {
+        name = "main #$index"
+        index++
+    } while (name in existing)
+
     runCatching {
-            activity.sessionBinder?.get()?.getService()?.actionExit()
+            val info = binder.createSession(name, TerminalBackEnd(), activity)
+            activity.changeSession(info.id)
         }
         .onFailure { logError(it) }
-
-    // 3) إغلاق الشاشة وإزالتها من قائمة المهام (لا أثر متبقٍّ)
-    runCatching { activity.finishAndRemoveTask() }.onFailure {
-        runCatching { activity.finish() }.onFailure { e -> logError(e) }
-    }
 }
 
 @Composable
@@ -189,6 +268,16 @@ private fun CompactTopBar(
     // 8.2.0: شريط نحيف كما هو (٤٦dp) لكن بهويّة بصرية واضحة: شريط متدرّج
     // بثلاثة ألوان أسفلَه، ونقطة «متصل» بلون التركوازي. لا عناوين كبيرة ولا
     // نصّ شرح — الطرفية تبقى ملكًا للمخرجات.
+    // 9.5.0: نقطة «متصل» تنبض بهدوء (٠٫٣٥ ⟷ ١) — إحساس حيّ بأن الطرفية تعمل.
+    val liveTransition = rememberInfiniteTransition(label = "live")
+    val liveDotAlpha by
+        liveTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
+            label = "liveDotAlpha",
+        )
+
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
             Row(
@@ -225,7 +314,7 @@ private fun CompactTopBar(
                     modifier =
                         Modifier.size(6.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF34D399)),
+                            .background(Color(0xFF34D399).copy(alpha = liveDotAlpha)),
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -251,7 +340,7 @@ private fun CompactTopBar(
                     IconButton(onClick = exit, modifier = Modifier.size(42.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(strings.terminal_close_session),
+                            contentDescription = stringResource(strings.terminal_close_current_session),
                             modifier = Modifier.size(19.dp),
                             tint = Color(0xFFFB7185),
                         )
@@ -334,18 +423,21 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                                     .onFailure { logError(it) }
                             },
                             onExit = {
-                                // 9.2.0 — «✕ يُغلق كل شيء»:
-                                // كان ✕ يُنهي الجلسة الحالية فقط ثم يُغلق الشاشة، فتبقى
-                                // خدمة الطرفية وعمليات proot حيّة في الخلفية (يسمعها
-                                // المستخدم ولا يراها). الآن: نُنهي **كل** الجلسات،
-                                // نُوقف الخدمة، ثم نُغلق شاشة الطرفية بلا سؤال.
-                                hardExitTerminal(terminalActivity)
+                                // 9.5.0: ✕ يُغلق **النافذة المعروضة فقط** وليس كل
+                                // الجلسات. إن بقيت نوافذ أخرى تُنتقل إليها الجلسة
+                                // المجاورة، وإن كانت الأخيرة تُغلق الشاشة.
+                                closeCurrentTerminalSession(terminalActivity)
                             },
                         )
                     }
                 ) { paddingValues ->
                     Column(modifier = Modifier.padding(paddingValues)) {
-                        // 6.1.0: بطاقة التقدّم صارت صغيرة ومثبّتة **داخل** منطقة الطرفية
+                        // 9.5.0: شريط النوافذ — كل جلسة شريحة باسمها ونقطة حالتها
+                        // و✕ خاصّة بها. صار ✕ العلوي يخصّ النافذة المعروضة، وهذا
+                        // الشريط يجعل النوافذ الأخرى مرئية وقابلة للإغلاق منفردة.
+                        TerminalSessionBar(terminalActivity)
+
+                        // 6.1.0: بطاقة التقدّم صغيرة ومثبّتة **داخل** منطقة الطرفية
                         // (كانت سابقًا شريطًا بعرض الشاشة يغطّي أسفلها وشريط المفاتيح).
                         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                             TerminalView(
@@ -368,7 +460,7 @@ fun TerminalScreenInternal(modifier: Modifier = Modifier, terminalActivity: Term
                         }
 
                         // شريط الأدوات السريع (2.6.0): أوامر جاهزة بلمسة واحدة
-                        TerminalQuickBar()
+                        TerminalQuickBar(terminalActivity)
 
                         val pagerState = rememberPagerState(pageCount = { 2 })
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().height(75.dp)) { page ->
@@ -612,33 +704,9 @@ private fun TerminalDrawer(drawerWidth: Dp, terminalActivity: Terminal, navContr
             ) {
                 Text(text = stringResource(strings.sessions), style = MaterialTheme.typography.titleLarge)
                 Row(horizontalArrangement = Arrangement.End) {
-                    IconButton(
-                        onClick = {
-                            fun generateUniqueString(existingStrings: List<String>): String {
-                                var index = 1
-                                var newString: String
-
-                                do {
-                                    newString = "main #$index"
-                                    index++
-                                } while (newString in existingStrings)
-
-                                return newString
-                            }
-                            terminalView.get()?.let {
-                                val client = TerminalBackEnd()
-                                terminalActivity.sessionBinder
-                                    ?.get()!!
-                                    .createSession(
-                                        generateUniqueString(
-                                            terminalActivity.sessionBinder?.get()!!.getService().sessionList.value
-                                        ),
-                                        client,
-                                        terminalActivity,
-                                    )
-                            }
-                        }
-                    ) {
+                    // 9.5.0: إنشاء الجلسة صار في [newTerminalSession] — يُستدعى من هنا
+                    // ومن زرّ + في شريط النوافذ، فتتطابق السلوكيات.
+                    IconButton(onClick = { newTerminalSession(terminalActivity) }) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = stringResource(strings.add_session))
                     }
 
@@ -655,8 +723,29 @@ private fun TerminalDrawer(drawerWidth: Dp, terminalActivity: Terminal, navContr
                 LazyColumn {
                     items(sessionList) { sessionId ->
                         val isSelected = sessionId == currentSession
+                        // 9.5.0: صفّ الجلسة يُظهر عنوانها الحقيقي (ما يعمل داخلها)
+                        // ونقطة حالة، بدل الاسم التقني وحده.
+                        val drawerSession = terminalActivity.sessionBinder?.get()?.getSession(sessionId)
                         NavigationDrawerItem(
-                            label = { Text(text = sessionId) },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier =
+                                            Modifier.size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (drawerSession?.isRunning == true) Color(0xFF34D399)
+                                                    else Color(0xFF94A3B8)
+                                                )
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = drawerSession?.title?.takeIf { it.isNotBlank() } ?: sessionId,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            },
                             selected = isSelected,
                             onClick = { terminalActivity.changeSession(sessionId) },
                             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
@@ -682,22 +771,7 @@ private fun TerminalDrawer(drawerWidth: Dp, terminalActivity: Terminal, navContr
                                     }
 
                                     IconButton(
-                                        onClick = {
-                                            if (isSelected) {
-                                                val index = sessionList.indexOf(sessionId)
-                                                val sessionBefore = sessionList.getOrNull(index - 1)
-                                                val sessionAfter = sessionList.getOrNull(index + 1)
-                                                val neighborSession = sessionBefore ?: sessionAfter
-                                                neighborSession?.let { terminalActivity.changeSession(it) }
-                                            }
-
-                                            terminalActivity.sessionBinder?.get()?.terminateSession(sessionId)
-
-                                            if (sessionList.isEmpty()) {
-                                                terminalActivity.finish()
-                                                service.actionExit()
-                                            }
-                                        },
+                                        onClick = { closeTerminalSession(terminalActivity, sessionId) },
                                         modifier = Modifier.size(24.dp),
                                     ) {
                                         Icon(
@@ -710,8 +784,171 @@ private fun TerminalDrawer(drawerWidth: Dp, terminalActivity: Terminal, navContr
                             },
                         )
                     }
+
+                    // 9.5.0: إغلاق كل النوافذ — هنا فقط، وبطلب تأكيد.
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)) {
+                            TextButton(
+                                onClick = {
+                                    dialogRes(
+                                        title = strings.close_all_sessions.getString(),
+                                        msg = strings.close_all_sessions_msg.getString(),
+                                        okRes = strings.close_all_sessions,
+                                        onOk = { closeAllTerminalSessions(terminalActivity) },
+                                        onCancel = {},
+                                    )
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(0xFFFB7185),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(strings.close_all_sessions),
+                                    color = Color(0xFFFB7185),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+/**
+ * 9.5.0 — شريط نوافذ الطرفية.
+ *
+ * كل جلسة = «نافذة» لها شريحة مستقلة: اسم الجلسة (أو عنوانها من البرنامج الذي
+ * يعمل داخلها)، نقطة حالة (خضراء = عملية تعمل الآن)، و✕ صغيرة تُغلق **هذه
+ * النافذة وحدها**. زرّ + في الطرف ينشئ نافذة جديدة.
+ *
+ * الحركة: الشريحة المختارة تتلوّن وتتّسع بنعومة (`animateColorAsState`)، فلا
+ * يوجد قفز مفاجئ عند تبديل النوافذ.
+ */
+@Composable
+private fun TerminalSessionBar(terminalActivity: Terminal, modifier: Modifier = Modifier) {
+    val binder = terminalActivity.sessionBinder?.get() ?: return
+    val service = binder.getService()
+    val sessions by service.sessionList.collectAsStateWithLifecycle()
+    val current by service.currentSession.collectAsStateWithLifecycle()
+
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+        Row(
+            modifier = modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 5.dp, bottom = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items(sessions, key = { it }) { id ->
+                    val session = binder.getSession(id)
+                    TerminalSessionChip(
+                        label = session?.title?.takeIf { it.isNotBlank() } ?: id,
+                        running = session?.isRunning == true,
+                        selected = id == current,
+                        onClick = {
+                            if (id != current) {
+                                runCatching { terminalActivity.changeSession(id) }.onFailure { logError(it) }
+                            }
+                        },
+                        onClose = { closeTerminalSession(terminalActivity, id) },
+                    )
+                }
+            }
+
+            IconButton(onClick = { newTerminalSession(terminalActivity) }, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(strings.add_session),
+                    modifier = Modifier.size(17.dp),
+                    tint = Color(0xFF38BDF8),
+                )
+            }
+        }
+    }
+}
+
+/** شريحة نافذة واحدة داخل [TerminalSessionBar]. */
+@Composable
+private fun TerminalSessionChip(
+    label: String,
+    running: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val accent = Color(0xFF38BDF8)
+    val container by
+        animateColorAsState(
+            targetValue =
+                if (selected) {
+                    accent.copy(alpha = 0.20f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.75f)
+                },
+            animationSpec = tween(220),
+            label = "sessionChipContainer",
+        )
+    val outline by
+        animateColorAsState(
+            targetValue =
+                if (selected) {
+                    accent.copy(alpha = 0.85f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                },
+            animationSpec = tween(220),
+            label = "sessionChipOutline",
+        )
+
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(container)
+                .border(1.dp, outline, RoundedCornerShape(50))
+                .clickable(onClick = onClick)
+                .padding(start = 10.dp, end = 3.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier.size(6.dp)
+                    .clip(CircleShape)
+                    .background(if (running) Color(0xFF34D399) else Color(0xFF94A3B8))
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color =
+                if (selected) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 128.dp),
+        )
+        Box(
+            modifier = Modifier.size(22.dp).clip(CircleShape).clickable(onClick = onClose),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = stringResource(strings.close),
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            )
         }
     }
 }
@@ -759,7 +996,7 @@ private fun TerminalView.applyTerminalColors(onSurfaceColor: Int, surfaceColor: 
  * مع لصق من الحافظة وتكبير/تصغير فوري للخط.
  */
 @Composable
-private fun TerminalQuickBar(modifier: Modifier = Modifier) {
+private fun TerminalQuickBar(terminalActivity: Terminal, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
 
@@ -815,6 +1052,24 @@ private fun TerminalQuickBar(modifier: Modifier = Modifier) {
                 { clipboard.getText()?.text?.let { text -> if (text.isNotEmpty()) send(text) } },
                 utility,
             ),
+            // 9.5.0: نسخ مخرجات النافذة الحالية (آخر ٤٠٠ سطر) — بدل تحديد النص يدويًا.
+            Triple(
+                stringResource(strings.terminal_tool_copy),
+                {
+                    val output =
+                        runCatching { terminalView.get()?.mEmulator?.screen?.transcriptText }.getOrNull()
+                    if (output.isNullOrBlank()) {
+                        toast(strings.terminal_nothing_to_copy)
+                    } else {
+                        val tail = output.lines().takeLast(400).joinToString("\n")
+                        clipboard.setText(AnnotatedString(tail))
+                        toast(strings.terminal_copied)
+                    }
+                },
+                utility,
+            ),
+            // 9.5.0: نافذة طرفية جديدة بلمسة — بلا عبور إلى الدُرج.
+            Triple(stringResource(strings.terminal_new_window), { newTerminalSession(terminalActivity) }, accent),
             Triple(stringResource(strings.terminal_tool_zoom_in), { zoomToNextLevel(true) }, accent),
             Triple(stringResource(strings.terminal_tool_zoom_out), { zoomToNextLevel(false) }, accent),
         )

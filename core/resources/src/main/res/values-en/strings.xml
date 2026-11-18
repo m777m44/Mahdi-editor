@@ -1173,4 +1173,19 @@ Thank you for using Mahdi-Editor.</string>
     <string name="terminal_connection_failed">Unable to connect to terminal service</string>
     <string name="terminal_connection_failed_desc">Reconnect to start the service again. Your files and sessions are kept.</string>
     <string name="terminal_status_connected">Connected</string>
+    <!-- 9.5.0: terminal windows + project stats -->
+    <string name="terminal_close_current_session">Close current window</string>
+    <string name="terminal_sessions_windows">Windows</string>
+    <string name="project_stats_files">Files</string>
+    <string name="project_stats_folders">Folders</string>
+    <string name="project_stats_size">Size</string>
+    <string name="project_stats_more">and more</string>
+    <string name="project_path_copied">Project path copied</string>
+    <string name="terminal_tool_copy">Copy</string>
+    <string name="terminal_copied">Window output copied</string>
+    <string name="terminal_nothing_to_copy">No output yet</string>
+    <string name="open_folder">Open folder</string>
+    <string name="terminal_new_window">Window</string>
+    <string name="close_all_sessions">Close all windows</string>
+    <string name="close_all_sessions_msg">All terminal windows will be closed and their processes terminated. Continue?</string>
 </resources>
