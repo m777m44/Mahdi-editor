@@ -3,8 +3,8 @@ package com.mahdi.terminal
 import android.graphics.Typeface
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -1013,7 +1013,7 @@ private fun TerminalQuickBar(terminalActivity: Terminal, modifier: Modifier = Mo
                     if (output.isNullOrBlank()) {
                         toast(strings.terminal_nothing_to_copy)
                     } else {
-                        val tail = output.lineSequence().takeLast(400).joinToString("\n")
+                        val tail = output.lines().takeLast(400).joinToString("\n")
                         clipboard.setText(AnnotatedString(tail))
                         toast(strings.terminal_copied)
                     }
