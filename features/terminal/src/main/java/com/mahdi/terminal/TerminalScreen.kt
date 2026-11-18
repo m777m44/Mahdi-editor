@@ -54,6 +54,7 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -99,6 +100,7 @@ import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
 import com.mahdi.lsp.LspMemoryGuard
+import com.mahdi.utils.dialogRes
 import com.mahdi.utils.logError
 import com.mahdi.settings.editor.DEFAULT_TERMINAL_FONT_PATH
 import com.mahdi.settings.editor.TerminalFontScreen
@@ -218,6 +220,22 @@ private fun closeCurrentTerminalSession(activity: Terminal) {
         return
     }
     closeTerminalSession(activity, current)
+}
+
+/**
+ * 9.5.0 — «إغلاق كل النوافذ» صار إجراءً **صراحةً** في الدُرج بطلب تأكيد، لا مفاجأة
+ * من زرّ ✕. يُغلق كل جلسة على حدة (فتُحذف من القائمة وتُقتل عملياتها) ثم الشاشة.
+ */
+private fun closeAllTerminalSessions(activity: Terminal) {
+    val binder = activity.sessionBinder?.get()
+    if (binder == null) {
+        runCatching { activity.finish() }.onFailure { logError(it) }
+        return
+    }
+    binder.getService().sessionList.value.toList().forEach { id ->
+        runCatching { binder.terminateSession(id) }.onFailure { logError(it) }
+    }
+    runCatching { activity.finish() }.onFailure { logError(it) }
 }
 
 /** ينشئ نافذة طرفية جديدة باسم غير مكرّر وينتقل إليها (9.5.0). */
@@ -765,6 +783,36 @@ private fun TerminalDrawer(drawerWidth: Dp, terminalActivity: Terminal, navContr
                                 }
                             },
                         )
+                    }
+
+                    // 9.5.0: إغلاق كل النوافذ — هنا فقط، وبطلب تأكيد.
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)) {
+                            TextButton(
+                                onClick = {
+                                    dialogRes(
+                                        title = strings.close_all_sessions.getString(),
+                                        msg = strings.close_all_sessions_msg.getString(),
+                                        okRes = strings.close_all_sessions,
+                                        onOk = { closeAllTerminalSessions(terminalActivity) },
+                                        onCancel = {},
+                                    )
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(0xFFFB7185),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(strings.close_all_sessions),
+                                    color = Color(0xFFFB7185),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
                     }
                 }
             }
