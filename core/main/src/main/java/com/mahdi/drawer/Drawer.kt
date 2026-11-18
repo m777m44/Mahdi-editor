@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -51,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -67,6 +71,7 @@ import com.mahdi.icons.MahdiIcon
 import com.mahdi.resources.drawables
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
+import com.mahdi.ui.components.StaggeredAppear
 import com.mahdi.utils.dialogRes
 import com.mahdi.utils.logError
 import kotlinx.coroutines.launch
@@ -251,21 +256,39 @@ fun DrawerContent(fullscreen: Boolean) {
                             if (tab != null) {
                                 tab.Content(modifier = Modifier.fillMaxSize())
                             } else {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.Center,
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Icon(
-                                        painter = painterResource(drawables.outline_folder),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        stringResource(strings.no_folder_opened),
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
+                                // 9.5.0: حالة «لا مشروع» لم تبقَ نصًّا ميتًا — صارت
+                                // بطاقة فيها زرّ «فتح مجلد» يفتح المُنتقي فورًا، مع
+                                // دخول ناعم (تلاشٍ + انزلاق) بدل الظهور الجامد.
+                                StaggeredAppear(delayMillis = 60) {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                                        verticalArrangement = Arrangement.Center,
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Box(
+                                            modifier =
+                                                Modifier.size(64.dp)
+                                                    .clip(RoundedCornerShape(20.dp))
+                                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(drawables.outline_folder),
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(30.dp),
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            stringResource(strings.no_folder_opened),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        Button(onClick = { openFolder.launch(null) }) {
+                                            Text(stringResource(strings.open_folder))
+                                        }
+                                    }
                                 }
                             }
                         }

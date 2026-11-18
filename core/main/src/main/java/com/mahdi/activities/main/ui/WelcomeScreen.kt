@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,10 +58,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,6 +87,9 @@ import com.mahdi.tabs.editor.EditorTab
 import com.mahdi.text.bidiNumbers
 import com.mahdi.ui.components.AppLogo
 import com.mahdi.ui.components.AppLogoHero
+import com.mahdi.ui.components.ProjectStats
+import com.mahdi.ui.components.ProjectStatsStrip
+import com.mahdi.ui.components.readProjectStats
 import com.mahdi.ui.components.AuroraBackground
 import com.mahdi.ui.components.StaggeredAppear
 import com.mahdi.ui.components.bounceClick
@@ -110,6 +117,7 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     // 9.4.0: رقم الإصدار كشارة أنيقة تحت اسم التطبيق (مصدره PackageManager).
     val appVersion =
@@ -119,6 +127,10 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                 }
                 .getOrNull()
         }
+
+    // 9.5.0: إحصاءات المشروع (ملفات · مجلدات · حجم) — تُحسب على خيط IO مرّة واحدة
+    // لكل مشروع، ثم تبقى ثابتة أثناء التنقّل داخل الشاشة.
+    var projectStats by remember { mutableStateOf<ProjectStats?>(null) }
 
     // ————— «آخر ملف مفتوح» —————
     var lastFile by remember { mutableStateOf<RecentFile?>(null) }
@@ -140,14 +152,29 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
         reloadRecent()
     }
 
+    val projectPath = currentProject?.getAbsolutePath()
+    LaunchedEffect(projectPath) {
+        projectStats = readProjectStats(projectPath?.let { File(it) })
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // 9.4.0: خلفية «الشفق» المتحركة — ثلاث هالات (سماوي · بنفسجي · نعناعي)
         // تنساب ببطء خلف المحتوى. شدّتها تتكيّف مع السمة: هادئة في الفاتح.
         AuroraBackground(Modifier.matchParentSize())
 
+        // 9.5.0: الرئيسية صارت قابلة للتمرير مع بقاء التوسيط عند وجود مساحة.
+        // قبل ذلك كانت العمود ثابتًا، فأي إضافة (بطاقة الإحصاءات مثلًا) تُقصّ على
+        // الشاشات القصيرة. الآن كل المحتوى متاح دائمًا، ويُمرَّر عند الحاجة فقط.
         Column(
-            modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp).widthIn(max = 560.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .widthIn(max = 560.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             // 9.4.0: الشعار البطولي — أيقونة المستخدم مع هالة نابضة وطفو خفيف،
             // وتحتها اسم التطبيق بتدرّج لوني (سماوي ⟶ بنفسجي) بدل الشعار الساكن.
@@ -198,6 +225,7 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
 
                 Spacer(Modifier.height(4.dp))
 
+                // 9.5.0: لمس المسار ينسخه (مع تأكيد عابر) — بدل نسخه يدويًا.
                 Text(
                     text = project.getAbsolutePath(),
                     style = MaterialTheme.typography.bodySmall,
@@ -205,8 +233,23 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(0.75f),
+                    modifier =
+                        Modifier.fillMaxWidth(0.75f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                clipboard.setText(AnnotatedString(project.getAbsolutePath()))
+                                toast(strings.project_path_copied)
+                            }
+                            .padding(vertical = 3.dp),
                 )
+
+                // 9.5.0: إحصاءات المشروع — تُحسب في الخلفية وتظهر بأرقام تتصاعد.
+                if (projectStats != null) {
+                    Spacer(Modifier.height(10.dp))
+                    StaggeredAppear(delayMillis = 80) {
+                        ProjectStatsStrip(stats = projectStats, modifier = Modifier.fillMaxWidth(0.94f))
+                    }
+                }
             }
 
             Spacer(Modifier.height(18.dp))
@@ -286,6 +329,9 @@ fun WelcomeScreen(drawerViewModel: DrawerViewModel) {
                         )
                 )
             }
+
+            // مساحة سفلية: شريط «تحديث متاح» يظهر فوق هذا الموضع فلا يغطّي زرًّا.
+            Spacer(Modifier.height(72.dp))
         }
 
         // 6.1.0: شريط التحديث في أسفل الشاشة الرئيسية — بأيقونة التطبيق وزرّي
