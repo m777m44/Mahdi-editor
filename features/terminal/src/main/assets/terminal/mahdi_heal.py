@@ -95,6 +95,70 @@ PY_DIST = {
 }
 
 
+# 9.5.1 — أسماء بديلة للحزمة نفسها.
+#
+# سبب العطل المبلَّغ عنه: `import telegram` لا يعني حزمة `telegram` على PyPI
+# (تلك حزمة قديمة مهجورة). الوحدة تُوفَّرها pyTelegramBotAPI وpython-telegram-bot.
+# كان المحرّك يجرّب اسمًا واحدًا فقط، فإن كان الاسم غير مناسب توقّف التثبيت
+# وظهر «المكتبة غير مثبّتة — أعد التشغيل بعد وصل الإنترنت».
+#
+# الآن: لكل وحدة قائمة مرشّحين مرتّبة، وتُجرَّب بالتتابع حتى **ينجح الاستيراد**.
+PY_DIST_ALT: dict[str, list[str]] = {
+    "telegram": ["pyTelegramBotAPI", "python-telegram-bot", "telegram"],
+    "telegram.ext": ["python-telegram-bot", "pyTelegramBotAPI"],
+    "telebot": ["pyTelegramBotAPI", "telebot"],
+    "cv2": ["opencv-python", "opencv-python-headless", "opencv-contrib-python"],
+    "PIL": ["pillow"],
+    "yaml": ["pyyaml"],
+    "google": ["google-api-python-client", "protobuf", "google-generativeai"],
+    "OpenSSL": ["pyopenssl"],
+    "Crypto": ["pycryptodome", "pycryptodomex"],
+    "Cryptodome": ["pycryptodomex", "pycryptodome"],
+    "pkg_resources": ["setuptools"],
+    "dotenv": ["python-dotenv"],
+    "serial": ["pyserial"],
+    "jwt": ["pyjwt"],
+    "attr": ["attrs"],
+    "fitz": ["pymupdf"],
+    "bs4": ["beautifulsoup4"],
+    "sklearn": ["scikit-learn"],
+    "skimage": ["scikit-image"],
+    "MySQLdb": ["mysqlclient"],
+    "psycopg2": ["psycopg2-binary", "psycopg2"],
+    "win32com": ["pywin32"],
+    "usb": ["pyusb"],
+    "magic": ["python-magic"],
+    "gi": ["pygobject"],
+    "wx": ["wxpython"],
+    "dateutil": ["python-dateutil"],
+    "docx": ["python-docx"],
+    "pptx": ["python-pptx"],
+}
+
+
+def candidates(module: str) -> list[str]:
+    """حزم PyPI المرشّحة لوحدة مفقودة، بلا تكرار، والأرجح أولًا."""
+    out: list[str] = []
+
+    def add(name: str | None) -> None:
+        if not name:
+            return
+        lowered = name.lower()
+        if lowered not in {item.lower() for item in out}:
+            out.append(name)
+
+    top = (module or "").split(".")[0]
+    for key in (module, top):
+        for candidate in PY_DIST_ALT.get(key, []):
+            add(candidate)
+        if key in PY_DIST:
+            add(PY_DIST[key])
+        elif top in PY_DIST:
+            add(PY_DIST[top])
+    add(top)
+    return out
+
+
 def python_stdlib() -> set[str]:
     names = set(getattr(sys, "stdlib_module_names", ()) or ())
     # احتياط لنسخ بايثون الأقدم من 3.10
@@ -434,6 +498,8 @@ def main() -> int:
     parser.add_argument("--file", dest="script", default="")
     parser.add_argument("--broken", action="store_true")
     parser.add_argument("--preflight", action="store_true")
+    # 9.5.1: أسماء الحزم المرشّحة لوحدة ناقصة (للأسماء التي تختلف عن الوحدة)
+    parser.add_argument("--candidates", dest="candidates_for", default="")
     # 9.3.1: يطبع أسماء الوحدات المفقودة التي هي **محلية** (لا تُثبَّت)
     parser.add_argument("--locals", action="store_true")
     args = parser.parse_args()
@@ -445,6 +511,11 @@ def main() -> int:
                 text = handle.read()[-200_000:]
         except OSError:
             return 0
+
+    if args.candidates_for:
+        for name in candidates(args.candidates_for):
+            print(name)
+        return 0
 
     if args.preflight:
         for action in preflight_repairs(args.script):

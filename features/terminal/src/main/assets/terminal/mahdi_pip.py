@@ -26,12 +26,14 @@
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -55,11 +57,16 @@ os.environ.setdefault("PIP_CACHE_DIR", os.path.join(HOME, ".mahdi", "cache", "pi
 SESSION_ID = "%d-%d" % (int(time.time()), os.getpid())
 NAME = ""
 
-# مرايا تُجرَّب فقط عند فشل المصدر الأساسي — لا تُفرض على المستخدم
+# مرايا تُجرَّب بالترتيب عند فشل المصدر السابق — لا تُفرض على المستخدم.
+#
+# 9.5.1: أُضيفت مرايا صينية/عالمية إضافية. الشبكة في بعض الدول تحجب أو تُبطئ
+# `pypi.org` وحدها، فكان فشل مصدر واحد يُعلن «لا اتصال» كذبًا وتتوقّف كل السلسلة.
 MIRRORS = [
     "https://pypi.org/simple",
     "https://pypi.tuna.tsinghua.edu.cn/simple",
     "https://mirrors.aliyun.com/pypi/simple",
+    "https://pypi.mirrors.ustc.edu.cn/simple",
+    "https://mirrors.cloud.tencent.com/pypi/simple",
 ]
 
 # ————————————————————————————— الترجمة الإنجليزية —————————————————————————————
@@ -283,26 +290,59 @@ def tracker():
 _NET_STATE = {}
 
 
-def net_ok(host="pypi.org", timeout=3.0):
-    """هل يوجد اتصال حقيقي (DNS) قبل إزعاج المستخدم بمحاولات pip فاشلة؟
+def net_ok(host="pypi.org", timeout=1.5):
+    """هل المضيف قابل للوصول فعلًا؟ فحص **اتصال TCP** لا مجرّد DNS.
 
-    8.3.0: النتيجة تُخزَّن لكل مضيف داخل العملية، و`MAHDI_OFFLINE=1` الذي
-    يضبطه محرّك الاعتماديات يقطع الطريق فورًا بدل ستّ ثوانٍ من انتظار DNS
-    تتكرّر مع كل حزمة.
+    9.5.1 — هذا هو أصل العطل الذي أبلغ عنه المستخدم: كانت الدالة تكتفي بـDNS،
+    وتُطيع `MAHDI_OFFLINE=1` الذي يضبطه فحص `curl` واحد. فإذا تعثّر DNS لثانية،
+    أو غاب `curl` من الصورة، يُعلَن «لا اتصال» ثم تُتجاهل **كل** المرايا ويظهر
+    «المكتبة غير مثبّتة — أعد التشغيل بعد وصل الإنترنت» بلا أي محاولة حقيقية.
+
+    الآن: اتصال TCP حقيقي لكل مضيف، والنتيجة تُخزَّن، و`MAHDI_OFFLINE` صار
+    **إرشاديًا فقط**: يُرتّب المحاولات ولا يمنعها.
     """
-    if os.environ.get("MAHDI_OFFLINE") == "1":
-        return False
     if os.environ.get("MAHDI_NET_CHECK", "1") == "0":
         return True
     if host in _NET_STATE:
         return _NET_STATE[host]
+    ok = False
     try:
-        socket.setdefaulttimeout(timeout)
-        ok = bool(socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP))
+        with socket.create_connection((host, 443), timeout=timeout):
+            ok = True
     except Exception:
-        ok = False
+        try:
+            socket.setdefaulttimeout(timeout)
+            ok = bool(socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP))
+        except Exception:
+            ok = False
     _NET_STATE[host] = ok
     return ok
+
+
+def host_of(index):
+    """اسم المضيف من رابط فهرس PyPI."""
+    if not index:
+        return "pypi.org"
+    rest = index.split("//", 1)[-1]
+    return rest.split("/", 1)[0].split(":", 1)[0] or "pypi.org"
+
+
+def indices():
+    """ترتيب المصادر: مصدر المستخدم أولًا، ثم المرايا الرسمية.
+
+    9.5.1: المصدر المختار في `PIP_INDEX_URL` / `MAHDI_PIP_INDEX` يُحترم،
+    ولا تُكرَّر المرايا.
+    """
+    order = []
+    for candidate in (
+        os.environ.get("MAHDI_PIP_INDEX", ""),
+        os.environ.get("PIP_INDEX_URL", ""),
+        *MIRRORS,
+    ):
+        candidate = (candidate or "").strip()
+        if candidate and candidate not in order:
+            order.append(candidate)
+    return order
 
 
 def file_name(url):
@@ -490,14 +530,51 @@ def plan_downloads(items, counter):
     return resolved
 
 
-def resolve(targets, index=None):
+_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def package_exists(name, timeout=5):
+    """هل الحزمة موجودة فعلًا على أي مصدر؟ فحص خفيف قبل أي عمل ثقيل.
+
+    9.5.1 — سبب ١١٠ ثوانٍ من الانتظار عند خطأ في اسم مكتبة: كان pip يعيد
+    المحاولة خمس مرات لكل مصدر (٣٤ ثانية) قبل أن يقول «لا توجد حزمة». الفحص
+    المباشر لصفحة الحزمة (٢٠٠ أو ٤٠٤) يجيب في أقل من ثانية.
+
+    يعيد True / False، أو **None** إذا تعذّر الوصول إلى أي مصدر (لا نُعلن اسمًا
+    خاطئًا بسبب انقطاع شبكة).
+    """
+    lowered = name.lower()
+    checked = 0
+    for index in indices():
+        if not net_ok(host_of(index)):
+            continue
+        checked += 1
+        url = index.rstrip("/") + "/" + lowered + "/"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "pip/24"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if getattr(resp, "status", 200) == 200:
+                    return True
+        except urllib.error.HTTPError as exc:
+            if exc.code in (404, 403):
+                continue
+            continue
+        except Exception:
+            continue
+    return False if checked else None
+
+
+def resolve(targets, index=None, timeout=300):
     """يعيد [(اسم، إصدار، رابط)] لكل ما ينبغي تثبيته، أو None عند الفشل."""
     report = os.path.join(tempfile.mkdtemp(prefix="mahdi-report-"), "report.json")
-    cmd = pip_cmd("install", "--dry-run", "--ignore-installed", "--quiet", "--report", report, *targets)
+    cmd = pip_cmd(
+        "install", "--dry-run", "--ignore-installed", "--quiet", "--report", report,
+        "--retries", "1", "--timeout", "15", *targets,
+    )
     if index:
         cmd += ["-i", index]
     try:
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout)
     except Exception:
         return None
     if proc.returncode != 0 or not os.path.exists(report):
@@ -532,11 +609,16 @@ def install_from_dir(directory, items):
         return False
 
 
-def plain_install(targets, index=None):
+def plain_install(targets, index=None, fast=False):
     """الطريق التقليدي — والنبضة تُحرّك النسبة أثناءه فلا تتوقّف عند رقم ثابت."""
     tracker().phase("install", "تثبيت المكتبة", NAME)
-    cmd = pip_cmd("install", "--upgrade", "--prefer-binary", "--progress-bar", "off",
-                  "--retries", "5", "--timeout", "30", *targets)
+    if fast:
+        # محاولة «برق» لمعرفة إن كان الاتصال حيًّا: لا انتظار طويل ولا إعادة محاولات
+        cmd = pip_cmd("install", "--upgrade", "--prefer-binary", "--progress-bar", "off",
+                      "--retries", "0", "--timeout", "6", *targets)
+    else:
+        cmd = pip_cmd("install", "--upgrade", "--prefer-binary", "--progress-bar", "off",
+                      "--retries", "3", "--timeout", "30", *targets)
     if index:
         cmd += ["-i", index]
     try:
@@ -560,6 +642,67 @@ def try_offline(targets):
         return False
 
 
+NODIST_DIR = os.path.join(HOME, ".mahdi", "nodist")
+
+
+def remember_missing(names):
+    """يحفظ أسماء الحزم غير الموجودة ليتذكّرها المحرّك بقية اليوم.
+
+    9.5.1: بلا هذا السجل كانت كل مرحلة (فحص مسبق ← إصلاح ذاتي) تعيد المحاولة
+    من الصفر على اسم خاطئ واحد، فينتظر المستخدم نصف دقيقة لعطل في اسم مكتبة.
+    """
+    try:
+        os.makedirs(NODIST_DIR, exist_ok=True)
+        for name in names:
+            path = os.path.join(NODIST_DIR, name.lower())
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(str(int(time.time())))
+    except Exception:
+        pass
+
+
+def download_and_install(items, t):
+    """ينزّل الحزم بالتوازي ثم يثبّتها محليًا. يعيد True عند النجاح."""
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+    except Exception:
+        pass
+
+    t.phase("download", "تنزيل الحزم", "%d ملف" % len(items))
+    counter = Counter(0)
+    pending = plan_downloads(items, counter)
+    if pending:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(
+                pool.map(
+                    lambda job: download_one(job[0], CACHE_DIR, counter, job[0], job[1]),
+                    pending,
+                )
+            )
+        ok = all(results)
+    else:
+        ok = True
+        t.real(80, "تنزيل الحزم", "من المخزن")
+
+    if not ok:
+        return False
+
+    # البناء والتثبيت: النبضة تُحرّك 82→99 أثناء بناء الـ wheel
+    t.phase("install", "بناء المكتبة", NAME)
+    if install_from_dir(CACHE_DIR, items):
+        remember_installed(items)
+        return True
+    return False
+
+
+def attempt(targets, index, t):
+    """محاولة كاملة على مصدر واحد: حلّ إصدارات ← تنزيل ← تثبيت، ثم pip مباشر."""
+    items = resolve(targets, index)
+    if items and download_and_install(items, t):
+        return True
+    return plain_install(targets, index)
+
+
 def main(argv):
     global NAME
     if not argv:
@@ -579,65 +722,54 @@ def main(argv):
 
     t = tracker()
 
-    # ٠) المخزن الداخلي أولًا: المكتبة المثبّتة سابقًا لا تُنزَّل مرة أخرى
+    # ٠) فحص وجود الحزم قبل أي عمل: اسم خاطئ واحد كان يكلّف دقيقتين انتظارًا
+    #    بينما الجواب متاح في طلب واحد. لا نطبّق الفحص إلا على أسماء حزم صريحة
+    #    (لا `-r requirements.txt` ولا قيود إصدار).
+    plain_names = [item for item in targets if _NAME_RE.match(item)]
+    if plain_names and len(plain_names) == len(targets):
+        t.phase("resolve", "التحقق من الإصدارات", NAME)
+        missing_names = [item for item in plain_names if package_exists(item) is False]
+        if missing_names:
+            remember_missing(missing_names)
+            t.finish("تعذّر تثبيت المكتبة")
+            # ٤ = «لا وجود لهذه الحزمة». رمز مميّز كي لا يعيد المحرّك المحاولة
+            #     ببناء من المصدر أو apt لحزمة لا وجود لها أصلًا.
+            return 4
+
+    # ٠٫٥) المخزن الداخلي: المكتبة المثبّتة سابقًا لا تُنزَّل مرة أخرى
     t.phase("cache", "التحقق من المخزن", NAME)
     if try_offline(targets):
         t.finish("مثبّتة مسبقًا — من المخزن")
         return 0
 
-    # ٠٫٥) لا شبكة؟ سطر عربي واحد واضح، بلا عشر محاولات pip فاشلة
-    if not net_ok():
-        sys.stdout.write("⚠ لا يوجد اتصال بالإنترنت — لم تُثبَّت: %s\n" % (NAME or targets[0]))
+    order = indices()
+
+    # ١) ترتيب المصادر حسب الوصول الفعلي. المضيف المتعذّر يُؤخَّر ولا يُلغي شيئًا.
+    reachable = [index for index in order if net_ok(host_of(index))]
+    preferred = os.environ.get("MAHDI_PIP_INDEX") or os.environ.get("PIP_INDEX_URL") or order[0]
+
+    if not reachable:
+        # ٩٥.١: لا نحكم بانقطاع الشبكة من الفحص وحده — نجري محاولة حقيقية سريعة.
+        t.phase("resolve", "التحقق من الإصدارات", NAME)
+        if plain_install(targets, preferred, fast=True):
+            t.finish("تم التثبيت بنجاح")
+            return 0
+        sys.stdout.write("⚠ لا اتصال بالإنترنت الآن — تعذّر تجهيز: %s\n" % (NAME or targets[0]))
         sys.stdout.flush()
         t.finish("تعذّر تثبيت المكتبة")
         return 2
 
-    # ١) حلّ الإصدارات — ثم مرايا عند الفشل
-    t.phase("resolve", "التحقق من الإصدارات", NAME)
-    items = resolve(targets)
-    index_used = None
-    if not items:
-        for mirror in MIRRORS[1:]:
-            if not net_ok(mirror.split("//")[-1].split("/")[0]):
-                continue
-            t.phase("resolve", "تجربة مرآة أسرع", mirror.split("//")[-1].split("/")[0])
-            items = resolve(targets, mirror)
-            if items:
-                index_used = mirror
-                break
+    # ٢) كل مصدر متاح يُجرَّب بالكامل قبل الانتقال إلى الذي بعده
+    for position, index in enumerate(reachable):
+        host = host_of(index)
+        if position > 0:
+            t.phase("resolve", "تجربة مرآة أسرع", host)
+        if attempt(targets, index, t):
+            t.finish("تم التثبيت بنجاح")
+            return 0
 
-    if items:
-        try:
-            os.makedirs(CACHE_DIR, exist_ok=True)
-        except Exception:
-            pass
-
-        t.phase("download", "تنزيل الحزم", "%d ملف" % len(items))
-        counter = Counter(0)
-        pending = plan_downloads(items, counter)
-        if pending:
-            with ThreadPoolExecutor(max_workers=6) as pool:
-                results = list(
-                    pool.map(
-                        lambda job: download_one(job[0], CACHE_DIR, counter, job[0], job[1]),
-                        pending,
-                    )
-                )
-            ok = all(results)
-        else:
-            ok = True
-            t.real(80, "تنزيل الحزم", "من المخزن")
-
-        if ok:
-            # ٢) البناء والتثبيت: النبضة تُحرّك 82→99 أثناء بناء الـ wheel
-            t.phase("install", "بناء المكتبة", NAME)
-            if install_from_dir(CACHE_DIR, items):
-                remember_installed(items)
-                t.finish("تم التثبيت بنجاح")
-                return 0
-
-    # ٣) الطريق التقليدي (أو مرآة إن نجحت)
-    if plain_install(targets, index_used):
+    # ٣) محاولة أخيرة على المصدر المفضّل: قد يكون الفشل توقيتيًا لا انقطاعًا
+    if plain_install(targets, preferred):
         t.finish("تم التثبيت بنجاح")
         return 0
 

@@ -169,6 +169,8 @@ mahdi_heal_report() {
 
   # 9.2.0: تصفير سياق الصياغة — لا تتسرّب بيانات خطأ سابق إلى الخطأ الحالي
   MAHDI_SYN_LINE="" MAHDI_SYN_SOURCE="" MAHDI_SYN_CARET="" MAHDI_SYN_FILE=""
+  # 9.5.1: إجراء مقترح يخصّ هذا الخطأ بعينه (يطبعه سطر النتيجة النهائي)
+  MAHDI_FAIL_ACTION=""
 
   if [ -s "$errfile" ]; then
     mod="$(mahdi_heal_missing_module "$errfile")"
@@ -186,10 +188,34 @@ mahdi_heal_report() {
     # وتكراره بالإنجليزية يجعل الرسالة تبدو كخطأين.
     line=""
   elif [ -n "$mod" ]; then
-    tone="$M_CORAL"
-    title="المكتبة «$mod» غير مثبّتة"
-    hint="سيُعاد التثبيت تلقائيًا بطرق أخرى — أعد التشغيل بعد وصل الإنترنت"
-    MAHDI_FAIL_REASON="مكتبة ناقصة: $mod"
+    # 9.5.1: سببان مختلفان تمامًا، فلا تصلح لهما رسالة واحدة:
+    #   • الشبكة تعمل ولا حزمة بهذا الاسم ⇒ المشكلة في الاسم (إجراء: صحّحه)
+    #   • الشبكة متعذّرة ⇒ المشكلة في الاتصال (إجراء: لا شيء — يتم تلقائيًا)
+    local _net_known=0 _net_ok=0
+    if declare -f mahdi_deps_net_ok >/dev/null 2>&1; then
+      _net_known=1
+      mahdi_deps_net_ok && _net_ok=1
+    fi
+    if [ "$_net_known" = "1" ] && [ "$_net_ok" = "1" ]; then
+      tone="$M_GOLD"
+      title="لا توجد حزمة باسم «$mod»"
+      hint=""
+      MAHDI_FAIL_REASON="اسم مكتبة غير معروف: $mod"
+      MAHDI_FAIL_ACTION="صحّح اسم «$mod» في أعلى الملف ثم شغّل ▶"
+    elif [ "$_net_known" = "1" ]; then
+      tone="$M_GOLD"
+      title="تعذّر تجهيز المكتبة «$mod»"
+      hint=""
+      MAHDI_FAIL_REASON="تعذّر تجهيز مكتبة: $mod"
+      MAHDI_FAIL_ACTION="سيكتمل تجهيز «$mod» تلقائيًا عند عودة الشبكة"
+    else
+      # لا نعرف حالة الشبكة (محرّك الاعتماديات غير محمَّل) ⇒ لا ندّعي شيئًا
+      tone="$M_GOLD"
+      title="تعذّر تجهيز المكتبة «$mod»"
+      hint=""
+      MAHDI_FAIL_REASON="تعذّر تجهيز مكتبة: $mod"
+      MAHDI_FAIL_ACTION="يتكرّر تجهيز «$mod» تلقائيًا عند التشغيل القادم"
+    fi
   else
     case "$line" in
       AttributeError:*)
@@ -223,8 +249,9 @@ mahdi_heal_report() {
         MAHDI_FAIL_REASON="إيقاف من المستخدم" ;;
       ModuleNotFoundError:*|ImportError:*)
         tone="$M_CORAL"; title="مكتبة ناقصة"
-        hint="سيُعاد التثبيت تلقائيًا بطرق أخرى — أعد التشغيل بعد وصل الإنترنت"
-        MAHDI_FAIL_REASON="مكتبة ناقصة" ;;
+        hint=""
+        MAHDI_FAIL_REASON="مكتبة ناقصة"
+        MAHDI_FAIL_ACTION="سيكتمل تجهيز المكتبة تلقائيًا عند عودة الشبكة" ;;
       TypeError:*|ValueError:*|KeyError:*|NameError:*|IndexError:*|ZeroDivisionError:*|RuntimeError:*|OSError:*|Exception:*)
         tone="$M_VIOLET"; title="خطأ في السكربت"
         hint="راجع الرسالة أعلاه والسطر المشار إليه في الملف"
@@ -283,6 +310,44 @@ mahdi_heal_report() {
     fi
   fi
   return 0
+}
+
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.5.1 — هل صار الاستيراد ممكنًا فعلًا؟
+#
+# «نجح pip» ليست إجابة كافية: حزمة باسم قريب قد تُثبَّت ولا تُوفّر الوحدة
+# المطلوبة (‏`pip install telegram` ≠ pyTelegramBotAPI). لذلك نتحقّق بالاستيراد
+# الحقيقي قبل إعادة تشغيل السكربت، فلا تُعاد المحاولة على خطأ لم يُصلح.
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_py_module_ok() {
+  local module="${1:-}"
+  [ -n "$module" ] || return 1
+  "${MAHDI_PY:-python3}" - "$module" >/dev/null 2>&1 <<'PYMOD'
+import importlib
+import sys
+
+name = sys.argv[1]
+sys.path.insert(0, "")
+try:
+    importlib.import_module(name)
+except Exception:
+    sys.exit(1)
+PYMOD
+}
+
+# حزم PyPI المرشّحة لوحدة بايثون ناقصة (الأرجح أولًا) — تُطبع سطرًا لكل حزمة.
+# تُستدعى باسم **الوحدة** (‏telegram) لا باسم الحزمة، لأن الجدول وحدة ← حزمة.
+mahdi_heal_candidates() {
+  local module="${1:-}"
+  [ -n "$module" ] || return 1
+  local helper
+  helper="$(mahdi_heal_helper)"
+  [ -n "$helper" ] && [ -f "$helper" ] || return 1
+  command -v "${MAHDI_PY:-python3}" >/dev/null 2>&1 || return 1
+  local out
+  out="$("${MAHDI_PY:-python3}" "$helper" --candidates "$module" 2>/dev/null || true)"
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out"
 }
 
 # مسار مساعد التحليل (بايثون)
@@ -363,42 +428,46 @@ mahdi_heal_repair() {
 }
 
 # تثبيت حزمة واحدة حسب اللغة، بشريط تقدّم داخل الطرفية
+#
+# $3 (اختياري) = اسم الوحدة المفقودة كما وردت في الخطأ. وجوده يفعّل التحقّق
+# الحقيقي بالاستيراد، وتجربة الأسماء البديلة للحزمة (`telegram` ← pyTelegramBotAPI
+# أو python-telegram-bot) حتى ينجح الاستيراد فعلًا.
 mahdi_heal_install() {
-  local lang="$1" pkg="$2"
+  local lang="$1" pkg="$2" module="${3:-}"
   local label
-
-  # 8.3.0: محرّك الاعتماديات جرّب هذه الحزمة وفشل (غالبًا بلا اتصال)؛
-  # إعادة المحاولة هنا كانت رابع محاولة وتُضيف ثوانٍ بلا فائدة.
-  if declare -f mahdi_deps_failed >/dev/null 2>&1 && mahdi_deps_failed "$pkg"; then
-    return 1
-  fi
 
   case "$lang" in
     python)
       label="pip install $pkg"
-      # 9.3.0: السلسلة الكاملة أولًا (ويل ← إصدارات أقدم ← بناء ← حزمة نظام ← مصدر بديل)
-      if declare -f mahdi_py_install_any >/dev/null 2>&1; then
-        mahdi_py_install_any "$pkg" && return 0
-        return 1
-      fi
-      if declare -f mahdi_pip_run >/dev/null 2>&1; then
-        # المثبّت الذكي يرسم النسبة الحقيقية بنفسه
-        local rc=0
-        mahdi_pip_run "$label" "$pkg" || rc=$?
-        # ٢ = لا يوجد اتصال (طُبعت الرسالة العربية من المثبّت) — لا نكرّرها
+      # 9.5.1: لم يعد «فشل سابق» يمنع المحاولة. كان الفشل الوهمي (فحص شبكة
+      # متشائم) يُسجَّل دائمًا فيمنع الإصلاح الحقيقي، فينتهي السكربت ناقصًا.
+      local cand rc=0
+      local -a candidates=("$pkg")
+      # أسماء بديلة: الوحدة قد تأتي من حزمة أخرى (‏telegram ← pyTelegramBotAPI)
+      while IFS= read -r cand; do
+        [ -n "$cand" ] || continue
+        case " ${candidates[*]} " in
+          *" $cand "*) continue ;;
+        esac
+        candidates+=("$cand")
+      done < <(mahdi_heal_candidates "$module" 2>/dev/null || true)
+
+      for cand in "${candidates[@]}"; do
+        rc=0
+        if declare -f mahdi_py_install_any >/dev/null 2>&1; then
+          mahdi_py_install_any "$cand" "$module" || rc=$?
+        elif declare -f mahdi_pip_run >/dev/null 2>&1; then
+          mahdi_pip_run "pip install $cand" "$cand" || rc=$?
+        fi
+        # لا اتصال بعد كل المصادر ⇒ لا فائدة من اسم حزمة آخر
         [ "$rc" -eq 2 ] && return 2
-        return "$rc"
-      fi
-      mahdi_bar_start "$label"
-      "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-        --quiet --no-input --retries 3 --timeout 30 "$pkg" 2>/dev/null
-      local rc=$?
-      if [ "$rc" -eq 0 ]; then
-        mahdi_bar_done "$pkg ✓"
-      else
-        mahdi_bar_abort "تعذّر تثبيت $pkg"
-      fi
-      return "$rc"
+        # نجاح حقيقي = الاستيراد صار يعمل (أو لا وحدة للتحقّق منها)
+        if [ -z "$module" ] || mahdi_py_module_ok "$module"; then
+          return 0
+        fi
+        # الحزمة ثُبّتت لكن الوحدة ما زالت ناقصة ⇒ نجرّب الاسم البديل التالي
+      done
+      return 1
       ;;
 
     node)
@@ -550,38 +619,44 @@ mahdi_run_heal() {
       break
     fi
 
-    # كل الحزم المكتشفة سبق أن فشل تثبيتها ⇒ لا محاولة رابعة، نعرض السبب الحقيقي.
-    local all_failed=1 pkg
-    while IFS= read -r pkg; do
-      [ -z "$pkg" ] && continue
-      if declare -f mahdi_deps_failed >/dev/null 2>&1 && mahdi_deps_failed "$pkg"; then
-        continue
-      fi
-      all_failed=0
-    done <<<"$pkgs"
-    if [ "$all_failed" -eq 1 ]; then
+    # 9.5.1 — كان هنا «كل الحزم سبق أن فشلت ⇒ نتوقّف». ذلك الشرط هو ما جعل
+    # السلوك المبلَّغ عنه: فشل وهمي واحد (فحص شبكة متشائم) يمنع أي محاولة
+    # تثبيت حقيقية، مع أن الشبكة تعمل. الشرط الوحيد المشروع للتوقّف الآن هو
+    # انقطاع مؤكّد: بلا شبكة يستحيل التثبيت، وبها نجرّب كل الطرق والمرايا.
+    if declare -f mahdi_deps_net_ok >/dev/null 2>&1 && ! mahdi_deps_net_ok; then
       mahdi_heal_report "$lang" "$errfile" "$rc" "$script"
       break
     fi
 
-    printf "${M_GOLD}⟳ مكتبة ناقصة — جاري تثبيتها: %s${M_RESET}\n" "$(printf '%s' "$pkgs" | tr '\n' ' ')"
+    # 9.5.1: سطر واحد هادئ يشرح ما يجري، ثم تأكيد أن الإعادة تلقائية —
+    # فلا يظنّ المستخدم أن عليه إعادة التشغيل بنفسه.
+    printf "${M_SKY}⚙${M_RESET}  ${M_BOLD}تجهيز المكتبة الناقصة${M_RESET}  ${M_MUTED}·${M_RESET}  ${M_GOLD}%s${M_RESET}\n" "$(printf '%s' "$pkgs" | tr '\n' ' ')"
+
+    # 9.5.1 — الوحدة التي شكا منها المفسّر: تُستخدم للتحقّق من نجاح التثبيت.
+    local mod_now
+    mod_now="$(mahdi_heal_missing_module "$errfile" 2>/dev/null || true)"
+
+    # 9.5.1 — «فشل سابق» لا يعني فشلًا حقيقيًا. نمسح العلامة هنا كي يُعاد
+    # التثبيت بكل الطرق والمرايا، فلا يبقى السكربت ناقصًا بلا محاولة.
+    if declare -f mahdi_deps_clear >/dev/null 2>&1; then
+      mahdi_deps_clear "$mod_now"
+      while IFS= read -r pkg; do
+        [ -n "$pkg" ] && mahdi_deps_clear "$pkg"
+      done <<<"$pkgs"
+    fi
 
     local failed=0
     while IFS= read -r pkg; do
       [ -z "$pkg" ] && continue
-      # لا نُعيد حزمة سُجّل فشلها قبل قليل
-      if declare -f mahdi_deps_failed >/dev/null 2>&1 && mahdi_deps_failed "$pkg"; then
-        continue
-      fi
       local install_rc=0
-      mahdi_heal_install "$lang" "$pkg" || install_rc=$?
+      mahdi_heal_install "$lang" "$pkg" "$mod_now" || install_rc=$?
       if [ "$install_rc" -ne 0 ]; then
         declare -f mahdi_deps_mark_failed >/dev/null 2>&1 && mahdi_deps_mark_failed "$pkg"
-        if [ "$install_rc" -eq 2 ]; then
-          printf "${M_GOLD}⚠ لا يوجد اتصال بالإنترنت — تعذّر تجهيز المكتبة.${M_RESET}\n" >&2
-        else
-          printf "${M_CORAL}✖ تعذّر تثبيت %s${M_RESET}\n" "$pkg" >&2
-        fi
+        # 9.5.1: لا نطلب من المستخدم إعادة التشغيل — نُسجّلها لتُجهَّز تلقائيًا
+        # في أول تشغيل تالٍ بعد عودة الشبكة.
+        declare -f mahdi_pending_add >/dev/null 2>&1 && mahdi_pending_add "$pkg"
+        # 9.5.1: لا سطر ثانٍ هنا. السبب يُعرض مرة واحدة في تقرير الخطأ
+        # التالي (⚠) ثم في سطر النتيجة (✖) — لا تكرار ولا علامتان لسبب واحد.
         failed=1
         break
       fi
@@ -591,6 +666,10 @@ mahdi_run_heal() {
       # 8.3.0: كان يكتفي بسطر «تحقّق من الاتصال» ويُخفي خطأ السكربت الأصلي.
       mahdi_heal_report "$lang" "$errfile" "$rc" "$script"
       break
+    fi
+
+    if [ "$failed" -eq 0 ] && [ "$attempt" -lt "$max_attempts" ]; then
+      printf "${M_MINT}✔${M_RESET}  ${M_MUTED}جُهِّزت — يُعاد تشغيل السكربت تلقائيًا${M_RESET}\n" || true
     fi
 
     attempt=$((attempt + 1))
