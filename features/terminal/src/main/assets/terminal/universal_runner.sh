@@ -27,6 +27,12 @@ if ! declare -f mahdi_auto_deps >/dev/null 2>&1; then
   mahdi_auto_deps() { return 0; }
 fi
 
+# 9.5.1: إكمال ما تأجّل من تجهيز المكتبات في تشغيل سابق. إن لا شبكة الآن
+# يعود فورًا بلا انتظار، ويبقى الطابور للتشغيل التالي.
+if declare -f mahdi_pending_flush >/dev/null 2>&1; then
+  mahdi_pending_flush || true
+fi
+
 # 5.5.0: شريط التقدّم أحادي السطر + محرّك «ثبّت المكتبة الناقصة وأعد التشغيل»
 if [ -f "$LOCAL/bin/progress" ]; then
   # shellcheck disable=SC1091
@@ -89,9 +95,13 @@ mahdi_run_footer() {
       [ -n "$_hint" ] && printf "${M_MUTED}   ↳ %s${M_RESET}\n" "$_hint" || true
     fi
 
-    # إجراء واحد ينفع في الحالتين، بلا محاضرة
-    if [ "$_reported" = "1" ]; then
-      printf "${M_MUTED}   ↳ بعد الإصلاح: أعد التشغيل من زرّ ▶${M_RESET}\n" || true
+    # إجراء واحد ينفع في الحالتين، بلا محاضرة.
+    # 9.5.1: لكل خطأ إجراؤه — خطأ الصياغة يحتاج تعديلًا، أما مكتبة تعذّر
+    # تجهيزها فلا تحتاج من المستخدم أي خطوة (التثبيت يتم تلقائيًا).
+    # 9.5.1: إجراء واحد فقط، ولا يُكرَّر ما طُبع أعلاه. إن لم يُحدَّد إجراء
+    # خاص بالخطأ فلا نضيف سطرًا عامًّا («أعد التشغيل…») — التشخيص أعلاه كافٍ.
+    if [ "$_reported" = "1" ] && [ -n "${MAHDI_FAIL_ACTION:-}" ]; then
+      printf "${M_MUTED}   ↳ %s${M_RESET}\n" "$MAHDI_FAIL_ACTION" || true
     fi
   fi
 
@@ -128,9 +138,11 @@ esac
 _mahdi_now="$(printf '%(%H:%M)T' -1)"
 
 # FSI = U+2068، PDI = U+2069 — علامتا تحكّم للعزل، لا تُخزَّنان مع الاسم.
-# (‏`printf` لا يفسّر \u داخل سلسلة التنسيق، لذا نبنيهما بـ$'…' ثم نطبعهما بـ%s.)
-_mahdi_fsi=$'\u2068'
-_mahdi_pdi=$'\u2069'
+# يُبنيان ببايتات UTF-8 (‏printf بترميز ثماني) ثم يُطبعان بـ%s.
+# 9.5.1: بايتات UTF-8 صريحة عبر printf بدل $'\u…' — بعض الصور/اللغات تُبقي
+# التعبير حرفيًّا فيظهر `\u2068` بجانب اسم الملف بدل عزل الاتجاه.
+_mahdi_fsi="$(printf '\342\201\250')"
+_mahdi_pdi="$(printf '\342\201\251')"
 printf "${M_SKY}▸${M_RESET}  ${M_BOLD}%s%s%s${M_RESET}\n" "$_mahdi_fsi" "$_mahdi_name" "$_mahdi_pdi" || true
 
 # ———————————————————— تحذير الذاكرة (9.1.0) ————————————————————
@@ -226,12 +238,16 @@ PYCHK
   _fsi="$(printf '\342\201\250')"
   _pdi="$(printf '\342\201\251')"
 
-  printf "${M_GOLD}✖${M_RESET}  ${M_BOLD}خطأ في صياغة الملف${M_RESET}\n" || true
+  # 9.5.1: ⚠ لا ✖ — ال✖ لسطر النتيجة النهائي وحده، فلا تتكرّر العلامة لسبب واحد.
+  printf "${M_GOLD}⚠${M_RESET}  ${M_BOLD}خطأ في صياغة الملف${M_RESET}\n" || true
   printf "${M_SKY}  %s%s%s${M_RESET}\n" "$_fsi" "$(basename "$file")" "$_pdi" || true
   printf "${M_GOLD}  السطر %s${M_RESET}\n" "$line_num" || true
   [ -n "$src_line" ] && printf "${M_WHITE}  %s${M_RESET}\n" "$src_line" || true
   [ -n "$caret_line" ] && printf "${M_CORAL}  %s${M_RESET}\n" "$caret_line" || true
-  printf "${M_MUTED}  ↳ صحّح السطر %s في المحرّر ثم أعد التشغيل${M_RESET}\n" "$line_num" || true
+  # 9.5.1: الإجراء يُطبع مرة واحدة في سطر النتيجة النهائي (لا سطرين متشابهين)
+  MAHDI_FAIL_ACTION="صحّح السطر $line_num في المحرّر ثم شغّل ▶"
+  MAHDI_REPORTED=1
+  export MAHDI_FAIL_ACTION MAHDI_REPORTED
   return 3
 }
 

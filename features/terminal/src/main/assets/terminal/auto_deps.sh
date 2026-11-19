@@ -39,6 +39,13 @@ MAHDI_DEPS_FAILED=" "
 MAHDI_NET_STATE=""
 export MAHDI_DEPS_FAILED
 
+# 9.5.1 — بيئة pip صالحة لكل عملية تثبيت، حتى التي يكتبها المستخدم بنفسه.
+# Ubuntu الحديثة ترفض `pip install` بحماية PEP 668، فيظهر الفشل كأنه عطل شبكة.
+export PIP_BREAK_SYSTEM_PACKAGES="${PIP_BREAK_SYSTEM_PACKAGES:-1}"
+export PIP_ROOT_USER_ACTION="${PIP_ROOT_USER_ACTION:-ignore}"
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+export PIP_NO_INPUT=1
+
 mahdi_deps_mark_failed() {
   local p
   for p in "$@"; do
@@ -62,25 +69,155 @@ mahdi_deps_failed() {
   esac
 }
 
-# فحص اتصال واحد سريع (٣ ثوان) يُخزَّن للجلسة، فلا يُعاد مع كل حزمة
+# 9.5.1: يمحي علامة «فشل سابق» حتى تُجرَّب الحزمة من جديد بكل الطرق.
+#
+# كان فشل واحد (بسبب فحص شبكة خاطئ) يسجّل الحزمة «فاشلة» فيمنع self_heal من
+# إعادة المحاولة، فينتهي السكربت بمكتبة ناقصة مع أن شبكة المستخدم سليمة.
+mahdi_deps_clear() {
+  local p out=" "
+  for p in "$@"; do
+    [ -z "$p" ] && continue
+    p="${p%%\[*}"
+    p="${p,,}"
+    case " $MAHDI_DEPS_FAILED " in
+      *" $p "*) ;;
+      *) out="$out$p " ;;
+    esac
+  done
+  MAHDI_DEPS_FAILED="$out"
+}
+
+# 9.5.1 — «هذه الحزمة غير موجودة»: ذاكرة يوم واحد يكتبها المثبّت الذكي.
+# تمنع إعادة المحاولة ببناء من المصدر وapt ومرايا لحزمة اسمها خاطئ.
+mahdi_nodist_known() {
+  local name="${1:-}"
+  [ -n "$name" ] || return 1
+  name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+  local file="${HOME:-/root}/.mahdi/nodist/$name"
+  [ -f "$file" ] || return 1
+  # العمر بأداة محمولة (‏find في toybox لا يعرف -quit دائمًا)
+  local age
+  age="$("${MAHDI_PY:-python3}" - "$file" 2>/dev/null <<'PYAGE'
+import os, sys, time
+try:
+    print(int(time.time() - os.path.getmtime(sys.argv[1])))
+except Exception:
+    print(10 ** 9)
+PYAGE
+)"
+  case "${age:-0}" in
+    '' | *[!0-9]*) age=0 ;;
+  esac
+  # الذاكرة صالحة ليوم واحد فقط: قد تُنشر الحزمة لاحقًا أو يُصحَّح الاسم
+  [ "$age" -lt 86400 ]
+}
+
+# ——————————————————————————————————————————————————————————————————————————————
+# 9.5.1 — طابور «مكتبات مؤجّلة»
+#
+# عندما يتعذّر تجهيز مكتبة (شبكة متقطّعة مثلًا) لا نُطالب المستخدم بأي خطوة:
+# يُسجَّل الاسم هنا، وعند أول تشغيل تالٍ — أو أول مرة تعود فيها الشبكة — يُثبَّت
+# في الخلفية قبل تشغيل السكربت، فيعمل المشروع بلا أن يلمس المستخدم شيئًا.
+# ——————————————————————————————————————————————————————————————————————————————
+mahdi_pending_file() {
+  printf '%s' "${HOME:-/root}/.mahdi/pending_deps"
+}
+
+mahdi_pending_add() {
+  local file pkg
+  file="$(mahdi_pending_file)"
+  mkdir -p "$(dirname "$file")" 2>/dev/null || true
+  for pkg in "$@"; do
+    [ -z "$pkg" ] && continue
+    grep -qxF "$pkg" "$file" 2>/dev/null && continue
+    printf '%s\n' "$pkg" >>"$file" 2>/dev/null || true
+  done
+  # سقف بسيط كي لا ينمو الملف بلا حدّ
+  if [ -f "$file" ] && [ "$(wc -l <"$file" 2>/dev/null || echo 0)" -gt 40 ]; then
+    tail -n 40 "$file" >"$file.tmp" 2>/dev/null && mv "$file.tmp" "$file" 2>/dev/null || true
+  fi
+  return 0
+}
+
+# يثبّت ما تأجّل عند توفّر الشبكة. صامت تمامًا عند الفشل، وسطر واحد عند النجاح.
+mahdi_pending_flush() {
+  local file pkg left=() done_count=0
+  file="$(mahdi_pending_file)"
+  [ -s "$file" ] || return 0
+  mahdi_deps_net_ok || return 0
+
+  while IFS= read -r pkg; do
+    [ -z "$pkg" ] && continue
+    if "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --no-input --quiet \
+      --disable-pip-version-check --root-user-action ignore --retries 1 --timeout 20 \
+      "$pkg" >/dev/null 2>&1; then
+      done_count=$((done_count + 1))
+    else
+      left+=("$pkg")
+    fi
+  done <"$file"
+
+  if [ ${#left[@]} -eq 0 ]; then
+    rm -f "$file" 2>/dev/null || true
+  else
+    printf '%s\n' "${left[@]}" >"$file" 2>/dev/null || true
+  fi
+
+  if [ "$done_count" -gt 0 ]; then
+    printf '\033[32m✔\033[0m  \033[2mأُكمل تجهيز %s مكتبة مؤجّلة\033[0m\n' "$done_count" || true
+  fi
+  return 0
+}
+
+# فحص اتصال حقيقي يُخزَّن للجلسة، فلا يُعاد مع كل حزمة.
+#
+# 9.5.1 — سبب «المكتبة غير مثبّتة» بلا أي محاولة: كان الفحص يعتمد على مصدر واحد
+# (‏curl إلى pypi.org/simple بمهلة ٣ ثوانٍ). فإن تعثّر DNS لثانية، أو غاب curl من
+# الصورة، أو حُجب pypi وحده في بلد المستخدم، يُعلَن «لا اتصال» وتُتجاهل كل المرايا
+# — ثم يظهر تلميح «أعد التشغيل بعد وصل الإنترنت» ولم يُجرَّب تثبيت واحد.
+#
+# الآن: اتصال TCP حقيقي لكل المضيفين المعروفين، والنجاح في **أي** واحد منهم يعني
+# أن الشبكة تعمل. وإذا فشلت كلها لا نمنع المحاولة: المثبّت الذكي يجرّب بنفسه.
+_mahdi_tcp_ok() {
+  local host="$1"
+  "${MAHDI_PY:-python3}" - "$host" <<'PROBE' >/dev/null 2>&1
+import socket, sys
+socket.setdefaulttimeout(1.5)
+try:
+    socket.create_connection((sys.argv[1], 443), timeout=1.5).close()
+except Exception:
+    sys.exit(1)
+PROBE
+}
+
 mahdi_deps_net_ok() {
   [ "$MAHDI_NET_STATE" = "ok" ] && return 0
   [ "$MAHDI_NET_STATE" = "off" ] && return 1
-  # يحترم المرآة التي يختارها المستخدم (MAHDI_PIP_INDEX) بدل فحص pypi دائمًا
-  local url="${MAHDI_PIP_INDEX:-https://pypi.org/simple/}"
-  local host="${url#*://}"; host="${host%%/*}"
-  local ok=1
+
+  local host
+  local -a hosts=()
+  if [ -n "$MAHDI_PIP_INDEX" ]; then
+    host="${MAHDI_PIP_INDEX#*://}"; host="${host%%/*}"; host="${host%%:*}"
+    [ -n "$host" ] && hosts+=("$host")
+  fi
+  hosts+=(pypi.org pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com)
+
+  for host in "${hosts[@]}"; do
+    if _mahdi_tcp_ok "$host"; then
+      MAHDI_NET_STATE=ok
+      return 0
+    fi
+  done
+
+  # احتياط أخير: curl أو wget (إن وُجدا) — قد ينجحان حيث يفشل اتصال بايثون
   if mahdi_have curl; then
-    curl -fsS --connect-timeout 3 --max-time 4 -o /dev/null "$url" >/dev/null 2>&1 && ok=0
+    curl -fsS --connect-timeout 3 --max-time 5 -o /dev/null "https://pypi.org/simple/" >/dev/null 2>&1 &&
+      { MAHDI_NET_STATE=ok; return 0; }
   elif mahdi_have wget; then
-    wget -q --spider --timeout=4 "$url" >/dev/null 2>&1 && ok=0
-  else
-    "${MAHDI_PY:-python3}" -c 'import socket,sys;socket.setdefaulttimeout(4);socket.create_connection((sys.argv[1],443)).close()' "$host" >/dev/null 2>&1 && ok=0
+    wget -q --spider --timeout=5 "https://pypi.org/simple/" >/dev/null 2>&1 &&
+      { MAHDI_NET_STATE=ok; return 0; }
   fi
-  if [ "$ok" -eq 0 ]; then
-    MAHDI_NET_STATE=ok
-    return 0
-  fi
+
   MAHDI_NET_STATE=off
   return 1
 }
@@ -109,15 +246,16 @@ mahdi_have() { command -v "$1" >/dev/null 2>&1; }
 # الآن: سطر أو سطران، بلا English ولا traceback.
 
 mahdi_deps_offline() {
-  printf '\033[33m⚠ لا يوجد اتصال بالإنترنت — لم تُثبَّت المكتبات: %s\033[0m\n' "$1" >&2
-  printf '\033[2m  وصّل الإنترنت ثم أعد التشغيل — سيُعاد التثبيت تلقائيًا\033[0m\n' >&2
+  printf '\033[33m⚠ لا يوجد اتصال بالإنترنت الآن — تعذّر تجهيز: %s\033[0m\n' "$1" >&2
+  printf '\033[2m  سيكتمل التجهيز تلقائيًا عند عودة الشبكة — لا إعداد مطلوب منك\033[0m\n' >&2
 }
 
 mahdi_deps_missing() {
-  printf '\033[31m✖ تعذّر تجهيز المكتبات: %s\033[0m\n' "$1" >&2
-  # 9.3.0: «ثبّتها من: اللغات ← المشغّلات» لم تكن إجراءً لأي مكتبة بايثون،
-  # فاستبدلناها بأمر يعمل فعلًا ويعيد المحاولة بكل الطرق.
-  printf '\033[2m  جرّب: mh fix ثم mh install . — يكرّر المحاولة بطرق وأصدور أخرى\033[0m\n' >&2
+  # 9.5.1: صامت افتراضيًا. كان يطبع ⚠ ثم يُطبع سبب آخر من الإصلاح الذاتي ثم ✖
+  # النتيجة — ثلاث رسائل لسبب واحد. الآن يتولّى محرّك الإصلاح الذاتي العرض
+  # (سطر ⚙ أثناء المحاولة، ثم ⚠ سبب واحد، ثم ✖ نتيجة واحدة، ثم ↳ إجراء واحد).
+  [ "${MAHDI_DEPS_VERBOSE:-0}" = "1" ] || return 0
+  printf '\033[33m⚠ تعذّر تجهيز المكتبات: %s\033[0m\n' "$1" >&2
 }
 
 # ————————————————————————————— أدوات مساعدة —————————————————————————————
@@ -292,14 +430,10 @@ mahdi_pip_run() {
     # || rc=$? : المشغّل يعمل بـ set -e، فأي رمز فشل غير مُختبَر يُنهي الجلسة
     "${MAHDI_PY:-python3}" "$script" --name "$name" "$@" || rc=$?
     [ "$rc" -eq 0 ] && return 0
-    # 6.1.0: رمز ٢ = لا يوجد اتصال. لا نكرّر المحاولة بعشر رسائل pip فاشلة.
-    [ "$rc" -eq 2 ] && return 2
-    # 8.3.0: انقطاع مؤكّد ⇒ لا خطة بديلة تنتظر الشبكة عبثًا
-    [ "${MAHDI_OFFLINE:-0}" = "1" ] && return 2
-    # خطة بديلة صامتة إن فشل المثبّت الذكي لسبب آخر
-  fi
-  if [ "${MAHDI_OFFLINE:-0}" = "1" ]; then
-    return 2
+    # ٤ = الحزمة غير موجودة أصلًا ⇒ لا فائدة من أي محاولة أخرى
+    [ "$rc" -eq 4 ] && return 4
+    # 9.5.1: لم نعد نتوقّف عند رمز «لا اتصال» — المثبّت نفسه صار يجرب كل
+    # المصادر، وإن عاد برمز الانقطاع فمعناه أنه جرّبها فعلًا وفشلت كلها.
   fi
   if declare -f mahdi_prog_start >/dev/null 2>&1; then
     mahdi_prog_start "$name" "تثبيت مباشر بـ pip…"
@@ -311,8 +445,10 @@ mahdi_pip_run() {
   # 6.1.0: كل ضجيج pip إلى ملف مؤقت — الطرفية تعرض سطرًا واحدًا فقط عند الفشل
   local log="${TMPDIR:-/tmp}/mahdi-pip-$$.log"
   local _prc=0
+  # 9.5.1: محاولة واحدة فقط هنا. المثبّت الذكي جرّب خمس مرايا بالفعل، وتكرارها
+  # في هذه الطبقة كان يضاعف زمن الفشل بلا أي احتمال جديد للنجاح.
   "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --disable-pip-version-check \
-    --quiet --no-input --retries 3 --timeout 20 "$@" >"$log" 2>&1 || _prc=$?
+    --quiet --no-input --retries 1 --timeout 15 "$@" >"$log" 2>&1 || _prc=$?
   declare -f mahdi_prog_creep_stop >/dev/null 2>&1 && mahdi_prog_creep_stop
   if [ "$_prc" -eq 0 ]; then
     rm -f "$log" 2>/dev/null || true
@@ -320,34 +456,34 @@ mahdi_pip_run() {
     return 0
   fi
   rm -f "$log" 2>/dev/null || true
+  # رمز ٢ = كل المصادر غير قابلة للوصول (يفحص الشبكة نفسها، لا الفحص القديم)
+  mahdi_deps_net_ok || return 2
   return 1
 }
 
 mahdi_pip_one() {
   local pkg="$1"
   local log="${TMPDIR:-/tmp}/mahdi-pip-one-$$.log"
-  local rc=0
-  mahdi_pip_run "$pkg" "$pkg" || rc=$?
-  [ "$rc" -eq 0 ] && return 0
-  # 6.1.0: لا اتصال → سطر واحد فقط، وبلا محاولات pip صاخبة
-  [ "$rc" -eq 2 ] && { mahdi_deps_mark_failed "$pkg"; return 2; }
-  # 8.3.0: إن تأكّد انقطاع الشبكة، لا تُجرب pip مرتين إضافيتين بلا جدوى
-  [ "${MAHDI_OFFLINE:-0}" = "1" ] && { mahdi_deps_mark_failed "$pkg"; return 2; }
-  # إعادة محاولة صامتة عبر المصدر الرسمي
-  "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --no-input --quiet \
-    --disable-pip-version-check --retries 2 --timeout 20 "$pkg" >"$log" 2>&1 && {
-    rm -f "$log" 2>/dev/null || true
-    return 0
-  }
-  "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --no-input --quiet \
-    --disable-pip-version-check --retries 2 --timeout 20 \
-    -i "https://pypi.org/simple" "$pkg" >"$log" 2>&1 && {
-    rm -f "$log" 2>/dev/null || true
-    return 0
-  }
+  # 9.5.1: الدفعة سبق أن مرّت على المثبّت الذكي؛ هنا نجرّب المصادر مباشرة
+  # (بدل إعادة تشغيل المثبّت نفسه لحزمة واحدة = عمل مكرّر وزمن مضاعف).
+  if declare -f mahdi_nodist_known >/dev/null 2>&1 && mahdi_nodist_known "$pkg"; then
+    mahdi_deps_mark_failed "$pkg"
+    return 3
+  fi
+  local idx
+  for idx in "https://pypi.org/simple" \
+    "https://pypi.tuna.tsinghua.edu.cn/simple" \
+    "https://mirrors.aliyun.com/pypi/simple" \
+    "https://pypi.mirrors.ustc.edu.cn/simple"; do
+    "${MAHDI_PY:-python3}" -m pip install --upgrade --prefer-binary --no-input --quiet \
+      --disable-pip-version-check --retries 2 --timeout 20 -i "$idx" "$pkg" >"$log" 2>&1 && {
+      rm -f "$log" 2>/dev/null || true
+      return 0
+    }
+  done
   rm -f "$log" 2>/dev/null || true
   mahdi_deps_mark_failed "$pkg"
-  warn "تعذّر تثبيت $pkg"
+  # 9.5.1: لا رسالة هنا — الإصلاح الذاتي هو من يعرض السبب النهائي مرة واحدة.
   return 1
 }
 
@@ -370,6 +506,11 @@ mahdi_pip_install_many() {
   if [ "$batch_rc" -eq 2 ]; then
     mahdi_deps_mark_failed "${pkgs[@]}"
     return 2
+  fi
+  # 9.5.1: «لا وجود للحزمة» ليس فشلًا شبكيًا، ولا يُصلحه أي إصدار أو بناء.
+  if [ "$batch_rc" -eq 4 ]; then
+    mahdi_deps_mark_failed "${pkgs[@]}"
+    return 3
   fi
 
   local p rc=0 succeeded=0
@@ -560,6 +701,29 @@ def distribution_installed(spec):
         return False
 
 
+# 9.5.1 — «هل هذا مجلد مشروع أم مجلّد تنزيلات؟»
+#
+# كان الفحص يقرأ **٦٠ ملفًا** من مجلد السكربت أيًّا كان. فإن نُزِّل سكربت من
+# تليجرام إلى Download (وفيه عشرات السكربتات الأخرى)، تُجمَع وارداتها كلها
+# وتُثبَّت حزم لا علاقة لها بالملف — انتظار طويل وأخطاء تثبيت لا معنى لها.
+# الآن الفحص الواسع يقتصر على مجلدات المشاريع الحقيقية (فيها ملف متطلبات)،
+# ونقرأ الملف نفسه دائمًا.
+PROJECT_MARKERS = (
+    "requirements.txt", "pyproject.toml", "setup.py", "setup.cfg",
+    "package.json", "Pipfile", "environment.yml", "poetry.lock",
+)
+
+
+def looks_like_project(directory):
+    if not directory or not os.path.isdir(directory):
+        return False
+    try:
+        entries = set(os.listdir(directory))
+    except OSError:
+        return False
+    return any(marker in entries for marker in PROJECT_MARKERS)
+
+
 # 9.3.1 — أسماء تتكرّر في كل مشروع ولا تكون حزمة PyPI (‏`core` · `utils` …).
 # كانت تُرسَل إلى pip فتُنتج «المكتبة ”core“ غير مثبّتة» وهي وحدة داخل المشروع.
 LOCAL_NAMES = {
@@ -647,7 +811,7 @@ def main():
     # مكتبة يستوردها `core/db.py` أو `handlers/start.py` لم تكن تُكتشف إطلاقًا
     # (كان الفحص يقرأ الملف المُشغَّل فقط)، فينهار السكربت عند أول استيراد
     # داخلي. الآن نقرأ ملفات المشروع حتى ٦٠ ملفًا وبحدّ حجم آمن.
-    if os.path.isdir(directory):
+    if os.path.isdir(directory) and looks_like_project(directory):
         skip_dirs = {
             "node_modules", ".git", "__pycache__", ".venv", "venv", "env",
             "build", "dist", ".gradle", ".idea", ".vscode", "target", ".next",
@@ -662,6 +826,9 @@ def main():
                     continue
                 full = os.path.join(dirpath, fname)
                 if full == os.path.abspath(path):
+                    continue
+                # ملفات مساعدة داخلية ليست جزءًا من مشروع المستخدم
+                if fname.startswith("mahdi_"):
                     continue
                 try:
                     size = os.path.getsize(full)
@@ -758,6 +925,21 @@ mahdi_py_deps() {
     return 0
   fi
 
+  # 9.5.1: الفحص إرشادي. إن نجح نجرّب كل شيء، وإن فشل لا نُعلن الفشل مسبقًا —
+  # المثبّت الذكي يحاول المخزن ثم المصادر البعيدة بنفسه، وهناك شبكات تُفشل
+  # الفحص وتنجح معها pip (‏IPv6 · اختلاف SNI · وسيط شفّاف).
+  #
+  # ونتيجة الفحص تُحسب **قبل** تصفية «الحزم الفاشلة»: كانت التصفية تسبقه، فإن
+  # كانت كل الحزم مُعلَّمة بالفشل يعود الأمر قبل أن تُمسح العلامات أصلًا.
+  if mahdi_deps_net_ok; then
+    MAHDI_OFFLINE=0
+    # علامة «فشل سابق» لا تعني فشلًا حقيقيًا (قد تكون من فحص متشائم أو انقطاع
+    # عابر). ما دامت الشبكة تعمل، كل شيء يُعاد فحصه وتثبيته من جديد.
+    MAHDI_DEPS_FAILED=" "
+  else
+    MAHDI_OFFLINE=1
+  fi
+
   # حزم سبق أن فشل تثبيتها في هذه الجلسة: لا نُعيد انتظار الشبكة عبثًا
   local -a fresh=() m
   for m in "${missing[@]}"; do
@@ -768,19 +950,13 @@ mahdi_py_deps() {
     return 3
   fi
 
-  # 8.3.0: فحص واحد سريع. بلا شبكة يكفي المخزن الدائم الداخلي (يجربه
-  # المثبّت أولًا) ثم يتوقّف فورًا بدل أربع محاولات pip تنتظر كلها.
-  if ! mahdi_deps_net_ok; then
-    export MAHDI_OFFLINE=1
-  fi
-
   local pip_rc=0
   mahdi_pip_install_many "${fresh[@]}" || pip_rc=$?
 
   # 9.3.0: «إن فشل إصدار ثبّته بغيره». كل حزمة فشلت في الدفعة تُمرَّر على سلسلة
   # البدائل وحدها: ويل فقط ← إصدارات أقدم ← بناء من المصدر ← حزمة النظام ←
   # مصدر بديل. كانت الدفعة الفاشلة تُعلَن فشلًا نهائيًا بلا محاولة أخرى.
-  if [ "$pip_rc" -ne 0 ] && [ "$pip_rc" -ne 2 ] && declare -f mahdi_py_install_any >/dev/null 2>&1; then
+  if [ "$pip_rc" -eq 1 ] && declare -f mahdi_py_install_any >/dev/null 2>&1; then
     local pkg_name rescued=0 still=()
     for pkg_name in "${fresh[@]}"; do
       if mahdi_py_install_any "$pkg_name" >/dev/null 2>&1; then
@@ -798,9 +974,13 @@ mahdi_py_deps() {
   fi
 
   if [ "$pip_rc" -ne 0 ]; then
+    # 9.5.1: الانقطاع ليس «فشلًا» للحزمة — لا نُسجّله كعلامة دائمة، فربما كان
+    # الفحص متشائمًا. الرسالة العربية طُبعت من المثبّت، لا نكرّرها.
+    if [ "$pip_rc" -eq 2 ]; then
+      declare -f mahdi_pending_add >/dev/null 2>&1 && mahdi_pending_add "${fresh[@]}"
+      return 2
+    fi
     mahdi_deps_mark_failed "${fresh[@]}"
-    # رمز ٢ = لا اتصال؛ الرسالة العربية طُبعت من المثبّت، لا نكرّرها
-    [ "$pip_rc" -eq 2 ] && return 2
     mahdi_deps_missing "${fresh[*]}"
     return 3
   fi

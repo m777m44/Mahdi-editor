@@ -53,6 +53,27 @@ private val SKIP_NAMES =
         ".next",
     )
 
+/**
+ * 9.5.1 — مجلدات «حاويات» لا مشاريع.
+ *
+ * سكربت يُنزَّل من تليجرام إلى `Download` ليس مشروعًا: نسخ المجلد كله (حتى ٤٠٠
+ * ملف) كان يُطيل التشغيل بلا فائدة، ويجعل ماسح المكتبات يقرأ عشرات السكربتات
+ * الأخرى فيُثبِّت ما لا يحتاجه الملف — وهو أحد أسباب «توقّف السكربت» المفاجئ.
+ * الآن هذه المجلدات تُشغَّل بملفها وحده، بينما مجلدات المشاريع الحقيقية تُنسخ
+ * كما هي لتعمل وارداتها النسبية.
+ */
+private val GENERIC_CONTAINERS =
+    setOf(
+        "download", "downloads", "downloads folder", "telegram", "documents",
+        "dcim", "pictures", "music", "movies", "whatsapp", "android", "tmp",
+        "temp", "bluetooth", "shareit", "snapchat", "screenshots", "sdcard",
+    )
+
+private fun isGenericContainer(name: String?): Boolean {
+    val normalized = name?.trim()?.lowercase() ?: return false
+    return normalized in GENERIC_CONTAINERS
+}
+
 object UniversalRunner : FileRunner() {
 
     override val id = "universal"
@@ -203,7 +224,7 @@ object UniversalRunner : FileRunner() {
         val copiedProject =
             withContext(Dispatchers.IO) {
                 runCatching {
-                    if (parent == null || !parent.isDirectory()) {
+                    if (parent == null || !parent.isDirectory() || isGenericContainer(folderName)) {
                         false
                     } else {
                         projectDir.deleteRecursively()

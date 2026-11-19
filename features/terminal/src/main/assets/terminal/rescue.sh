@@ -479,11 +479,37 @@ mahdi_install_command() {
 # ——————————————————————————————————————————————————————————————————————————————
 # 6) بايثون — «إن فشل إصدار ثبّته بغيره»
 # ——————————————————————————————————————————————————————————————————————————————
+_MAHDI_PIP_LAST_REASON=""
+
 _mahdi_pip_quiet() {
   local py="${MAHDI_PY:-python3}"
   local log="${TMPDIR:-/tmp}/mahdi-rescue-pip.log"
-  "$py" -m pip install --disable-pip-version-check --no-input --quiet \
-    --retries 2 --timeout 25 "$@" >"$log" 2>&1
+  # 9.5.1: PEP 668 في Ubuntu الحديثة يرفض التثبيت بلا هذا المتغيّر، فيبدو
+  # فشل الحماية كأنه فشل شبكة.
+  export PIP_BREAK_SYSTEM_PACKAGES=1
+  export PIP_ROOT_USER_ACTION=ignore
+  export PIP_DISABLE_PIP_VERSION_CHECK=1
+  if "$py" -m pip install --disable-pip-version-check --no-input --quiet \
+    --retries 2 --timeout 25 --root-user-action ignore "$@" >"$log" 2>&1; then
+    _MAHDI_PIP_LAST_REASON=""
+    return 0
+  fi
+  # 9.5.1: معرفة **نوع** الفشل توفّر دقائق: حزمة غير موجودة لا تحتاج بناءً من
+  # المصدر ولا أدوات بناء ولا apt — تحتاج اسمًا صحيحًا فقط.
+  if grep -qiE "no matching distribution|could not find a version" "$log" 2>/dev/null; then
+    _MAHDI_PIP_LAST_REASON="nodist"
+  elif grep -qiE "connection|timed out|network is unreachable|temporary failure|ssl|proxy" "$log" 2>/dev/null; then
+    _MAHDI_PIP_LAST_REASON="net"
+  else
+    _MAHDI_PIP_LAST_REASON="other"
+  fi
+  return 1
+}
+
+# ملاحظة تقدّم: لا تُطبع إلا في الوضع التفصيلي. الافتراضي سطر واحد لكل نتيجة.
+_mahdi_note() {
+  [ "${MAHDI_DEPS_VERBOSE:-0}" = "1" ] || return 0
+  printf '%s↻%s  %s\n' "${M_SKY:-}" "${M_RESET:-}" "$*"
 }
 
 _mahdi_pip_versions() {
@@ -510,8 +536,29 @@ _mahdi_apt_python_pkg() {
   return 1
 }
 
+# هل صار الاستيراد ممكنًا؟ (يُتحقَّق منه بعد كل تثبيت)
+_mahdi_py_import_ok() {
+  local module="$1"
+  [ -z "$module" ] && return 0
+  "${MAHDI_PY:-python3}" - "$module" >/dev/null 2>&1 <<'PYMOD'
+import importlib, sys
+try:
+    importlib.import_module(sys.argv[1])
+except Exception:
+    sys.exit(1)
+PYMOD
+}
+
+# تثبيت حزمة بايثون بأقصى عدد من الطرق حتى ينجح **الاستيراد** فعلًا.
+# $2 اختياري: اسم الوحدة التي يجب أن تعمل بعد التثبيت.
+#
+# 9.5.1 — ترتيب المحاولات صار ذكيًا:
+#   • أربع مرايا قبل أي بناء من المصدر (الحجب يخصّ مصدرًا لا الحزمة).
+#   • إن كانت الحزمة غير موجودة أصلًا على PyPI نتوقّف فورًا بدل تثبيت
+#     `build-essential` وأدوات البناء لحزمة لا وجود لها.
+#   • لا سطر لكل محاولة: ملاحظات التقدّم مخفيّة إلا مع MAHDI_DEPS_VERBOSE=1.
 mahdi_py_install_any() {
-  local pkg="$1"
+  local pkg="$1" module="${2:-}"
   [ -z "$pkg" ] && return 1
   local py="${MAHDI_PY:-python3}"
 
@@ -519,44 +566,74 @@ mahdi_py_install_any() {
     mahdi_ensure_pip >/dev/null 2>&1 || true
   fi
 
-  # ١) الطريق العادي (يجرّب أيضًا المخزن الدائم تلقائيًا)
-  _mahdi_pip_quiet --upgrade --prefer-binary "$pkg" && return 0
+  # ٩٥.١: حزمة أثبت الفحص أنها غير موجودة على أي مصدر — لا بناء ولا apt.
+  if declare -f mahdi_nodist_known >/dev/null 2>&1 && [ -z "$module" ] &&
+    mahdi_nodist_known "$pkg"; then
+    return 1
+  fi
+
+  # ٠) بلا شبكة: المخزن الداخلي ثم محاولة سريعة واحدة فقط (6 ثوانٍ)،
+  #    بدل ستّ طرق تنتظر مهلة كل واحدة منها.
+  if declare -f mahdi_deps_net_ok >/dev/null 2>&1 && ! mahdi_deps_net_ok; then
+    _mahdi_pip_quiet --no-index --find-links "${HOME:-/root}/.mahdi/cache/wheels" --upgrade "$pkg" &&
+      _mahdi_py_import_ok "$module" && return 0
+    "${py}" -m pip install --disable-pip-version-check --no-input --quiet \
+      --retries 0 --timeout 6 --root-user-action ignore --upgrade "$pkg" >/dev/null 2>&1 &&
+      _mahdi_py_import_ok "$module" && return 0
+    return 1
+  fi
+
+  local idx
+  # ١) الطريق العادي (يجرّب المخزن الدائم تلقائيًا)
+  _mahdi_pip_quiet --upgrade --prefer-binary "$pkg" &&
+    _mahdi_py_import_ok "$module" && return 0
 
   # ٢) ويل جاهز فقط — يتجاوز أي فشل في البناء المحلي
-  printf '%s↻%s  %s: محاولة بصيغة ويل جاهزة…\n' "$M_SKY" "$M_RESET" "$pkg"
-  _mahdi_pip_quiet --only-binary :all: --upgrade "$pkg" && return 0
+  _mahdi_note "$pkg: محاولة بصيغة ويل جاهزة…"
+  _mahdi_pip_quiet --only-binary :all: --upgrade "$pkg" &&
+    _mahdi_py_import_ok "$module" && return 0
 
-  # ٣) إصدارات أقدم — كثير من المكتبات القديمة تُثبَّت حيث يفشل الأحدث
+  # ٣) مرايا صريحة — قد تكون شبكة المستخدم تحجب pypi.org وحدها.
+  for idx in \
+    "https://pypi.tuna.tsinghua.edu.cn/simple" \
+    "https://mirrors.aliyun.com/pypi/simple" \
+    "https://pypi.mirrors.ustc.edu.cn/simple" \
+    "https://pypi.org/simple"; do
+    _mahdi_note "$pkg: محاولة عبر ${idx#*//}"
+    _mahdi_pip_quiet --index-url "$idx" --upgrade "$pkg" &&
+      _mahdi_py_import_ok "$module" && return 0
+  done
+
+  # ٤) الحزمة غير موجودة على أي مصدر ⇒ البناء وapt لن يخترعاها
+  if [ "$_MAHDI_PIP_LAST_REASON" = "nodist" ]; then
+    return 1
+  fi
+
+  # ٥) إصدارات أقدم — كثير من المكتبات القديمة تُثبَّت حيث يفشل الأحدث
   local v tried=0
   while IFS= read -r v; do
     [ -z "$v" ] && continue
     tried=$((tried + 1))
     [ "$tried" -gt 3 ] && break
-    printf '%s↻%s  %s: محاولة الإصدار %s…\n' "$M_SKY" "$M_RESET" "$pkg" "$v"
-    _mahdi_pip_quiet --upgrade "$pkg==$v" && return 0
+    _mahdi_note "$pkg: محاولة الإصدار $v…"
+    _mahdi_pip_quiet --upgrade "$pkg==$v" && _mahdi_py_import_ok "$module" && return 0
   done < <(_mahdi_pip_versions "$pkg")
 
-  # ٤) بناء من المصدر مع أدوات البناء (كان السبب الأشهر لفشل التثبيت)
-  printf '%s↻%s  %s: تجهيز أدوات البناء ثم بناء من المصدر…\n' "$M_SKY" "$M_RESET" "$pkg"
+  # ٦) بناء من المصدر مع أدوات البناء (أشهر سبب لفشل التثبيت عند وجود الحزمة)
+  _mahdi_note "$pkg: تجهيز أدوات البناء ثم بناء من المصدر…"
   mahdi_apt_install_soft build-essential python3-dev pkg-config libffi-dev libssl-dev >/dev/null 2>&1 || true
-  _mahdi_pip_quiet --no-build-isolation --no-cache-dir "$pkg" && return 0
-  _mahdi_pip_quiet --no-binary :all: --no-cache-dir "$pkg" && return 0
+  _mahdi_pip_quiet --no-build-isolation --no-cache-dir "$pkg" &&
+    _mahdi_py_import_ok "$module" && return 0
+  _mahdi_pip_quiet --no-binary :all: --no-cache-dir "$pkg" &&
+    _mahdi_py_import_ok "$module" && return 0
 
-  # ٥) حزمة النظام (تتجاوزت pip تمامًا)
+  # ٧) حزمة النظام (تتجاوز pip تمامًا)
   local apt_pkg
   if apt_pkg="$(_mahdi_apt_python_pkg "$pkg")"; then
-    printf '%s↻%s  %s: محاولة حزمة النظام %s…\n' "$M_SKY" "$M_RESET" "$pkg" "$apt_pkg"
+    _mahdi_note "$pkg: محاولة حزمة النظام $apt_pkg…"
     mahdi_apt_install_soft "$apt_pkg" >/dev/null 2>&1 || true
-    if "$py" -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)" \
-      "$(printf '%s' "$pkg" | tr '-' '_')" >/dev/null 2>&1; then
-      return 0
-    fi
+    _mahdi_py_import_ok "${module:-$(printf '%s' "$pkg" | tr '-' '_')}" && return 0
   fi
-
-  # ٦) مصدر بديل صريح (قد يكون المستخدم خلف شبكة تحجب pypi)
-  printf '%s↻%s  %s: محاولة عبر مصدر بديل…\n' "$M_SKY" "$M_RESET" "$pkg"
-  _mahdi_pip_quiet --index-url https://pypi.org/simple "$pkg" && return 0
-  _mahdi_pip_quiet --index-url https://mirrors.aliyun.com/pypi/simple "$pkg" && return 0
 
   return 1
 }
