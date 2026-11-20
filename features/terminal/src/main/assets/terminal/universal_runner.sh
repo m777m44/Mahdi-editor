@@ -42,6 +42,12 @@ if [ -f "$LOCAL/bin/self_heal" ]; then
   # shellcheck disable=SC1091
   source "$LOCAL/bin/self_heal"
 fi
+# 9.6.0: حرس الربط الديناميكي لبايثون — يمنع «CANNOT LINK EXECUTABLE … libpython not found»
+if [ -f "$LOCAL/bin/pylink" ]; then
+  # shellcheck disable=SC1091
+  source "$LOCAL/bin/pylink"
+fi
+
 # بديل بسيط: تشغيل مباشر بلا إصلاح ذاتي (تثبيت قديم للتطبيق)
 if ! declare -f mahdi_run_heal >/dev/null 2>&1; then
   mahdi_run_heal() {
@@ -452,6 +458,17 @@ case "$file" in
   *.py)
     if ! command_exists "${MAHDI_PY:-python3}"; then
       install_package "python3 python3-pip python3-venv"
+    fi
+    # 9.6.0: قبل أي فحص صياغة أو تشغيل — تأكّد أن المفسّر نفسه يعمل فعلًا،
+    # لا أن ملفه موجود. غلافٌ معطوب (‏libpython مفقودة) يبدو «موجودًا» ثم ينهار
+    # برسالة رابط إنجليزية غامضة عند أول تشغيل.
+    if declare -f mahdi_py_ensure >/dev/null 2>&1 && ! mahdi_py_ensure; then
+      printf "${M_GOLD}⚠${M_RESET}  ${M_BOLD}مكتبة بايثون المشتركة مفقودة${M_RESET}\n" || true
+      MAHDI_FAIL_REASON="تعذّر تجهيز مفسّر بايثون (مكتبة libpython مفقودة)"
+      MAHDI_FAIL_ACTION="جرّب: mh pyfix — يعيد بناء المسار أو يثبّت مفسّرًا سليمًا"
+      MAHDI_REPORTED=1
+      export MAHDI_FAIL_REASON MAHDI_FAIL_ACTION MAHDI_REPORTED
+      exit 1
     fi
     # 9.2.0: الصياغة أولًا. سكربت لا يُترجم لا يستحق انتظار تثبيت مكتبات.
     if ! mahdi_py_syntax_check "$file"; then

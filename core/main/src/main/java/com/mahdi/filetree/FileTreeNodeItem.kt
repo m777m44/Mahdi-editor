@@ -37,6 +37,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.produceState
+import com.mahdi.text.bidiNumbers
+import com.mahdi.ui.components.formatBytes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.components.compose.utils.addIf
 import com.mahdi.components.getDrawerWidth
@@ -194,9 +199,17 @@ fun FileTreeNodeItem(
                         ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.addIf(underlineColor != null) { drawErrorUnderline(underlineColor!!) },
+                    modifier =
+                        Modifier.weight(1f)
+                            .addIf(underlineColor != null) { drawErrorUnderline(underlineColor!!) },
                     color = getFileColor(file) ?: MaterialTheme.colorScheme.onSurface,
                 )
+
+                // 9.6.0: بادئة صغيرة بحجم الملف — كما في مستكشف ملفات احترافي.
+                // لا تُحسب إلا للملفات (لا المجلدات)، وفي الخلفية، وبعد أول عرض.
+                if (!node.isExpandable) {
+                    FileSizeHint(file)
+                }
             }
         }
 
@@ -222,4 +235,28 @@ fun FileTreeNodeItem(
             }
         }
     }
+}
+
+/**
+ * 9.6.0 — حجم الملف بجانب اسمه، بحساب غير حاجز.
+ *
+ * `FileObject.length()` دالة `suspend`، وقد تكون على قرص بطيء أو شبكة، فلا
+ * تُستدعى داخل التكوين مباشرة. تُقرأ مرة واحدة في `produceState` على خيط IO،
+ * وتُعرض بحجم صغير باهت لا يزاحم الاسم. المجلدات لا تمرّ من هنا أصلًا.
+ */
+@Composable
+private fun FileSizeHint(file: FileObject) {
+    val size by
+        produceState<Long?>(initialValue = null, key1 = file.hashCode()) {
+            value = withContext(Dispatchers.IO) { runCatching { file.length() }.getOrNull() }
+        }
+    val readable = size?.takeIf { it > 0 } ?: return
+    val label = remember(readable) { formatBytes(readable) }
+    Text(
+        text = label.bidiNumbers(),
+        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
+        maxLines = 1,
+        modifier = Modifier.padding(start = 6.dp, end = 2.dp),
+    )
 }

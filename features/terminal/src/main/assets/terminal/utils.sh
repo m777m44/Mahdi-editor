@@ -128,7 +128,10 @@ mahdi_python_bin() {
   if [ -z "$preferred" ] && [ -r "$pref_file" ]; then
     preferred="$(head -n 1 "$pref_file" 2>/dev/null)"
   fi
-  if [ -n "$preferred" ] && command -v "$preferred" >/dev/null 2>&1; then
+  # 9.6.0: «موجود» لا تكفي — غلاف بايثون قد يوجد ثم يفشل بالرابط الديناميكي
+  # (‏libpython مفقودة). لا نختاره إلا إذا نفّذ أمرًا فعليًا.
+  if [ -n "$preferred" ] && command -v "$preferred" >/dev/null 2>&1 &&
+    "$preferred" -c 'print(1)' >/dev/null 2>&1; then
     printf '%s' "$preferred"
     return 0
   fi
@@ -143,6 +146,7 @@ mahdi_python_bin() {
     case "${ts:-}" in '' | *[!0-9]*) ts=0 ;; esac
     if [ -n "${cached:-}" ] && [ "$ts" -gt 0 ] && [ $((now - ts)) -lt 21600 ] &&
       command -v "$cached" >/dev/null 2>&1 &&
+      "$cached" -c 'print(1)' >/dev/null 2>&1 &&
       "$cached" -m pip --version >/dev/null 2>&1; then
       printf '%s' "$cached"
       return 0
