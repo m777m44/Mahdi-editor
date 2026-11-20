@@ -3,7 +3,9 @@ package com.mahdi.activities.main
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.DragEvent
 import android.view.KeyEvent
+import android.view.ViewGroup
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -69,6 +71,9 @@ class MainActivity : AppCompatActivity() {
             private set(value) {
                 activityRef = WeakReference(value)
             }
+
+        /** 9.6.0: حدّ أعلى لعدد الملفات المفتوحة من إفلاتة واحدة — يمنع فتح مئات التبويبات. */
+        private const val MAX_DROPPED_FILES = 8
     }
 
     /** هل جاهز الـViewModel للاستخدام؟ (يُقرأ من خيوط خلفية أثناء استعادة الجلسة) */
@@ -232,6 +237,61 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+
+        installFileDropTarget()
+    }
+
+    /**
+     * 9.6.0 — سحب ملف من مدير ملفات النظام وإفلاته داخل المحرّر.
+     *
+     * أندرويد يسلّم الملف كـ`ClipData` يحوي `content://` URI (وليس مسارًا)، فنفتحه
+     * عبر `toFileObject` نفسه المستخدم في `ACTION_VIEW` — نفس المسار المُجرَّب،
+     * بلا نسخ ولا صلاحيات إضافية. السحب على الهاتف نادر لكنه مجاني هنا: يخدم
+     * الوضع الحر واللوحات والشاشات الكبيرة بلا أي تكلفة على الاستخدام العادي.
+     *
+     * المستمع يُثبَّت على حاوية المحتوى (أب الـ ComposeView) فلا يتعارض مع
+     * أهداف السحب الداخلية في الواجهة.
+     */
+    private fun installFileDropTarget() {
+        val content = findViewById<ViewGroup>(android.R.id.content) ?: return
+        content.setOnDragListener { _, event ->
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> true
+                DragEvent.ACTION_DROP -> {
+                    handleDroppedFiles(event)
+                    true
+                }
+                else -> true
+            }
+        }
+    }
+
+    private fun handleDroppedFiles(event: DragEvent) {
+        val clip = event.clipData ?: return
+        val uris = buildList {
+            for (index in 0 until clip.itemCount.coerceAtMost(MAX_DROPPED_FILES)) {
+                clip.getItemAt(index).uri?.let { add(it) }
+            }
+        }
+        if (uris.isEmpty()) {
+            toast(strings.unsupported_content)
+            return
+        }
+        lifecycleScope.launch {
+            viewModel.awaitSessionRestoration()
+            var opened = 0
+            uris.forEach { uri ->
+                runCatching {
+                    val file = uri.toFileObject(expectedIsFile = true)
+                    viewModel.editorManager.openFile(file, projectRoot = null, switchToTab = true)
+                    opened++
+                }
+                    .onFailure { logError(it, "drop file") }
+            }
+            // لا رسالة عند النجاح: التبويب المفتوح هو التأكيد. الرسالة تُعرض فقط
+            // حين يفشل كل شيء، فتظهر مرة واحدة بلا تكرار.
+            if (opened == 0) toast(strings.unsupported_content)
         }
     }
 
