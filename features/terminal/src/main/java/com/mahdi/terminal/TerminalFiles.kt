@@ -64,6 +64,10 @@ fun setupTerminalFiles() {
     // 5.5.0: محلّل stderr الذي يستخرج اسم المكتبة الناقصة
     setupPythonFile("mahdi_heal")
 
+    // 9.6.0: حرس الربط الديناميكي لبايثون — يصلح «libpython not found» جذريًا
+    // (مسار الرابط ← وصلات ثابتة ← ldconfig ← RPATH ← أو مفسّر التوزيعة).
+    setupAssetFile("pylink")
+
     // 6.1.0: الإصدار الحقيقي للتطبيق يكتبه التطبيق ليقرأه شعار الطرفية
     // (كان الرقم مكتوبًا يدويًا في banner.sh فبقي 3.1.0 سنوات)
     runCatching {

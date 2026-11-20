@@ -15,6 +15,37 @@ export APT_LISTCHANGES_FRONTEND=none
 source "$LOCAL/bin/utils"
 
 # ——————————————————————————————————————————————————————————————————————————————
+# 9.6.0 — حرس الربط الديناميكي لبايثون
+#
+# المشكلة المُبلَّغ عنها: `CANNOT LINK EXECUTABLE … Pyahmed.so: library
+# "libpython3.11.so.1.0" not found`. أي غلاف بايثون (‏Pyahmed أو أي ملف تنفيذي
+# نُسخ من خارج الحاوية) يحتاج مكتبة مشتركة يجب أن تكون في مسار الرابط.
+#
+# هنا نضيف مسارات المكتبات المعروفة **مقدمًا وبلا أي تنفيذ** (رخيص جدًا)، ثم
+# نُشغّل الحرس مرة واحدة يوميًا في الخلفية كي لا تتأخّر المطالبة أبدًا.
+# ——————————————————————————————————————————————————————————————————————————————
+if [ -f "$LOCAL/bin/pylink" ]; then
+    # shellcheck disable=SC1091
+    source "$LOCAL/bin/pylink"
+    for _mahdi_libdir in "${NATIVE_LIB_DIR:-}" "${HOME:-/home}/.mahdi/pylib" /usr/local/lib; do
+        [ -n "$_mahdi_libdir" ] && [ -d "$_mahdi_libdir" ] || continue
+        case ":$LD_LIBRARY_PATH:" in
+            *":$_mahdi_libdir:"*) ;;
+            *) export LD_LIBRARY_PATH="$_mahdi_libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+        esac
+    done
+    unset _mahdi_libdir
+    if declare -f mahdi_py_ensure >/dev/null 2>&1; then
+        if [ -f "${MAHDI_PYLIB_STAMP:-}" ]; then
+            mahdi_py_ensure >/dev/null 2>&1 || true
+        else
+            ( mahdi_py_ensure >/dev/null 2>&1 || true ) >/dev/null 2>&1 &
+            disown 2>/dev/null || true
+        fi
+    fi
+fi
+
+# ——————————————————————————————————————————————————————————————————————————————
 # 9.3.0 — محرّك «ثبّتها بأي طريقة» + أدوات بيئة أندرويد الناقصة
 #
 # كان `npm` يُطبع «الأمر غير موجود» أربع مرات متتالية ثم يقول «ثبّتها بنفسك»،

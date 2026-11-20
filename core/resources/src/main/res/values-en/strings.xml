@@ -1188,4 +1188,5 @@ Thank you for using Mahdi-Editor.</string>
     <string name="terminal_new_window">Window</string>
     <string name="close_all_sessions">Close all windows</string>
     <string name="close_all_sessions_msg">All terminal windows will be closed and their processes terminated. Continue?</string>
+    <string name="check_python_runtime">Python runtime (libpython) check</string>
 </resources>

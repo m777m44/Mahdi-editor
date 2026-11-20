@@ -14,6 +14,7 @@ import com.mahdi.file.child
 import com.mahdi.file.sandboxDir
 import com.mahdi.file.sandboxHomeDir
 import com.mahdi.resources.strings
+import com.mahdi.runtime.PythonLinkDiagnostics
 import com.mahdi.utils.application
 import com.mahdi.utils.getTempDir
 import java.io.File
@@ -44,6 +45,7 @@ fun terminalChecks(): SnapshotStateList<Check> {
     val checkUbuntu = stringResource(strings.check_ubuntu)
     val checkNetworkAccess = stringResource(strings.check_network_access)
     val checkAbnormalities = stringResource(strings.check_abnormalities)
+    val checkPythonRuntime = stringResource(strings.check_python_runtime)
 
     val isArabic = LocalConfiguration.current.locales[0].language == "ar"
 
@@ -252,6 +254,71 @@ fun terminalChecks(): SnapshotStateList<Check> {
                     }
                 },
             ),
+            /**
+             * 9.6.0 — فحص مفسّر بايثون والربط الديناميكي.
+             *
+             * العطل المُبلَّغ عنه: `CANNOT LINK EXECUTABLE … Pyahmed.so: library
+             * "libpython3.11.so.1.0" not found`. كان يظهر كرسالة إنجليزية خام في
+             * الطرفية بلا أي فحص أو إصلاح. الآن الفحص يُشغّل بايثون فعلًا داخل
+             * أوبنتو (بمهلة)، ويفسّر أي فشل ربط بالعربية، ويقترح `mh pyfix`.
+             */
+            Check(
+                label = checkPythonRuntime,
+                run = { printLog ->
+                    withContext(Dispatchers.IO) {
+                        if (!isTerminalInstalled()) {
+                            printLog(t("أوبنتو غير مثبّتة — تخطٍّ", "Ubuntu not installed — skipped"))
+                            return@withContext true
+                        }
+
+                        var output = ""
+                        var code: Int? = null
+                        try {
+                            val process =
+                                ubuntuProcess(
+                                    command =
+                                        listOf(
+                                            "/bin/sh",
+                                            "-c",
+                                            "python3 -c 'print(\"MAHDI_PY_OK\")' 2>&1 || " +
+                                                "echo MAHDI_PY_FAIL",
+                                        ),
+                                )
+                            code = process.awaitExit(PYTHON_TIMEOUT_MS)
+                            output =
+                                runCatching { process.inputStream.bufferedReader().use { it.readText() } }
+                                    .getOrDefault("")
+                            if (code == null) {
+                                printLog(t("✘ لم يستجب بايثون خلال ${PYTHON_TIMEOUT_MS / 1000} ثانية", "✘ Python timed out after ${PYTHON_TIMEOUT_MS / 1000}s"))
+                                return@withContext false
+                            }
+                        } catch (e: Exception) {
+                            printLog(t("تعذّر تشغيل بايثون: ${e.message}", "Python failed: ${e.message}"))
+                            return@withContext false
+                        }
+
+                        if (output.contains("MAHDI_PY_OK")) {
+                            printLog(t("✓ بايثون يعمل — الربط الديناميكي سليم", "✓ Python works — dynamic linking is fine"))
+                            return@withContext true
+                        }
+
+                        // تشخيص عطل الرابط بالعربية بدل نص الرابط الإنجليزي الخام
+                        if (LinkerError.isLinkError(output)) {
+                            val soname = LinkerError.soname(output)
+                            printLog(t("✘ مكتبة بايثون المشتركة مفقودة: $soname", "✘ Missing shared Python library: $soname"))
+                            printLog(t("→ الحل: شغّل mh pyfix — يربط المكتبة أو يثبّت مفسّرًا سليمًا", "→ Fix: run mh pyfix — links the library or installs a clean interpreter"))
+                            if (LinkerError.repair()) {
+                                printLog(t("✓ أُصلح المسار تلقائيًا", "✓ Path repaired automatically"))
+                                return@withContext true
+                            }
+                        } else {
+                            printLog(t("✘ بايثون لا يعمل (رمز $code)", "✘ Python is not working (code $code)"))
+                            printLog(t("→ الحل: mh pyfix ثم إعادة الفحص", "→ Fix: mh pyfix, then re-run the check"))
+                        }
+                        false
+                    }
+                },
+            ),
             Check(
                 label = checkAbnormalities,
                 run = { printLog ->
@@ -317,6 +384,8 @@ private const val SHELL_TIMEOUT_MS = 8_000L
 private const val UBUNTU_TIMEOUT_MS = 30_000L
 private const val DNS_TIMEOUT_MS = 20_000L
 private const val PROBE_TIMEOUT_MS = 12_000L
+private const val PYTHON_TIMEOUT_MS = 20_000L
+private const val PYFIX_TIMEOUT_MS = 90_000L
 
 /**
  * ينتظر انتهاء العملية بمهلة، ويقتلها إن تجاوزتها.
@@ -400,5 +469,36 @@ object TerminalRepair {
                 log("✘ ${e.message}")
                 0
             }
+        }
+}
+
+/**
+ * 9.6.0 — إصلاح عطل الربط الديناميكي لبايثون داخل أوبنتو.
+ *
+ * التشخيص (ما معنى الرسالة الإنجليزية) في [com.mahdi.runtime.PythonLinkDiagnostics]
+ * كي يُختبر بلا أندرويد؛ وهذا الصنف يشغّل `mh pyfix` فقط، بمهلة صريحة.
+ */
+internal object LinkerError {
+
+    fun isLinkError(output: String): Boolean = PythonLinkDiagnostics.isLinkError(output)
+
+    fun soname(output: String): String = PythonLinkDiagnostics.soname(output)
+
+    /** يشغّل `mh pyfix` داخل أوبنتو بمهلة. @return نجاح الإصلاح. */
+    suspend fun repair(): Boolean =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                // سكربت واحد واضح: مهما كان المسار، المطلوب أن يعمل بايثون بعده.
+                // سلسلة خام، والتعبير المُلتفّ يمرّر $LOCAL حرفيًا إلى الصدفة (لا Kotlin).
+                val script =
+                    """
+                    if [ -x "${'$'}LOCAL/bin/mh" ]; then "${'$'}LOCAL/bin/mh" pyfix; fi
+                    python3 -c 'print(1)' >/dev/null 2>&1
+                    """.trimIndent()
+                val process =
+                    ubuntuProcess(command = listOf("/bin/sh", "-c", script))
+                val code = process.awaitExit(PYFIX_TIMEOUT_MS) ?: return@withContext false
+                code == 0
+            }.getOrDefault(false)
         }
 }

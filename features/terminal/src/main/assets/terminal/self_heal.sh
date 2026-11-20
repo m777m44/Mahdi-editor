@@ -24,6 +24,12 @@ if [ -f "${LOCAL:-/home}/bin/rescue" ]; then
   . "${LOCAL:-/home}/bin/rescue"
 fi
 
+# 9.6.0: حرس الربط الديناميكي (libpython) — يُستخدم عند تحليل أي فشل تشغيل
+if [ -f "${LOCAL:-/home}/bin/pylink" ]; then
+  # shellcheck disable=SC1091
+  . "${LOCAL:-/home}/bin/pylink"
+fi
+
 if ! declare -f mahdi_bar_start >/dev/null 2>&1; then
   mahdi_bar_start() { :; }
   mahdi_bar_set() { :; }
@@ -177,7 +183,17 @@ mahdi_heal_report() {
     line="$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception|Interrupt):' "$errfile" | tail -n 1)"
   fi
 
-  if [ -n "$mod" ] && mahdi_heal_is_local "$mod" "$script_path"; then
+  # 9.6.0 — عطل رابط ديناميكي (libpython) قبل أي تصنيف آخر: ليس خطأً في السكربت
+  if [ -s "$errfile" ] && declare -f mahdi_py_link_broken >/dev/null 2>&1 &&
+    mahdi_py_link_broken "$(tail -c 8000 "$errfile" 2>/dev/null || true)"; then
+    tone="$M_GOLD"
+    title="مكتبة بايثون المشتركة مفقودة"
+    hint=""
+    MAHDI_FAIL_REASON="مكتبة libpython غير موجودة في مسار الرابط"
+    MAHDI_FAIL_ACTION="جرّب: mh pyfix — يربط المكتبة أو يثبّت مفسّرًا سليمًا"
+    mod=""
+    line=""
+  elif [ -n "$mod" ] && mahdi_heal_is_local "$mod" "$script_path"; then
     # 9.3.1: وحدة محلية — لا علاقة لها بالإنترنت ولا بـ pip
     tone="$M_GOLD"
     title="وحدة محلية مفقودة: $mod"
@@ -567,6 +583,32 @@ mahdi_run_heal() {
     fi
     [ "$MAHDI_HEAL" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc" "$script"; break; }
     [ "$MAHDI_AUTO_DEPS" = "0" ] && { mahdi_heal_report "$lang" "$errfile" "$rc" "$script"; break; }
+
+    # ————————————————————— 9.6.0: عطل رابط libpython —————————————————————
+    # الغلاف (‏Pyahmed.so أو أي ملف تنفيذي مستورد) يحتاج مكتبة مشتركة غير موجودة
+    # في مسار الرابط. نصلح المسار ونعيد التشغيل مرة واحدة، بدل عرض رسالة
+    # إنجليزية خام أو مطالبة المستخدم بأي خطوة.
+    if [ -s "$errfile" ] && declare -f mahdi_py_link_broken >/dev/null 2>&1 &&
+      mahdi_py_link_broken "$(tail -c 8000 "$errfile" 2>/dev/null || true)"; then
+      # نحفظ آخر رسالة رابط كي يجدها `mh pyfix` بلا وسائط
+      mkdir -p "${HOME:-/home}/.mahdi" 2>/dev/null || true
+      cp "$errfile" "${HOME:-/home}/.mahdi/pylink.last" 2>/dev/null || true
+      if [ "${MAHDI_PYLINK_TRIED:-0}" != "1" ]; then
+        MAHDI_PYLINK_TRIED=1
+        export MAHDI_PYLINK_TRIED
+        printf "${M_SKY}⚙${M_RESET}  ${M_BOLD}تجديد رابط مكتبة بايثون${M_RESET}\n" || true
+        if mahdi_py_link_fix "$errfile" "$script" >/dev/null 2>&1; then
+          # 9.6.0: لا «✔» هنا — النجاح الحقيقي هو أن يعمل السكربت في المحاولة
+          # التالية (وهي تطبع «✔ تمّ التشغيل»). علامتان لسبب واحد كانتا تظهران
+          # كأن هناك خطأين متتاليين.
+          printf "${M_SKY}↻${M_RESET}  ${M_MUTED}أُعيد ترتيب مسار المكتبة — محاولة أخرى${M_RESET}\n" || true
+          attempt=$((attempt + 1))
+          continue
+        fi
+      fi
+      mahdi_heal_report "$lang" "$errfile" "$rc" "$script"
+      break
+    fi
 
     # ————————————————————— 9.3.0: سبب «الانهيار» الأشهر عند تشغيل مشاريع GitHub —————
     # سكربت يستدعي أمرًا غير موجود (npm · node · git · curl · ffmpeg …) كان يفشل

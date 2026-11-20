@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import com.mahdi.resources.strings
+import com.mahdi.text.BidiText
 import com.mahdi.utils.toast
 import java.io.File
 import java.io.FileInputStream
@@ -143,7 +144,8 @@ class FileWrapper(var file: File) : FileObject {
 
     override suspend fun renameTo(string: String): Boolean =
         withContext(Dispatchers.IO) {
-            val newFile = File(file.parentFile, string)
+            // 9.6.0: تطبيع الاسم الجديد (NFC) وإزالة علامات الاتجاه إن لُصقت.
+            val newFile = File(file.parentFile, BidiText.nfc(BidiText.stripControls(string)))
             return@withContext file.renameTo(newFile).also { this@FileWrapper.file = newFile }
         }
 
@@ -157,10 +159,12 @@ class FileWrapper(var file: File) : FileObject {
             if (name.isBlank()) {
                 throw IllegalArgumentException("Name cannot be blank")
             }
+            // 9.6.0: الاسم يُطبَّع إلى NFC عند الإنشاء — فيتطابق مع `ls` والبحث.
+            val childName = BidiText.nfc(BidiText.stripControls(name))
             return@withContext if (createFile) {
-                FileWrapper(File(file, name)).createFileIfNot()
+                FileWrapper(File(file, childName)).createFileIfNot()
             } else {
-                FileWrapper(File(file, name)).createDirIfNot()
+                FileWrapper(File(file, childName)).createDirIfNot()
             }
         }
 

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import com.mahdi.theme.JetBrainsMonoFontFamily
+import java.text.Normalizer
 
 /**
  * معالجة الأرقام في السياق العربي (3.0.0).
@@ -56,6 +57,22 @@ object BidiText {
         charArrayOf(LRI, PDI, FSI, RLI, '\u202A', '\u202B', '\u202C', '\u202D', '\u202E')
 
     private val DIGIT_RUN = Regex("[0-9]+")
+
+    /**
+     * 9.6.0 — تطبيع Unicode إلى **NFC**.
+     *
+     * اسم عربي واحد يمكن أن يُكتب بطريقتين متطابقتين بصريًا: محارف مركّبة (NFC)
+     * أو حرف + شدّة منفصلة (NFD). أندرويد وmacOS يكتبان NFD أحيانًا، فتظهر
+     * الأسماء متشابهة لكنها لا تتطابق في البحث ولا في `ls` ولا في المقارنة،
+     * وتنقسم عندها الحركات عن حروفها فتفسد الوصلة العربية. التطبيع عند
+     * **الإنشاء والحفظ** يجعل الاسم المُخزَّن موحّدًا دائمًا، بلا أي تغيير مرئي.
+     *
+     * لا يُطبَّق على محتوى المحرّر (قد يكون ملايين المحارف) — على الأسماء فقط.
+     */
+    fun nfc(input: String): String {
+        if (input.isEmpty() || Normalizer.isNormalized(input, Normalizer.Form.NFC)) return input
+        return Normalizer.normalize(input, Normalizer.Form.NFC)
+    }
 
     /** يزيل كل علامات التحكّم من نص (قبل التخزين أو عند لصق نص مُلوَّث). */
     fun stripControls(input: String): String {
@@ -114,7 +131,11 @@ fun String.bidiNumbers(): String = BidiText.display(this)
  * طرف السطر. والحلّ المعياري: **عزل** الاسم بين FSI…PDI فيبقى الامتداد ملتصقًا به
  * وترتيب أحرفه الداخلي سليم، وعلامات التحكّم لا تُخزَّن في أي اسم ملف.
  */
-fun String.bidiFileName(): String = "${BidiText.FSI}$this${BidiText.PDI}"
+fun String.bidiFileName(): String {
+    // 9.6.0: NFC أولًا — فلا تظهر الحركات منفصلة ولا يختلف الاسم عن نظيره في `ls`.
+    val name = BidiText.nfc(BidiText.stripControls(this))
+    return "${BidiText.FSI}$name${BidiText.PDI}"
+}
 
 /** الاسم نفسه معزولًا — يبقى الامتداد ملتصقًا ولا يندمج مع النص المجاور. */
 @Composable

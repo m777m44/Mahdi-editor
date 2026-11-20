@@ -69,6 +69,25 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # ═══════════════════════════════════════════════════════════════════════════
+      # 9.6.0 — اختبار حرس رابط بايثون (libpython) قبل أي بناء.
+      # العطل الذي أبلغ عنه المستخدم كان في سكربتات الطرفية لا في Kotlin، فلا
+      # يكشفه مترجم Kotlin. هذا الاختبار يشغّل الإصلاح كاملًا على غلاف معطوب
+      # حقيقي ويؤكد أنه صار يعمل — ويفشل البناء إن عاد العطل.
+      # ═══════════════════════════════════════════════════════════════════════════
+      - name: Test python linker guard
+        run: |
+          set -o pipefail
+          syntax=0
+          for f in features/terminal/src/main/assets/terminal/*.sh; do
+            if ! bash -n "$f"; then echo "::error title=bash -n::ملف غير سليم نحويًا: $f"; syntax=1; fi
+          done
+          if ! bash tools/tests/pylink_test.sh; then
+            echo "::error title=pylink_test::فشل اختبار حرس الرابط — التفاصيل في التعليقات أعلاه"
+            exit 1
+          fi
+          exit "$syntax"
+
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
@@ -94,6 +113,18 @@ jobs:
       # بصمت. هذه الخطوة تفحص البيان **النهائي داخل الـ APK** وتُفشل البناء إن
       # غاب أي مكوّن أساسي — فلا يمكن أن يتكرّر العطل مهما تعدّل البيان.
       # ═══════════════════════════════════════════════════════════════════════════
+      # ═══════════════════════════════════════════════════════════════════════════
+      # 9.6.0 — اختبارات الوحدة الحرجة (رابط بايثون · أسماء الملفات العربية).
+      # `assembleCommunityRelease` لا يترجم مجلد src/test أصلًا، فكانت الاختبارات
+      # تُكتب ولا تُشغَّل. هذه الخطوة تترجمها وتنفّذها **وتفشل البناء** إن كسرها
+      # تعديل لاحق — وهي حرس دائم لعطل libpython وعزل الأسماء ثنائية الاتجاه.
+      # ═══════════════════════════════════════════════════════════════════════════
+      - name: Run critical unit tests
+        run: |
+          ./gradlew :core:main:testDebugUnitTest --no-daemon \
+            --tests "com.mahdi.runtime.PythonLinkDiagnosticsTest" \
+            --tests "com.mahdi.text.BidiFileNameTest"
+
       - name: Verify APK manifest components
         run: |
           set -uo pipefail

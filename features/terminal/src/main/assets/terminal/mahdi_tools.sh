@@ -158,7 +158,18 @@ _mh_doctor_python() {
     return 0
   fi
 
-  _mh_doc ok "المفسّر" "$py · $(mahdi_python_version 2>/dev/null || printf '—') · $(command -v "$py" 2>/dev/null)"
+  # 9.6.0: «موجود» لا يعني «يعمل». غلاف بايثون قد يُعثر عليه ثم يفشل بالرابط
+  # الديناميكي (libpython)، وكان الفحص يعرضه أخضر ثم ينفجر كل تشغيل. الآن
+  # ننفّذ أمرًا واحدًا فعليًا (~20ms) ونصنّف العطل إن وُجد.
+  local probe link_err=0
+  probe="$("$py" -c 'print(1)' 2>&1)" || link_err=1
+  if [ "$link_err" = "0" ]; then
+    _mh_doc ok "المفسّر" "$py · $(mahdi_python_version 2>/dev/null || printf '—') · $(command -v "$py" 2>/dev/null)"
+  elif declare -f mahdi_py_link_broken >/dev/null 2>&1 && mahdi_py_link_broken "$probe"; then
+    _mh_doc bad "المفسّر" "لا يبدأ — مكتبة بايثون المشتركة مفقودة (libpython) · أصلح: mh pyfix"
+  else
+    _mh_doc bad "المفسّر" "لا ينفّذ أمرًا — أصلح: mh pyfix"
+  fi
 
   local pipv
   pipv="$(_mh_pip_version)"
@@ -264,6 +275,15 @@ _mh_doctor_fix() {
     break_stale_apt_locks >/dev/null 2>&1 && _mh_doc ok "أقفال apt" "سليمة"
   fi
 
+  # 9.6.0: إصلاح الرابط الديناميكي أولًا — قبله لا يعمل pip ولا أي حزمة.
+  if declare -f mahdi_py_ensure_working >/dev/null 2>&1; then
+    if mahdi_py_ensure_working >/dev/null 2>&1; then
+      _mh_doc ok "رابط بايثون" "سليم — libpython في مسار البحث"
+    else
+      _mh_doc bad "رابط بايثون" "تعذّر ربط libpython — أعد المحاولة بعد التأكد من الاتصال"
+    fi
+  fi
+
   hash -r 2>/dev/null || true
   return 0
 }
@@ -281,6 +301,45 @@ _mh_doctor_summary() {
     printf "  ${M_MINT}↳${M_RESET}  %s\n" "كل شيء سليم — لا توجد مشكلة تحتاج تدخّلًا"
   fi
   printf '\n'
+}
+
+# ————————————————— 9.6.0: إصلاح رابط بايثون (libpython) —————————————————
+#
+# «CANNOT LINK EXECUTABLE … library "libpython3.11.so.1.0" not found» ليست
+# مشكلة في السكربت، بل في غلاف بايثون لا يجد مكتبته المشتركة. هذه الدالة:
+#   • تكتشف رسالة الرابط من أي ملف أو من الطرفية الحالية (‏~/.mahdi/pylink.last)
+#   • تربط المكتبة إن وُجدت (مسار + وصلات + ldconfig + RPATH إن توفّر patchelf)
+#   • أو تُجهّز مفسّر التوزيعة السليم وتُبعد الغلاف المعطوب
+#   • تتحقّق بالتشغيل الفعلي قبل إعلان النجاح
+mh_pyfix() {
+  mahdi_heading "إصلاح رابط بايثون"
+  if declare -f mahdi_py_link_fix >/dev/null 2>&1; then
+    printf "%s▸%s  فحص مفسّر بايثون…\n" "$M_SKY" "$M_RESET"
+    if mahdi_py_ensure_working >/dev/null 2>&1; then
+      success "بايثون يعمل: $(mahdi_python_version)"
+      local lib
+      lib="$(ls -1 "$HOME/.mahdi/pylib" 2>/dev/null | head -n 1)"
+      [ -n "$lib" ] && mahdi_kv "مجلد المكتبة" "$HOME/.mahdi/pylib"
+      [ -n "$lib" ] && mahdi_kv "المكتبة" "$lib"
+      printf "%s  ↳%s  %s\n" "$M_SKY" "$M_RESET" "إن ظهر عطل في غلاف خارجي: mh pyfix <path-to-wrapper>"
+      return 0
+    fi
+  fi
+
+  local errfile="${1:-$HOME/.mahdi/pylink.last}"
+  [ -f "$errfile" ] || errfile=""
+  printf "%s↻%s  تجديد المسار وتجهيز مفسّر سليم…\n" "$M_SKY" "$M_RESET"
+  if mahdi_py_link_fix "$errfile" "${2:-}" >/dev/null 2>&1; then
+    export MAHDI_PY_FORCE=1
+    rm -f "${MAHDI_PYLIB_STAMP:-}" 2>/dev/null || true
+    if mahdi_py_ensure_working >/dev/null 2>&1; then
+      success "تمّ — بايثون يعمل الآن"
+      return 0
+    fi
+  fi
+  warn "تعذّر تجهيز مفسّر بايثون تلقائيًا"
+  printf "%s  ↳%s  %s\n" "$M_SKY" "$M_RESET" "أعد تثبيت بيئة الطرفية من: الإعدادات ← الطرفية ← أعد التثبيت"
+  return 1
 }
 
 mh_doctor() {
@@ -700,6 +759,12 @@ mh_cache() {
 # حزم الأساس التي تحتاجها ٩٩٪ من سكربتات GitHub (‏`curl | sh`، `git clone`، `npm i`)
 _MH_BASE_PKGS="curl wget git ca-certificates unzip zip tar xz-utils file less nano tree jq procps"
 
+# 9.6.0: أوامر رابط بايثون متاحة دائمًا داخل mh
+if [ -f "${LOCAL:-/home}/bin/pylink" ]; then
+  # shellcheck disable=SC1091
+  . "${LOCAL:-/home}/bin/pylink"
+fi
+
 mh_fix() {
   printf '\n'
   mahdi_rule 34
@@ -904,10 +969,13 @@ mh_home() {
   mahdi_heading "بيئة العمل"
 
   local py="${MAHDI_PY:-python3}" pipv nodev lsp=0 s
-  if command -v "$py" >/dev/null 2>&1; then
-    mahdi_status ok "بايثون" "$(mahdi_python_version 2>/dev/null || printf '—')  ·  $py"
-  else
+  if ! command -v "$py" >/dev/null 2>&1; then
     mahdi_status bad "بايثون" "غير مثبّت — mh doctor --fix"
+  elif ! "$py" -c 'print(1)' >/dev/null 2>&1; then
+    # 9.6.0: موجود لكنه لا يبدأ (libpython) — الحالة كانت تُعرض خضراء خطأً.
+    mahdi_status bad "بايثون" "لا يبدأ — مكتبة libpython مفقودة · mh pyfix"
+  else
+    mahdi_status ok "بايثون" "$(mahdi_python_version 2>/dev/null || printf '—')  ·  $py"
   fi
   pipv="$(_mh_pip_version)"
   if [ -n "$pipv" ]; then
@@ -931,6 +999,7 @@ mh_home() {
   printf "  ${M_SKY}mh doctor${M_RESET}  ${M_MUTED}فحص شامل${M_RESET}      ${M_SKY}mh new py app${M_RESET}  ${M_MUTED}مشروع جديد${M_RESET}\n"
   printf "  ${M_SKY}mh pip -V${M_RESET}  ${M_MUTED}مدير الحزم${M_RESET}     ${M_SKY}mh run main.py${M_RESET}  ${M_MUTED}تشغيل ملف${M_RESET}\n"
   printf "  ${M_SKY}mh fix${M_RESET}     ${M_MUTED}إصلاح البيئة${M_RESET}     ${M_SKY}mh clone <رابط>${M_RESET}  ${M_MUTED}مشروع من GitHub${M_RESET}\n"
+  printf "  ${M_SKY}mh pyfix${M_RESET}   ${M_MUTED}إصلاح رابط بايثون (libpython)${M_RESET}\n"
   printf "  ${M_MUTED}mh help — كل الأوامر${M_RESET}\n"
   printf '\n'
 }
@@ -961,6 +1030,10 @@ case "${1:-}" in
     ;;
   fix | إصلاح | repair)
     mh_fix
+    ;;
+  pyfix | رابط)
+    shift
+    mh_pyfix "$@"
     ;;
   install | تجهيز | تثبيت)
     shift

@@ -1213,4 +1213,5 @@
     <string name="terminal_new_window">نافذة</string>
     <string name="close_all_sessions">إغلاق كل النوافذ</string>
     <string name="close_all_sessions_msg">ستُغلق كل نوافذ الطرفية وتُنهى عملياتها. هل تريد المتابعة؟</string>
+    <string name="check_python_runtime">فحص مفسّر بايثون (libpython)</string>
 </resources>
