@@ -22,7 +22,13 @@ trap 'rm -rf "$WORK"' EXIT
 pass=0
 fail=0
 ok() { printf '  ✔ %s\n' "$1"; pass=$((pass + 1)); }
-no() { printf '  ✘ %s\n' "$1"; fail=$((fail + 1)); }
+no() {
+  printf '  ✘ %s\n' "$1"
+  # 9.6.0: التشخيص يظهر أيضًا كتعليق على الـ PR في GitHub (annotations API)،
+  # فحين يفشل الاختبار في CI نعرف **أي** تحقّق سقط بلا حاجة لسجلّ كامل.
+  printf '::error title=pylink_test::%s\n' "$1"
+  fail=$((fail + 1))
+}
 check() { if eval "$2"; then ok "$1"; else no "$1"; fi; }
 
 mkdir -p "$WORK/home" "$WORK/bin" "$WORK/lib"
@@ -86,6 +92,18 @@ check "لا يحتوي CANNOT LINK" "! printf '%s' \"\$reason\" | grep -q 'CANNO
 
 printf '\n== ٦) صحة الملفات ==\n'
 check "pylink.sh سليم نحويًا" "bash -n \"$ASSETS/pylink.sh\""
+
+# تشخيص البيئة عند الفشل فقط — يشرح فرق CI عن الجهاز المحلي.
+if [ "$fail" -ne 0 ]; then
+  {
+    printf 'user=%s home=%s\n' "$(id -un 2>/dev/null)" "$HOME"
+    printf 'python3=%s\n' "$(command -v python3 || printf 'غائب')"
+    printf 'patchelf=%s\n' "$(command -v patchelf || printf 'غائب')"
+    printf 'ldconfig=%s\n' "$(command -v ldconfig || printf 'غائب')"
+    printf 'LD_LIBRARY_PATH=%s\n' "${LD_LIBRARY_PATH:-<فارغ>}"
+    printf 'locale=%s\n' "${LANG:-<فارغ>}"
+  } | while IFS= read -r line; do printf '::error title=env::%s\n' "$line"; done
+fi
 
 printf '\n————————————————————————————\n'
 printf 'نجح: %d · فشل: %d\n' "$pass" "$fail"

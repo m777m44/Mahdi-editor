@@ -78,8 +78,15 @@ jobs:
       - name: Test python linker guard
         run: |
           set -o pipefail
-          for f in features/terminal/src/main/assets/terminal/*.sh; do bash -n "$f"; done
-          bash tools/tests/pylink_test.sh
+          syntax=0
+          for f in features/terminal/src/main/assets/terminal/*.sh; do
+            if ! bash -n "$f"; then echo "::error title=bash -n::ملف غير سليم نحويًا: $f"; syntax=1; fi
+          done
+          if ! bash tools/tests/pylink_test.sh; then
+            echo "::error title=pylink_test::فشل اختبار حرس الرابط — التفاصيل في التعليقات أعلاه"
+            exit 1
+          fi
+          exit "$syntax"
 
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
