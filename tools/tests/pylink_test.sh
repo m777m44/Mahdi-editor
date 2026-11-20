@@ -87,8 +87,12 @@ check "لم يُعَد تسميته" "[ -f \"$WORK/bin/healthy\" ]"
 
 printf '\n== ٥) تعذّر كل شيء: لا نص إنجليزي خام ==\n'
 reason="$(mahdi_py_link_reason)"
-check "السبب عربي" "printf '%s' \"\$reason\" | grep -qE '[ء-ي]'"
-check "لا يحتوي CANNOT LINK" "! printf '%s' \"\$reason\" | grep -q 'CANNOT LINK'"
+# 9.6.0: لا نستخدم نطاق محارف عربي داخل grep — في ترميز C.UTF-8 على CI
+# يفشل بـ«Invalid collation character». مطابقة النمط في bash تعمل على البايتات
+# نفسها بلا اعتماد على locale.
+check "السبب عربي" '[[ "$reason" == *بايثون* ]]'
+check "لا يحتوي CANNOT LINK" '[[ "$reason" != *"CANNOT LINK"* ]]'
+check "لا يحوي نصًا إنجليزيًا خامًا" '[[ "$reason" != *"not found"* && "$reason" != *"error while"* ]]'
 
 printf '\n== ٦) صحة الملفات ==\n'
 check "pylink.sh سليم نحويًا" "bash -n \"$ASSETS/pylink.sh\""
