@@ -1,5 +1,6 @@
 package com.mahdi.text
 
+import java.text.Normalizer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -75,6 +76,27 @@ class BidiFileNameTest {
         assertTrue(arabic.contains("${BidiText.LRI}2026${BidiText.PDI}"))
         // النص اللاتيني لا يحتاج عزلًا ولا يُلوَّث
         assertEquals("version 2026", "version 2026".bidiNumbers())
+    }
+
+    @Test
+    fun decomposedArabicIsStoredAsNfc() {
+        // «آمل.py» مبنيّ بأسلوب NFD: ألف + مدّة منفصلة (U+0627 U+0653)
+        // كما تكتبه بعض الأنظمة بدل الحرف المركّب U+0622.
+        val decomposed = "\u0627\u0653\u0645\u0644.py"
+        assertFalse(Normalizer.isNormalized(decomposed, Normalizer.Form.NFC))
+        val stored = BidiText.nfc(decomposed)
+        assertEquals("ناتج NFC", "\u0622\u0645\u0644.py", stored)
+        assertTrue(Normalizer.isNormalized(stored, Normalizer.Form.NFC))
+        // العرض يستخدم الصيغة نفسها، فلا يظهر الاسم بصيغتين مختلفتين
+        assertEquals("${BidiText.FSI}\u0622\u0645\u0644.py${BidiText.PDI}", decomposed.bidiFileName())
+    }
+
+    @Test
+    fun nfcKeepsAlreadyNormalizedNamesUntouched() {
+        val name = "صيد حسابات هوتميل ربط العاب.py"
+        assertEquals(name, BidiText.nfc(name))
+        assertEquals("main.py", BidiText.nfc("main.py"))
+        assertEquals("", BidiText.nfc(""))
     }
 
     @Test

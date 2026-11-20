@@ -12,10 +12,13 @@ import com.mahdi.resources.strings
 import com.mahdi.utils.logError
 import com.mahdi.utils.toast
 import java.io.File
+import com.mahdi.text.BidiText
 import java.util.zip.ZipFile
 
 fun File.child(fileName: String): File {
-    return File(this, fileName)
+    // 9.6.0: الاسم يُطبَّع إلى NFC عند الإنشاء، فيتطابق ما يراه المستخدم في الدُرج
+    // مع ما يطبعه `ls` في الطرفية، ويعمل البحث والمقارنة بلا اختلاف ظاهري.
+    return File(this, BidiText.nfc(fileName))
 }
 
 fun File.createFileIfNot(): File {
