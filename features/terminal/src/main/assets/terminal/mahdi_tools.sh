@@ -158,7 +158,18 @@ _mh_doctor_python() {
     return 0
   fi
 
-  _mh_doc ok "المفسّر" "$py · $(mahdi_python_version 2>/dev/null || printf '—') · $(command -v "$py" 2>/dev/null)"
+  # 9.6.0: «موجود» لا يعني «يعمل». غلاف بايثون قد يُعثر عليه ثم يفشل بالرابط
+  # الديناميكي (libpython)، وكان الفحص يعرضه أخضر ثم ينفجر كل تشغيل. الآن
+  # ننفّذ أمرًا واحدًا فعليًا (~20ms) ونصنّف العطل إن وُجد.
+  local probe link_err=0
+  probe="$("$py" -c 'print(1)' 2>&1)" || link_err=1
+  if [ "$link_err" = "0" ]; then
+    _mh_doc ok "المفسّر" "$py · $(mahdi_python_version 2>/dev/null || printf '—') · $(command -v "$py" 2>/dev/null)"
+  elif declare -f mahdi_py_link_broken >/dev/null 2>&1 && mahdi_py_link_broken "$probe"; then
+    _mh_doc bad "المفسّر" "لا يبدأ — مكتبة بايثون المشتركة مفقودة (libpython) · أصلح: mh pyfix"
+  else
+    _mh_doc bad "المفسّر" "لا ينفّذ أمرًا — أصلح: mh pyfix"
+  fi
 
   local pipv
   pipv="$(_mh_pip_version)"
@@ -262,6 +273,15 @@ _mh_doctor_fix() {
 
   if declare -f break_stale_apt_locks >/dev/null 2>&1; then
     break_stale_apt_locks >/dev/null 2>&1 && _mh_doc ok "أقفال apt" "سليمة"
+  fi
+
+  # 9.6.0: إصلاح الرابط الديناميكي أولًا — قبله لا يعمل pip ولا أي حزمة.
+  if declare -f mahdi_py_ensure_working >/dev/null 2>&1; then
+    if mahdi_py_ensure_working >/dev/null 2>&1; then
+      _mh_doc ok "رابط بايثون" "سليم — libpython في مسار البحث"
+    else
+      _mh_doc bad "رابط بايثون" "تعذّر ربط libpython — أعد المحاولة بعد التأكد من الاتصال"
+    fi
   fi
 
   hash -r 2>/dev/null || true
@@ -949,10 +969,13 @@ mh_home() {
   mahdi_heading "بيئة العمل"
 
   local py="${MAHDI_PY:-python3}" pipv nodev lsp=0 s
-  if command -v "$py" >/dev/null 2>&1; then
-    mahdi_status ok "بايثون" "$(mahdi_python_version 2>/dev/null || printf '—')  ·  $py"
-  else
+  if ! command -v "$py" >/dev/null 2>&1; then
     mahdi_status bad "بايثون" "غير مثبّت — mh doctor --fix"
+  elif ! "$py" -c 'print(1)' >/dev/null 2>&1; then
+    # 9.6.0: موجود لكنه لا يبدأ (libpython) — الحالة كانت تُعرض خضراء خطأً.
+    mahdi_status bad "بايثون" "لا يبدأ — مكتبة libpython مفقودة · mh pyfix"
+  else
+    mahdi_status ok "بايثون" "$(mahdi_python_version 2>/dev/null || printf '—')  ·  $py"
   fi
   pipv="$(_mh_pip_version)"
   if [ -n "$pipv" ]; then

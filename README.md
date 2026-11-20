@@ -248,13 +248,14 @@ usage            # بطاقة مختصرة بالأمثلة
 ```bash
 mh                 # نظرة سريعة: بايثون · pip · Node · خوادم اللغة · المخزن
 mh doctor          # فحص ملوّن: النظام · بايثون · pip · Node · المخازن · خوادم اللغة
-mh doctor --fix    # يجهّز pip والمخازن والاختصارات تلقائيًا
+mh doctor --fix    # يجهّز pip والمخازن والاختصارات ورابط بايثون تلقائيًا
 mh new py app      # مشروع جاهز: py · bot · web · api · html · node
 mh py --list       # كل مفسّرات بايثون — و--use للاختيار
 mh pip install …   # pip عبر أحدث مفسّر وبمخزن دائم
 mh run main.py     # تشغيل أي ملف عبر المحرّك الموحّد
 mh cache prune     # ينظّف المؤقت فقط — المخازن الدائمة لا تُمسّ
 mh fix             # إصلاح البيئة: أدوات الشبكة · pip · Node · الاختصارات
+mh pyfix           # إصلاح رابط بايثون: libpython مفقودة أو غلاف معطوب
 mh install .       # تجهيز اعتماديات مشروع قائم (requirements · package.json)
 mh clone <رابط>    # استنساخ مشروع من GitHub ثم تجهيزه تلقائيًا
 pkg install curl   # واجهة Termux متوافقة — أسماء Termux تُترجم تلقائيًا

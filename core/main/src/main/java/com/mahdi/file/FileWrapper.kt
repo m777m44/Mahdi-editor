@@ -159,10 +159,12 @@ class FileWrapper(var file: File) : FileObject {
             if (name.isBlank()) {
                 throw IllegalArgumentException("Name cannot be blank")
             }
+            // 9.6.0: الاسم يُطبَّع إلى NFC عند الإنشاء — فيتطابق مع `ls` والبحث.
+            val childName = BidiText.nfc(BidiText.stripControls(name))
             return@withContext if (createFile) {
-                FileWrapper(File(file, name)).createFileIfNot()
+                FileWrapper(File(file, childName)).createFileIfNot()
             } else {
-                FileWrapper(File(file, name)).createDirIfNot()
+                FileWrapper(File(file, childName)).createDirIfNot()
             }
         }
 
