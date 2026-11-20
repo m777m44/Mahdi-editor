@@ -26,6 +26,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,11 +38,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.produceState
-import com.mahdi.text.bidiNumbers
-import com.mahdi.ui.components.formatBytes
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.components.compose.utils.addIf
 import com.mahdi.components.getDrawerWidth
@@ -49,10 +45,14 @@ import com.mahdi.file.FileObject
 import com.mahdi.file.ZipFileObject
 import com.mahdi.resources.drawables
 import com.mahdi.settings.Settings
-import com.mahdi.utils.drawErrorUnderline
 import com.mahdi.text.bidiFileName
+import com.mahdi.text.bidiNumbers
+import com.mahdi.ui.components.formatBytes
+import com.mahdi.utils.drawErrorUnderline
 import com.mahdi.utils.getFileColor
 import com.mahdi.utils.getUnderlineColor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun FileTreeNodeItem(
