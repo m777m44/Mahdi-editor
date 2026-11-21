@@ -507,30 +507,37 @@ object PythonIntelliSense {
     private fun MEMBERS(vararg pairs: Pair<String, SuggestionKind>): List<Triple<String, SuggestionKind, String?>> =
         pairs.map { Triple(it.first, it.second, null) }
 
-    /** الوحدات المتاحة أثناء `import`. */
+    /**
+     * الوحدات المتاحة أثناء `import` — **مرتّبة بالأهمية لا أبجديًا**.
+     *
+     * `LinkedHashMap` يحفظ ترتيب الإدراج، والشريط يعرض أول ١٢ فقط، فالترتيب
+     * هنا هو ما يراه المستخدم فعلًا. الترتيب الأبجدي كان يعرض `asyncio` قبل
+     * `requests` و`telebot` — أي أن الوحدات التي يستوردها ٩ من كل ١٠ مستخدمين
+     * كانت خارج الشاشة. الآن الأكثر استخدامًا أولًا.
+     */
     private val MODULES: Map<String, SuggestionKind> =
         mapOf(
             "os" to SuggestionKind.MODULE,
             "sys" to SuggestionKind.MODULE,
-            "re" to SuggestionKind.MODULE,
             "json" to SuggestionKind.MODULE,
+            "re" to SuggestionKind.MODULE,
+            "requests" to SuggestionKind.MODULE,
             "math" to SuggestionKind.MODULE,
             "random" to SuggestionKind.MODULE,
             "time" to SuggestionKind.MODULE,
             "datetime" to SuggestionKind.MODULE,
             "pathlib" to SuggestionKind.MODULE,
-            "subprocess" to SuggestionKind.MODULE,
-            "threading" to SuggestionKind.MODULE,
+            "telebot" to SuggestionKind.MODULE,
+            "telegram" to SuggestionKind.MODULE,
             "asyncio" to SuggestionKind.MODULE,
+            "threading" to SuggestionKind.MODULE,
+            "subprocess" to SuggestionKind.MODULE,
             "sqlite3" to SuggestionKind.MODULE,
+            "typing" to SuggestionKind.MODULE,
+            "logging" to SuggestionKind.MODULE,
             "collections" to SuggestionKind.MODULE,
             "itertools" to SuggestionKind.MODULE,
             "functools" to SuggestionKind.MODULE,
-            "typing" to SuggestionKind.MODULE,
-            "logging" to SuggestionKind.MODULE,
-            "requests" to SuggestionKind.MODULE,
-            "telebot" to SuggestionKind.MODULE,
-            "telegram" to SuggestionKind.MODULE,
             "flask" to SuggestionKind.MODULE,
             "fastapi" to SuggestionKind.MODULE,
             "numpy" to SuggestionKind.MODULE,

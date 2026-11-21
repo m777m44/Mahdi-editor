@@ -68,8 +68,17 @@ class PythonIntelliSenseTest {
 
     @Test
     fun importKeywordOffersModuleNames() {
+        // بعد `import ` بلا بادئة: الوحدات الأكثر استخدامًا تظهر أولًا
         val list = texts("import re\nimport ")
-        assertTrue(list.toString(), "requests" in list || "telebot" in list)
+        assertTrue(list.toString(), "os" in list)
+        assertTrue(list.toString(), "requests" in list)
+    }
+
+    @Test
+    fun importPrefixFiltersModules() {
+        // وبادئة تُرشّح: `import req` ← requests فقط
+        val list = texts("import req")
+        assertEquals(list.toString(), listOf("requests"))
     }
 
     @Test
