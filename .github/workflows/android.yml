@@ -93,6 +93,13 @@ jobs:
             echo "::error title=kdoc_check::تعليق كتلة غير مغلق — رسائل 'Unresolved reference' قد تكون ناتجة عنه"
             exit 1
           fi
+          # 9.9.0: أيقونة SVG بأبعاد نسبية أو بمرشّح توهّج تُرسم ركامًا في
+          # androidsvg — وهو عيب يبدو في الواجهة كأنه خطأ رسم، ومصدره ملفّ
+          # أصل واحد. الفحص هنا يمنع عودته.
+          if ! python3 tools/tests/svg_assets_check.py; then
+            echo "::error title=svg_assets_check::أيقونة SVG غير صالحة للرسم في androidsvg"
+            exit 1
+          fi
           exit "$syntax"
 
       - name: Accept Android SDK licenses

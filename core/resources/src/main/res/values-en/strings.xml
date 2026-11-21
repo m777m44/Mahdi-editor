@@ -1198,4 +1198,16 @@ Thank you for using Mahdi-Editor.</string>
     <string name="vscode_icons_name">VS Code icons</string>
     <string name="vscode_icons_desc">Colourful file-type shapes (Python, JSON, Java, folders…)</string>
     <string name="vscode_icons_unavailable">Built-in pack unavailable — restart the app to copy it again</string>
+    <string name="file_tree_zoom_in">Zoom in</string>
+    <string name="file_tree_zoom_out">Zoom out</string>
+    <string name="file_tree_reset_zoom">Reset zoom</string>
+    <string name="file_tree_two_lines">Two-line file names</string>
+    <string name="file_tree_show_size">Show file size</string>
+    <string name="file_tree_compact_path">Compact single folders</string>
+    <string name="file_tree_density">Row density</string>
+    <string name="file_tree_density_compact">Compact</string>
+    <string name="file_tree_density_normal">Normal</string>
+    <string name="file_tree_density_roomy">Roomy</string>
+    <string name="file_tree_section_appearance">Appearance</string>
+    <string name="file_tree_section_sort">Sort by</string>
 </resources>

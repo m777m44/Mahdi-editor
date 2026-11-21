@@ -4,7 +4,7 @@
 	xmlns="http://www.w3.org/2000/svg"
 	xmlns:xlink="http://www.w3.org/1999/xlink"
 	x="0%" y="0%"
-	width="100%" height="100%"
+	width="120" height="120"
 	viewBox="0 0 120.0 120.0"
 	enable-background="new 0 0 120.0 120.0"
 	xml:space="preserve">
@@ -16,32 +16,12 @@
 		<stop offset="100.000%" style="stop-color:rgb(0,10,114);stop-opacity:1.000" />
 	</linearGradient>
 
-<filter id="glow59" x="-200%" y="-200%" width="600%" height="600%" >
-	<feOffset result="offOut" in="SourceGraphic" dx="0.0" dy="0.0" />
-	<feGaussianBlur result="blurOut" in="offOut" stdDeviation="1.2906256" />
-	<feFlood flood-color="#F60000" flood-opacity="1.000" result="flood"/>
-	<feComposite in="flood" in2="blurOut" operator="in" result="blendOut0"/>
-	<feBlend in="blendOut0" in2="blendOut0" result="blendOut1" mode="normal" />
-	<feBlend in="SourceGraphic" in2="blendOut1" mode="normal" />
-</filter>
-
-	<linearGradient id="fillGrad66" x1="0.000%" y1="50.000%" x2="95.816%" y2="46.862%">
+<linearGradient id="fillGrad66" x1="0.000%" y1="50.000%" x2="95.816%" y2="46.862%">
    		<stop offset="0.000%" style="stop-color:rgb(0,214,236);stop-opacity:1.000" />
 		<stop offset="27.204%" style="stop-color:rgb(0,127,235);stop-opacity:1.000" />
 		<stop offset="57.225%" style="stop-color:rgb(0,13,223);stop-opacity:1.000" />
 		<stop offset="100.000%" style="stop-color:rgb(22,0,116);stop-opacity:1.000" />
 	</linearGradient>
-
-<filter id="glow66" x="-200%" y="-200%" width="600%" height="600%" >
-	<feOffset result="offOut" in="SourceGraphic" dx="0.0" dy="0.0" />
-	<feGaussianBlur result="blurOut" in="offOut" stdDeviation="0.55988175" />
-	<feFlood flood-color="#F60000" flood-opacity="1.000" result="flood"/>
-	<feComposite in="flood" in2="blurOut" operator="in" result="blendOut0"/>
-	<feBlend in="blendOut0" in2="blendOut0" result="blendOut1" mode="normal" />
-	<feBlend in="blendOut1" in2="blendOut0" result="blendOut2" mode="normal" />
-	<feBlend in="blendOut2" in2="blendOut0" result="blendOut3" mode="normal" />
-	<feBlend in="SourceGraphic" in2="blendOut3" mode="normal" />
-</filter>
 
 </defs>
 	<path
@@ -62,7 +42,6 @@
 		stroke-opacity="1.000"
 		fill-rule="nonzero"
 		stroke-width="0.48000002"
-		filter="url(#glow59)"
 		stroke-linejoin="miter"
 		stroke-linecap="square"
 		d="M35.46,81.00C35.87,83.00,36.47,84.42,37.46,85.81Q38.69,87.20,41.34,89.07L55.11,98.72L55.15,105.14C55.48,107.65,57.29,109.45,60.16,109.57C63.03,109.45,64.54,107.49,64.83,105.22L64.89,98.80L79.24,88.73Q81.88,87.03,82.93,85.45C83.88,83.94,84.29,82.90,84.66,81.13L84.72,73.11C84.72,71.15,84.72,69.73,84.10,68.32C83.84,67.39,82.93,65.92,82.18,65.17C81.75,64.50,79.77,63.12,77.87,62.43L45.10,49.67L45.10,35.08L74.92,35.08L74.98,46.91A4.88 4.69 -0.00 0 0 84.63,46.91L84.55,25.33L35.28,25.40L35.28,50.30C35.57,54.51,37.82,56.61,40.24,58.12L74.90,71.64L74.90,79.84L60.12,90.30L45.06,79.93L44.99,73.32A4.91 4.75 -0.00 0 0 35.28,73.40L35.46,81.00z"/>
@@ -74,7 +53,6 @@
 		stroke-opacity="1.000"
 		fill-rule="nonzero"
 		stroke-width="0.48000002"
-		filter="url(#glow66)"
 		stroke-linejoin="miter"
 		stroke-linecap="square"
 		d="M38.50,20.32A4.86 4.03 269.58 0 1 38.50,10.59L81.78,10.55A4.86 4.03 90.42 0 1 81.78,20.28L38.50,20.32z"/>

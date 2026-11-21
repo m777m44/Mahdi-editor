@@ -1,11 +1,12 @@
 package com.mahdi.filetree
 
 import android.os.Environment
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,8 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
@@ -28,19 +28,22 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -55,6 +58,7 @@ import com.mahdi.icons.MahdiIcon
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
+import com.mahdi.text.bidiNumbers
 import com.mahdi.utils.application
 import kotlin.math.min
 import kotlinx.coroutines.launch
@@ -104,9 +108,18 @@ fun FileTree(
 
     LaunchedEffect(sortMode) { viewModel.refreshEverything() }
 
+    // 9.9.0 — التكبير: قيمة محدودة تُثبَّت في التخزين عند انتهاء الإيماءة.
+    // تُقرأ من `Settings` في `remember` حتى يبدأ الشريط على آخر حجم اختاره
+    // المستخدم، ولا يُكتب في التفضيلات في كل إطار من إيماءة القرص.
+    var liveScale by
+        remember {
+            mutableStateOf(Settings.file_tree_scale.coerceIn(FILE_TREE_MIN_SCALE, FILE_TREE_MAX_SCALE))
+        }
+    val metrics = rememberFileTreeMetrics(liveScale)
+
     Column(modifier = modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isAnyFileSelected) {
@@ -115,7 +128,11 @@ fun FileTree(
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(strings.go_prev))
                     }
 
-                    Text(selectionCount.toString())
+                    Text(
+                        text = selectionCount.toString().bidiNumbers(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
 
@@ -127,12 +144,24 @@ fun FileTree(
                 if (isAnyFileSelected) {
                     SelectionActions(viewModel, drawerViewModel, rootNode, selectedFiles[rootNode.file] ?: emptyList())
                 } else {
-                    FileTreeActions(viewModel, onSearchClick)
+                    // ذرّا التكبير بجانب الأدوات: لا يحتاج المستخدم معرفة إيماءة
+                    // القرص، ويكفيه نقرة واحدة. يُضغطان محدودين عند الحدّين.
+                    ZoomButtons(
+                        scale = liveScale,
+                        onScale = { next ->
+                            liveScale = next
+                            Settings.file_tree_scale = next
+                        },
+                    )
+                    FileTreeActions(viewModel, onSearchClick, liveScale) { next ->
+                        liveScale = next
+                        Settings.file_tree_scale = next
+                    }
                 }
             }
         }
 
-        Box(modifier = Modifier.fillMaxWidth().height(4.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp)) {
             if (isFileOperationInProgress || isIndexingRoot) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxSize())
             } else {
@@ -145,24 +174,91 @@ fun FileTree(
             onRefresh = { viewModel.viewModelScope.launch { viewModel.refreshEverything(wasPulled = true) } },
             modifier = Modifier.fillMaxWidth().weight(1f),
         ) {
-            Column(
-                modifier =
-                    Modifier.fillMaxSize()
-                        .horizontalScroll(rememberScrollState())
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp)
+            // التكبير بإيماءة القرص يلفّ القائمة **فقط**، فلا تُكبَّر شريط
+            // الأدوات معها. الإيماءة لا تستهلك اللمس المفرد، فيبقى التمرير
+            // والنقر كما كانا.
+            FileTreePinchZoom(
+                onZoom = { next ->
+                    liveScale = next
+                    Settings.file_tree_scale = next
+                },
             ) {
-                key(rootNode.file.hashCode(), rootNode.name) {
-                    FileTreeNodeItem(
-                        modifier = Modifier.fillMaxWidth(),
-                        root = rootNode.file,
-                        node = rootNode,
-                        depth = 0,
-                        onFileClick = { rootNode.onFileClick(it) },
-                        viewModel = viewModel,
-                    )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 6.dp),
+                ) {
+                    // جذر واحد يُوسَّع تلقائيًا؛ صفوفه تُركَّب عند الظهور.
+                    item(key = "root-${rootNode.file.hashCode()}-${rootNode.name}") {
+                        FileTreeNodeItem(
+                            modifier = Modifier.fillMaxWidth(),
+                            root = rootNode.file,
+                            node = rootNode,
+                            depth = 0,
+                            onFileClick = { rootNode.onFileClick(it) },
+                            viewModel = viewModel,
+                            metrics = metrics,
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+/**
+ * 9.9.0 — زرّا التكبير («+» و«−») في شريط الشجرة.
+ *
+ * التكبير بنقرة ضرورة لا رفاهية: إيماءة القرص غير معروفة لكثير من المستخدمين،
+ * ومن يحتاج خطًّا أكبر (ضعف نظر، شمس ساطعة) يجب أن يجده في نقرة. الزرّان
+ * يُعطَّلان عند الحدّ الأقصى/الأدنى حتى لا يبدو الضغط بلا أثر.
+ */
+@Composable
+private fun ZoomButtons(scale: Float, onScale: (Float) -> Unit) {
+    val step = 0.1f
+    val canShrink = scale > FILE_TREE_MIN_SCALE + 0.001f
+    val canGrow = scale < FILE_TREE_MAX_SCALE - 0.001f
+
+    IconButton(
+        enabled = canShrink,
+        onClick = { onScale((scale - step).coerceIn(FILE_TREE_MIN_SCALE, FILE_TREE_MAX_SCALE)) },
+    ) {
+        ZoomGlyph(
+            plus = false,
+            tint =
+                if (canShrink) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+        )
+    }
+
+    IconButton(
+        enabled = canGrow,
+        onClick = { onScale((scale + step).coerceIn(FILE_TREE_MIN_SCALE, FILE_TREE_MAX_SCALE)) },
+    ) {
+        ZoomGlyph(
+            plus = true,
+            tint =
+                if (canGrow) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+        )
+    }
+}
+
+/**
+ * ‏«+» و«−» مرسومان بـ`Canvas` لا كأصل جديد.
+ *
+ * السبب: حزمة الأيقونات في المشروع `material-icons-core` فقط، ولا تحتوي
+ * `Remove`. رسم عشرين نبضة أوفر من إضافة ملفّ drawable جديد ومن استيراد
+ * حزمة كاملة لأجل خطّين.
+ */
+@Composable
+private fun ZoomGlyph(plus: Boolean, tint: Color) {
+    Canvas(modifier = Modifier.size(18.dp)) {
+        val stroke = 2.dp.toPx()
+        val c = size.width / 2f
+        val r = size.width * 0.36f
+        drawLine(tint, Offset(c - r, c), Offset(c + r, c), strokeWidth = stroke, cap = StrokeCap.Round)
+        if (plus) {
+            drawLine(tint, Offset(c, c - r), Offset(c, c + r), strokeWidth = stroke, cap = StrokeCap.Round)
         }
     }
 }
@@ -317,7 +413,12 @@ private fun SelectionActions(
 }
 
 @Composable
-private fun FileTreeActions(viewModel: FileTreeViewModel, onSearchClick: () -> Unit) {
+private fun FileTreeActions(
+    viewModel: FileTreeViewModel,
+    onSearchClick: () -> Unit,
+    scale: Float,
+    onScale: (Float) -> Unit,
+) {
     var showOptionsMenu by remember { mutableStateOf(false) }
     val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
 
@@ -360,6 +461,102 @@ private fun FileTreeActions(viewModel: FileTreeViewModel, onSearchClick: () -> U
                     showOptionsMenu = false
                 },
             )
+
+            MenuSectionHeader(stringResource(strings.file_tree_section_appearance))
+
+            // ————— 9.9.0: شكل الأسماء والأحجام (داخل نفس القائمة، لا شاشة ثانية) —————
+            MahdiDropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = Settings.file_tree_two_lines, onCheckedChange = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(strings.file_tree_two_lines))
+                        Spacer(Modifier.width(8.dp))
+                    }
+                },
+                onClick = {
+                    Settings.file_tree_two_lines = !Settings.file_tree_two_lines
+                    showOptionsMenu = false
+                },
+            )
+
+            MahdiDropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = Settings.file_tree_show_size, onCheckedChange = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(strings.file_tree_show_size))
+                        Spacer(Modifier.width(8.dp))
+                    }
+                },
+                onClick = {
+                    Settings.file_tree_show_size = !Settings.file_tree_show_size
+                    showOptionsMenu = false
+                },
+            )
+
+            MahdiDropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = Settings.file_tree_compact_path, onCheckedChange = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(strings.file_tree_compact_path))
+                        Spacer(Modifier.width(8.dp))
+                    }
+                },
+                onClick = {
+                    Settings.file_tree_compact_path = !Settings.file_tree_compact_path
+                    showOptionsMenu = false
+                },
+            )
+
+            // ثلاث كثافات بدل مفتاحين: «مضغوط» و«مريح» حالتان متطرّفتان،
+            // والوسط هو ما يريده الأكثر. النقر يبدّل والحفظ فوري.
+            MahdiDropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(strings.file_tree_density),
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        // نُظهر الحالة الحالية صريحةً بدل تكرار النقر عشوائيًا.
+                        Text(
+                            text =
+                                stringResource(
+                                    when (Settings.file_tree_density) {
+                                        0 -> strings.file_tree_density_compact
+                                        2 -> strings.file_tree_density_roomy
+                                        else -> strings.file_tree_density_normal
+                                    }
+                                ),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                },
+                onClick = {
+                    Settings.file_tree_density = (Settings.file_tree_density + 1) % 3
+                    showOptionsMenu = false
+                },
+            )
+
+            MahdiDropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(strings.file_tree_reset_zoom))
+                        Spacer(Modifier.width(8.dp))
+                    }
+                },
+                onClick = {
+                    Settings.file_tree_scale = FILE_TREE_DEFAULT_SCALE
+                    onScale(FILE_TREE_DEFAULT_SCALE)
+                    showOptionsMenu = false
+                },
+            )
+
+            MenuSectionHeader(stringResource(strings.file_tree_section_sort))
 
             MahdiDropdownMenuItem(
                 text = {
@@ -420,4 +617,24 @@ fun FileObject.getAppropriateName(): String {
     } else {
         getName()
     }
+}
+
+/**
+ * عنوان قسم داخل قائمة الخيارات.
+ *
+ * القائمة صارت عشرة بنود؛ بلا فواصل تصير جدارًا نصّيًا لا يُقرأ. العنوان
+ * صغير وباهت ومُعطَّل (لا يُنقر)، فلا يُشتبه بأنه خيار.
+ */
+@Composable
+private fun MenuSectionHeader(title: String) {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+    )
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 2.dp),
+    )
 }

@@ -1,21 +1,21 @@
 package com.mahdi.filetree
 
-import androidx.compose.animation.Animatable
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,15 +32,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.components.compose.utils.addIf
-import com.mahdi.components.getDrawerWidth
 import com.mahdi.file.FileObject
 import com.mahdi.file.ZipFileObject
 import com.mahdi.resources.drawables
@@ -54,6 +57,21 @@ import com.mahdi.utils.getUnderlineColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * 9.9.0 — صفّ واحد في شجرة الملفات.
+ *
+ * أُعيد بناء الصفّ كاملًا لأن الشكل السابق كان **مكسورًا فعليًا** لا قبيحًا فقط:
+ *
+ *  - العرض كان `getDrawerWidth() - 61.dp` أي ٨٣٪ من **عرض الشاشة** بينما اللوحة
+ *    أضيق، فامتدّ الصفّ خارجها وانزاح الاسم إلى اليمين، ومع
+ *    `horizontalScroll` التفّت الشجرة كلها جانبيًا (لقطات المستخدم).
+ *  - الاسم كان سطرًا واحدًا مقطوعًا بـ«…» فأسماء الملفات المهمّة تفقد نهايتها
+ *    وامتدادها.
+ *
+ * الآن: العرض يُقاس من الأب مباشرةً (`fillMaxWidth`)، والاسم يعيد اللفّ على
+ * سطرين حين يطول، والامتداد يبقى ظاهرًا، وكل عنصر نقر له مساحته المستقلّة
+ * (لم يبقَ `combinedClickable` على الصفّ كله فتصطدم أهداف اللمس).
+ */
 @Composable
 fun FileTreeNodeItem(
     modifier: Modifier,
@@ -62,6 +80,7 @@ fun FileTreeNodeItem(
     depth: Int,
     onFileClick: (FileTreeNode) -> Unit,
     viewModel: FileTreeViewModel,
+    metrics: FileTreeMetrics,
 ) {
     val file = node.file
     val isHidden = file.getName().startsWith(".")
@@ -75,152 +94,169 @@ fun FileTreeNodeItem(
     val fileListCache by viewModel.fileListCache.collectAsStateWithLifecycle()
 
     val isExpanded = expandedNodes[root]?.contains(file) ?: false
-    val horizontalPadding = (depth * 16).dp
-
     val isLoading = loadingStates[file] == true
     val isCut = file in cutNodes
-
     val isFileSelected = selectedFiles[root]?.contains(file) == true
     val isFileFocused = focusedFile[root] == file
+    val isActive = isFileFocused || isFileSelected
 
     val context = LocalContext.current
-    val surfaceColor =
-        if (file is ZipFileObject) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
-        } else {
-            MaterialTheme.colorScheme.surface
-        }
     val selectionColor = MaterialTheme.colorScheme.primaryContainer
+    val zipTint = MaterialTheme.colorScheme.tertiaryContainer
 
-    val nodeBackground = remember { Animatable(surfaceColor) }
-    LaunchedEffect(isFileFocused, isFileSelected, surfaceColor, selectionColor) {
-        if (isFileFocused || isFileSelected) {
-            nodeBackground.animateTo(selectionColor, animationSpec = tween(300))
-        } else {
-            nodeBackground.animateTo(surfaceColor, animationSpec = tween(300))
-        }
-    }
+    // لون الخلفية ينتقل بسلاسة عند الاختيار أو التركيز — لا قفزة لونية.
+    val background by
+        animateColorAsState(
+            targetValue = if (isActive) selectionColor else Color.Transparent,
+            animationSpec = tween(180),
+            label = "rowBackground",
+        )
+    val zipWash by
+        animateColorAsState(
+            targetValue = if (file is ZipFileObject) zipTint.copy(alpha = 0.14f) else Color.Transparent,
+            animationSpec = tween(180),
+            label = "zipWash",
+        )
 
-    // Load children when expanded
     LaunchedEffect(file, isExpanded) {
-        if (isExpanded && node.isExpandable) {
-            viewModel.loadChildrenForNode(node)
-        }
+        if (isExpanded && node.isExpandable) viewModel.loadChildrenForNode(node)
     }
 
     val children by
         remember(file, isExpanded) {
             derivedStateOf {
-                if (node.isExpandable && isExpanded) {
-                    fileListCache[node.file] ?: emptyList()
-                } else {
-                    emptyList()
-                }
+                if (node.isExpandable && isExpanded) fileListCache[node.file] ?: emptyList() else emptyList()
             }
         }
 
-    var displayedChildren by remember { mutableStateOf(children) }
-    var displayName by remember { mutableStateOf(node.name) }
+    // 9.9.0 — «دمج المجلدات المفردة» (كما في VS Code): مجلد يحتوي مجلدًا
+    // واحدًا فقط يُعرض في سطر واحد `src/main/kotlin`. يُحسب فقط عند تفعيل
+    // الخيار وعند وجود مجلد واحد قابل للتوسيع، وإلا فالتكلفة صفر.
+    val compactPath = Settings.file_tree_compact_path
+    var mergedName by remember { mutableStateOf(node.name) }
+    var mergedChildren by remember { mutableStateOf(children) }
 
-    LaunchedEffect(children, Settings.compact_folders_drawer) {
-        displayedChildren =
-            if (Settings.compact_folders_drawer && children.size == 1 && children[0].isExpandable) {
-                val collapsedNode = viewModel.collapseNode(root, node)
-                viewModel.getNodeChildren(collapsedNode)
-            } else children
-        displayName =
-            if (Settings.compact_folders_drawer) {
-                viewModel.getCollapsedName(node)
-            } else node.name
+    LaunchedEffect(children, compactPath, isExpanded) {
+        val only = children.singleOrNull()
+        if (compactPath && isExpanded && only != null && only.isExpandable) {
+            val collapsed = viewModel.collapseNode(root, node)
+            mergedName = viewModel.getCollapsedName(collapsed)
+            mergedChildren = viewModel.getNodeChildren(collapsed)
+        } else {
+            mergedName = node.name
+            mergedChildren = children
+        }
     }
+    val displayName = mergedName
+
+    // الإزاحة عنصر واحد رفيع بدل حشو ضخم: يحفظ شكل الشجرة ويترك مساحة للاسم.
+    val indent = metrics.indent * depth
+
+    val nameStyle =
+        MaterialTheme.typography.bodyMedium.copy(
+            fontSize = metrics.nameSize,
+            textDirection = TextDirection.ContentOrLtr,
+            lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+        )
+
+    val underlineColor = getUnderlineColor(context, viewModel, file)
+    val titleColor = getFileColor(file) ?: MaterialTheme.colorScheme.onSurface
+    val shape = RoundedCornerShape(10.dp)
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier =
                 Modifier.addIf(isCut) { alpha(0.5f) }
-                    .background(nodeBackground.value)
+                    .padding(horizontal = 4.dp)
+                    .clip(shape)
+                    .background(background)
+                    .background(zipWash)
+                    // ‏‎48dp حدًّا أدنى للمس، وارتفاع فعلي يتبع حجم الخطّ.
+                    .heightIn(min = 44.dp)
+                    .fillMaxWidth()
                     .combinedClickable(
                         onClick = {
-                            if (viewModel.isAnyFileSelected(root)) {
-                                viewModel.toggleSelection(root, file)
-                                return@combinedClickable
-                            }
-
                             if (node.isExpandable) {
                                 viewModel.toggleNodeExpansion(root, file)
-                                return@combinedClickable
+                            } else {
+                                onFileClick(node)
                             }
-
-                            onFileClick(node)
                         },
+                        // الضغط المطوّل = تحديد دائمًا، للملف والمجلد معًا.
                         onLongClick = { viewModel.toggleSelection(root, file) },
                     )
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(
+                        start = 6.dp,
+                        end = 8.dp,
+                        top = metrics.rowPadding,
+                        bottom = metrics.rowPadding,
+                    ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Spacer(modifier = Modifier.width(horizontalPadding))
+            // ——— العمود الأيمن: إزاحة + شيفرون + أيقونة ———
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.width(indent))
 
-            if (node.isExpandable) {
-                val rotationDegree by
-                    animateFloatAsState(targetValue = if (!isExpanded) 0f else 90f, label = "rotation")
-
-                Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(9.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(
-                            painter = painterResource(drawables.chevron_right),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.size(16.dp).rotate(rotationDegree),
-                        )
+                Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                    if (node.isExpandable) {
+                        val rotation by
+                            animateFloatAsState(
+                                targetValue = if (isExpanded) 90f else 0f,
+                                animationSpec = tween(160),
+                                label = "chevron",
+                            )
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(
+                                painter = painterResource(drawables.chevron_right),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                modifier = Modifier.size(metrics.glyphSize.value.dp).rotate(rotation),
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(4.dp))
-            } else {
-                Spacer(modifier = Modifier.width(24.dp))
-            }
-
-            Box(modifier = Modifier.addIf(isHidden) { alpha(0.5f) }) { FileIcon(file, isExpanded = isExpanded) }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            val underlineColor = getUnderlineColor(context, viewModel, file)
-            Row(modifier = Modifier.width((getDrawerWidth() - 61.dp)), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    // 9.0.0: عزل الاسم بـFSI…PDI — وإلا اندمج امتداد `.py` مع سلسلة
-                    // لاتينية مجاورة وقُذف إلى أقصى يسار السطر في الواجهة العربية.
-                    text = displayName.bidiFileName(),
-                    style =
-                        MaterialTheme.typography.bodyMedium.copy(
-                            textDirection = TextDirection.ContentOrLtr,
-                        ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier =
-                        Modifier.weight(1f)
-                            .addIf(underlineColor != null) { drawErrorUnderline(underlineColor!!) },
-                    color = getFileColor(file) ?: MaterialTheme.colorScheme.onSurface,
-                )
-
-                // 9.6.0: بادئة صغيرة بحجم الملف — كما في مستكشف ملفات احترافي.
-                // لا تُحسب إلا للملفات (لا المجلدات)، وفي الخلفية، وبعد أول عرض.
-                if (!node.isExpandable) {
-                    FileSizeHint(file)
+                Box(modifier = Modifier.addIf(isHidden) { alpha(0.55f) }) {
+                    FileIcon(file, isExpanded = isExpanded, size = metrics.iconSize)
                 }
             }
+
+            Spacer(Modifier.width(9.dp))
+
+            // ——— الاسم: سطر أو سطران، بلا بتر الامتداد ———
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    // 9.0.0: عزل الاسم بين FSI…PDI — وإلا اندمج الامتداد مع نصّ
+                    // لاتيني مجاور وقُذف إلى أقصى يسار السطر في الواجهة العربية.
+                    text = displayName.bidiFileName(),
+                    style = nameStyle,
+                    // 9.9.0 — اللفّ يتمّ **داخل** تخطيط النصّ نفسه، لا بتقطيع
+                    // يدوي: فواصل Compose تعرف `-` و`_` والمسافة، وتقيس بالعرض
+                    // الحقيقي المتبقّي بعد الإزاحة والأيقونة وحجم الملف. النتيجة:
+                    // `ملف-قاعدة-بيانات-` في السطر الأول و`طلاب-في-مدرسة.txt`
+                    // في الثاني — بلا حساب عرض هشّ يخالف ما يُرسم فعلًا.
+                    maxLines = if (metrics.twoLines) 2 else 1,
+                    softWrap = metrics.twoLines,
+                    overflow = TextOverflow.Ellipsis,
+                    color = titleColor,
+                    // الاتجاه يُضبط في `nameStyle` لا هنا: `Text` لا يقبل
+                    // `textDirection` كمعامل، و`TextStyle` هو الحامل الصحيح له.
+                    modifier = underlineModifier(underlineColor),
+                )
+            }
+
+            // ——— الذيل: حجم الملف أو عدد العناصر ———
+            RowMeta(node = node, file = file, metrics = metrics)
         }
 
-        AnimatedVisibility(
-            modifier = Modifier.width(getDrawerWidth()),
-            visible = isExpanded && node.isExpandable && children.isNotEmpty(),
-            enter = expandVertically(animationSpec = tween(120)),
-            exit = shrinkVertically(animationSpec = tween(90)),
-        ) {
-            Column {
-                displayedChildren.forEach { childNode ->
+        if (isExpanded && node.isExpandable && mergedChildren.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                mergedChildren.forEach { childNode ->
                     key(childNode.file.hashCode(), childNode.name) {
                         FileTreeNodeItem(
                             modifier = Modifier.fillMaxWidth(),
@@ -229,6 +265,7 @@ fun FileTreeNodeItem(
                             depth = depth + 1,
                             onFileClick = onFileClick,
                             viewModel = viewModel,
+                            metrics = metrics,
                         )
                     }
                 }
@@ -238,25 +275,57 @@ fun FileTreeNodeItem(
 }
 
 /**
- * 9.6.0 — حجم الملف بجانب اسمه، بحساب غير حاجز.
+ * معلومة الطرف: حجم الملف للملفات، وعدد العناصر للمجلدات المطويّة.
  *
- * `FileObject.length()` دالة `suspend`، وقد تكون على قرص بطيء أو شبكة، فلا
- * تُستدعى داخل التكوين مباشرة. تُقرأ مرة واحدة في `produceState` على خيط IO،
- * وتُعرض بحجم صغير باهت لا يزاحم الاسم. المجلدات لا تمرّ من هنا أصلًا.
+ * كلاهما يُقرأ في الخلفية عبر `produceState`، وكلاهما يبقى **صغيرًا وباهتًا**
+ * فلا يزاحم الاسم. لا يُطلب أي شيء قبل معرفة النوع.
  */
 @Composable
-private fun FileSizeHint(file: FileObject) {
-    val size by
-        produceState<Long?>(initialValue = null, key1 = file.hashCode()) {
-            value = withContext(Dispatchers.IO) { runCatching { file.length() }.getOrNull() }
+private fun RowMeta(node: FileTreeNode, file: FileObject, metrics: FileTreeMetrics) {
+    val showSize = Settings.file_tree_show_size && !node.isExpandable
+    val showCount = Settings.file_tree_show_count && node.isExpandable
+    if (!showSize && !showCount) return
+
+    val memo by
+        produceState<String?>(initialValue = null, key1 = file.hashCode(), key2 = showSize, key3 = showCount) {
+            value =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                            if (showSize) {
+                                file.length().takeIf { it > 0 }?.let { formatBytes(it) }
+                            } else {
+                                val count = file.listFiles()?.size ?: 0
+                                if (count > 0) count.toString() else null
+                            }
+                        }
+                        .getOrNull()
+                }
         }
-    val readable = size?.takeIf { it > 0 } ?: return
-    val label = remember(readable) { formatBytes(readable) }
+
+    val label = memo ?: return
+
     Text(
         text = label.bidiNumbers(),
-        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
+        style =
+            MaterialTheme.typography.labelSmall.copy(
+                fontSize = metrics.metaSize,
+                textDirection = TextDirection.ContentOrLtr,
+                fontWeight = FontWeight.Medium,
+            ),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
         maxLines = 1,
-        modifier = Modifier.padding(start = 6.dp, end = 2.dp),
+        softWrap = false,
+        modifier = Modifier.padding(start = 6.dp),
     )
 }
+
+/**
+ * الخطّ المموّج لملفّ فيه خطأ — أو لا شيء.
+ *
+ * `addIf` يتوقّع `Modifier.() -> Modifier`، والاستدعاء المضمّن مباشرةً داخل
+ * تركيبة `Text` كان يخفق في استنتاج النوع (خطأ المترجم: «None of the
+ * following candidates is applicable»). الدالّة الصريحة تُثبّت النوع مرّة
+ * واحدة وتُقرأ أوضح من تعبير مضمّن.
+ */
+private fun underlineModifier(color: Color?): Modifier =
+    if (color == null) Modifier else Modifier.drawErrorUnderline(color)

@@ -1228,4 +1228,16 @@
     <string name="vscode_icons_name">أيقونات VS Code</string>
     <string name="vscode_icons_desc">أشكال ملوّنة لأنواع الملفات (بايثون، JSON، جافا، المجلّدات…)</string>
     <string name="vscode_icons_unavailable">الحزمة المدمجة غير متاحة — أعد تشغيل التطبيق لتُنسخ من جديد</string>
+    <string name="file_tree_zoom_in">تكبير</string>
+    <string name="file_tree_zoom_out">تصغير</string>
+    <string name="file_tree_reset_zoom">إعادة الحجم الافتراضي</string>
+    <string name="file_tree_two_lines">اسم الملف على سطرين</string>
+    <string name="file_tree_show_size">إظهار حجم الملف</string>
+    <string name="file_tree_compact_path">دمج المجلدات المفردة</string>
+    <string name="file_tree_density">كثافة الصفوف</string>
+    <string name="file_tree_density_compact">مضغوط</string>
+    <string name="file_tree_density_normal">عادي</string>
+    <string name="file_tree_density_roomy">مريح</string>
+    <string name="file_tree_section_appearance">المظهر والأحجام</string>
+    <string name="file_tree_section_sort">الترتيب</string>
 </resources>
