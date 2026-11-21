@@ -78,7 +78,7 @@ class PythonIntelliSenseTest {
     fun importPrefixFiltersModules() {
         // وبادئة تُرشّح: `import req` ← requests فقط
         val list = texts("import req")
-        assertEquals(list.toString(), listOf("requests"))
+        assertEquals(list.toString(), listOf("requests").toList())
     }
 
     @Test
