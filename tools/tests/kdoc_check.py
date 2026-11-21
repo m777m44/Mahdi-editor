@@ -20,45 +20,49 @@ import sys
 def scan(path, text):
     """يعيد (عمق التعليق عند نهاية الملف، هل أُغلق تعليق زيادةً)."""
     depth = 0
-    i, n = 0, text.__len__()
+    i, n = 0, len(text)
     while i < n:
-        # نصّ ثلاثي العلامات: يُتجاهل كاملًا (يسمح بـ /* بداخله)
-        if text[i:i + 3] == '"""':
-            end = text.find('"""', i + 3)
-            i = (end + 3) if end >= 0 else n
-            continue
-        c = text[i]
-        # نصّ عادي: يُتجاهل كاملًا
-        if c == '"':
-            i += 1
-            while i < n and text[i] != '"':
-                if text[i] == '\\':
-                    i += 1
-                i += 1
-            i += 1
-            continue
-        # حرف: يُتجاهل
-        if c == "'":
-            i += 1
-            while i < n and text[i] != "'":
-                if text[i] == '\\':
-                    i += 1
-                i += 1
-            i += 1
-            continue
-        if text[i:i + 2] == '//':
+        two = text[i:i + 2]
+        # التعليقات أولًا: داخل التعليق لا معنى للنصوص الحرفية، فعلامة `"`
+        # في جملة مثل ("command's") كانت تفتح «نصًّا» يبتلع `*/` ويُنتج
+        # إنذارًا كاذبًا. الترتيب هنا هو الفرق بين فحص صادق وفحص مزعج.
+        if two == '//':
             while i < n and text[i] != '\n':
                 i += 1
             continue
-        if text[i:i + 2] == '/*':
+        if two == '/*':
             depth += 1
             i += 2
             continue
-        if text[i:i + 2] == '*/':
+        if two == '*/':
             depth -= 1
             i += 2
             if depth < 0:
                 return 0, True
+            continue
+        # نصّ ثلاثي العلامات
+        if text[i:i + 3] == '"""':
+            end_q = text.find('"""', i + 3)
+            i = (end_q + 3) if end_q >= 0 else n
+            continue
+        # نصّ عادي (سطر واحد)
+        if text[i] == '"':
+            i += 1
+            while i < n and text[i] != '"' and text[i] != '\n':
+                if text[i] == '\\':
+                    i += 1
+                i += 1
+            i += 1
+            continue
+        # حرف: محرف واحد أو محرف مهروب، لا يمتدّ عبر سطرين
+        if text[i] == "'":
+            if i + 3 <= n and text[i + 2] == "'" and text[i + 1] != '\n':
+                i += 3
+                continue
+            if i + 4 <= n and text[i + 1] == '\\' and text[i + 3] == "'" and text[i + 2] != '\n':
+                i += 4
+                continue
+            i += 1
             continue
         i += 1
     return depth, False
