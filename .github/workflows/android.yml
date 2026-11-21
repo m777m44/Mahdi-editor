@@ -123,7 +123,9 @@ jobs:
         run: |
           ./gradlew :core:main:testDebugUnitTest --no-daemon \
             --tests "com.mahdi.runtime.PythonLinkDiagnosticsTest" \
-            --tests "com.mahdi.text.BidiFileNameTest"
+            --tests "com.mahdi.text.BidiFileNameTest" \
+            --tests "com.mahdi.editor.complete.PythonIntelliSenseTest" \
+            --tests "com.mahdi.editor.complete.PythonSnippetsTest"
 
       - name: Verify APK manifest components
         run: |

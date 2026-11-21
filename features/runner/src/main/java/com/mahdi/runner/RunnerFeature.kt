@@ -6,6 +6,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.commands.CommandProvider
 import com.mahdi.commands.ToolbarConfiguration
+import com.mahdi.commands.editor.PythonRunScriptCommand
 import com.mahdi.commands.editor.RunCommand
 import com.mahdi.commands.global.OpenLinkCommand
 import com.mahdi.components.DialogProvider
@@ -68,6 +69,8 @@ class RunnerFeature : Feature {
         // Register Run command
         CommandProvider.registerCommand(RunCommand)
         ToolbarConfiguration.addGlobalToolbarCommand(RunCommand, 0)
+        // 9.7.0: تشغيل سكربت بايثون مباشرة (Ctrl+R) بلا نافذة اختيار مشغّل
+        CommandProvider.registerCommand(PythonRunScriptCommand)
 
         // 9.2.0: «فتح رابط» — متصفّح داخلي كما في المتصفحات (لا متصفّح ثانٍ:
         // يُستخدم PreviewBrowserActivity نفسه الذي يعرض ملفات HTML).
@@ -80,6 +83,7 @@ class RunnerFeature : Feature {
         runnersRoute?.let { SettingsRegistry.unregisterRoute(it) }
         htmlRunnersRoute?.let { SettingsRegistry.unregisterRoute(it) }
 
+        CommandProvider.unregisterCommand(PythonRunScriptCommand)
         CommandProvider.unregisterCommand(OpenLinkCommand)
         CommandProvider.unregisterCommand(RunCommand)
         ToolbarConfiguration.removeGlobalToolbarCommand(RunCommand)
