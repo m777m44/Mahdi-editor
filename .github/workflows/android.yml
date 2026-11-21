@@ -212,7 +212,8 @@ jobs:
               fail=1
             fi
           done
-          # عدد أيقونات الحزمة: 24 شكلًا + مجلّد + افتراضي + نصّ = 27
+          # عدد أيقونات الحزمة: 26 ملف SVG (شكل لكل نوع ملف + مجلّد + افتراضي)
+          # والفحص يطلب 24 على الأقل حتى لا يفشل بإضافة أيقونة أو حذف شكل غير حرج.
           icons=$(unzip -l out/Mahdi-Editor.apk 2>/dev/null | grep -cF 'assets/vscode/icons/' || true)
           echo "أيقونات SVG داخل الـ APK: $icons"
           if [ "${icons:-0}" -lt 24 ]; then
