@@ -9,7 +9,7 @@ import com.mahdi.commands.KeyCombination
 import com.mahdi.file.FileObject
 import com.mahdi.icons.Icon
 import com.mahdi.resources.drawables
-import com.mahdi.runner.runners.UniversalRunner
+import com.mahdi.runner.RunnerManager
 import kotlinx.coroutines.launch
 
 /**
@@ -21,10 +21,11 @@ import kotlinx.coroutines.launch
  *
  *  1. **يحفظ** الملف أولًا — أشهر خطأ في تطبيقات بايثون للهاتف: تعدّل الكود
  *     ثم تشغّله فتظهر مخرجات النسخة القديمة.
- *  2. يشغّله مباشرة بالمحرّك الموحّد **بلا أي نافذة**.
+ *  2. يشغّله بأول مشغّل ملفات مناسب **بلا أي نافذة** ([RunnerManager.runDirect]).
  *
- * المخرجات تظهر في الطرفية نفسها التي يعرفها المستخدم (ومعها بطاقة التقدّم
- * وتثبيت المكتبات التلقائي)، فلا تدفّق تشغيل ثانٍ يجب تعلّمه.
+ * لا يعتمد على `UniversalRunner` (يعيش في وحدة الطرفية التي تعتمد على هذه
+ * الوحدة لا العكس)، بل على تجريد [RunnerManager] — فيبقى التشغيل صحيحًا حتى
+ * لو تغيّر المشغّل الافتراضي أو أضاف امتدادٌ مشغّلًا خاصًّا.
  */
 class PythonRunScriptCommand : EditorCommand() {
     override val id: String = "editor.python_run_script"
@@ -36,27 +37,24 @@ class PythonRunScriptCommand : EditorCommand() {
     override val defaultKeybinds: KeyCombination? =
         KeyCombination(keyCode = KeyEvent.KEYCODE_R, ctrl = true)
 
-    override fun isSupported(context: EditorNonActionContext): Boolean = context.editorTab.file.isPythonFile()
+    override fun isSupported(context: EditorNonActionContext): Boolean = context.editorTab.file.isPythonScript()
 
-    override fun isEnabled(context: EditorNonActionContext): Boolean = context.editorTab.file.isPythonFile()
+    override fun isEnabled(context: EditorNonActionContext): Boolean = context.editorTab.file.isPythonScript()
 
     override fun execute(context: EditorActionContext) {
         val tab = context.editorTab
         val file = tab.file ?: return
         val activity = context.currentActivity
-        if (!file.isPythonFile()) return
+        if (!file.isPythonScript()) return
 
         // حفظ ← تشغيل، بالترتيب داخل نفس الـ coroutine (كلا الخطوتين معلّقة).
         DefaultScope.launch {
             runCatching { tab.save() } // فشل الحفظ (ملف للقراءة فقط) لا يمنع التشغيل
-            runCatching { UniversalRunner.run(activity, file) }
+            runCatching { RunnerManager.runDirect(activity, file, tab.projectRoot) }
         }
     }
-
-    private fun FileObject?.isPythonFile(): Boolean =
-        this?.getName()?.substringAfterLast('.', "")?.lowercase() in PYTHON_EXTENSIONS
-
-    private companion object {
-        val PYTHON_EXTENSIONS = setOf("py", "pyw", "pyi")
-    }
 }
+
+/** 9.7.0: هل الملف سكربت بايثون بأحد امتداداته الثلاثة؟ */
+private fun FileObject?.isPythonScript(): Boolean =
+    this?.getName()?.substringAfterLast('.', "")?.lowercase() in setOf("py", "pyw", "pyi")

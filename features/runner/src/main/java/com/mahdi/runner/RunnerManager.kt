@@ -76,6 +76,35 @@ object RunnerManager {
         return result
     }
 
+    /**
+     * 9.7.0 — تشغيل فوري بلا نافذة اختيار.
+     *
+     * يأخذ **أول مشغّل ملفات** يوافق الملف (بنفس ترتيب [getAvailableRunners]:
+     * المشغّلات المضمّنة ثم الامتدادات) وينفّذه. يُستخدم من `Ctrl+R` في محرّر
+     * بايثون، حيث المطلوب تشغيل السكربت المعروض الآن لا اختيار مشغّل.
+     *
+     * @return true إن وُجد مشغّل ونُفِّذ، false إن لم يوجد أي مشغّل مناسب.
+     */
+    suspend fun runDirect(
+        activity: Activity,
+        fileObject: FileObject?,
+        projectRoot: FileObject? = null,
+    ): Boolean {
+        if (fileObject == null) return false
+        beforeRun?.invoke()
+        val runner =
+            getAvailableRunners(fileObject, projectRoot)
+                .filterIsInstance<FileRunner>()
+                .firstOrNull() ?: return false
+        runner.run(activity, fileObject)
+        Settings.runs += 1
+        Events.publish(RunnerEvent.RunnerRun(runner))
+        return true
+    }
+
+    /** خطّاف اختياري يُنفَّذ قبل أي تشغيل مباشر (يضبطه من يريد حفظًا مسبقًا). */
+    var beforeRun: (suspend () -> Unit)? = null
+
     fun run(
         activity: Activity,
         fileObject: FileObject?,

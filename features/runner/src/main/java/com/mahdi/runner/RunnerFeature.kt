@@ -70,7 +70,7 @@ class RunnerFeature : Feature {
         CommandProvider.registerCommand(RunCommand)
         ToolbarConfiguration.addGlobalToolbarCommand(RunCommand, 0)
         // 9.7.0: تشغيل سكربت بايثون مباشرة (Ctrl+R) بلا نافذة اختيار مشغّل
-        CommandProvider.registerCommand(PythonRunScriptCommand)
+        CommandProvider.registerCommand(PythonRunScriptCommand())
 
         // 9.2.0: «فتح رابط» — متصفّح داخلي كما في المتصفحات (لا متصفّح ثانٍ:
         // يُستخدم PreviewBrowserActivity نفسه الذي يعرض ملفات HTML).
@@ -83,7 +83,7 @@ class RunnerFeature : Feature {
         runnersRoute?.let { SettingsRegistry.unregisterRoute(it) }
         htmlRunnersRoute?.let { SettingsRegistry.unregisterRoute(it) }
 
-        CommandProvider.unregisterCommand(PythonRunScriptCommand)
+        CommandProvider.unregisterCommand(PythonRunScriptCommand())
         CommandProvider.unregisterCommand(OpenLinkCommand)
         CommandProvider.unregisterCommand(RunCommand)
         ToolbarConfiguration.removeGlobalToolbarCommand(RunCommand)
