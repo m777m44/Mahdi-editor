@@ -53,7 +53,9 @@ class PythonReplCommand : EditorCommand() {
         // التشغيل قرارًا منفصلًا.
         // المجلد يُقرأ من المسار المطلق مباشرةً: `getParentFile()` معلّقة
         // (suspend) في تجريد [FileObject]، ولا حاجة لنداء معلّق لمجرد قصّ مسار.
-        val dir = file?.getAbsolutePath()?.substringBeforeLast('/', "").takeIf { it.isNotEmpty() }
+        // `file?.getAbsolutePath()` نصّ قد يكون null، فالقصّ يحتاج `?.` ثانيةً —
+        // وإلا فسلسلة الاستدعاء تتوقّف عند القيمة القابلة للعدم.
+        val dir = file?.getAbsolutePath()?.substringBeforeLast('/', "")?.takeIf { it.isNotEmpty() }
         val prefix = if (isPython && dir != null) "PYTHONPATH=\"$dir:\${PYTHONPATH:-}\" " else ""
         val script = "${prefix}exec python3 -qiu"
 
