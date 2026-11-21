@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg
+	version="1.1"
+	xmlns="http://www.w3.org/2000/svg"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	x="0%" y="0%"
+	width="100%" height="100%"
+	viewBox="0 0 50.0 50.0"
+	enable-background="new 0 0 50.0 50.0"
+	xml:space="preserve">
+<defs>
+	<linearGradient id="fillGrad7" x1="0.000%" y1="50.000%" x2="100.000%" y2="50.000%">
+   		<stop offset="0.000%" style="stop-color:rgb(61,237,255);stop-opacity:1.000" />
+		<stop offset="64.218%" style="stop-color:rgb(0,136,249);stop-opacity:1.000" />
+		<stop offset="100.000%" style="stop-color:rgb(18,60,255);stop-opacity:1.000" />
+	</linearGradient>
+
+	<linearGradient id="fillGrad66" x1="0.000%" y1="50.000%" x2="100.000%" y2="50.000%">
+   		<stop offset="0.000%" style="stop-color:rgb(28,255,246);stop-opacity:1.000" />
+		<stop offset="61.537%" style="stop-color:rgb(45,137,255);stop-opacity:1.000" />
+		<stop offset="100.000%" style="stop-color:rgb(1,0,251);stop-opacity:1.000" />
+	</linearGradient>
+
+</defs>
+	<path
+		fill="#FFFFFF"
+		stroke="#FFFFFF"
+		fill-opacity="0.000"
+		stroke-opacity="1.000"
+		fill-rule="nonzero"
+		stroke-width="2.25"
+		stroke-linejoin="miter"
+		stroke-linecap="square"
+		d="M40.36,-19.06C50.82,-19.06,59.30,-17.82,59.30,-16.29C59.30,-14.77,50.82,-13.53,40.36,-13.53C29.90,-13.53,21.43,-14.77,21.43,-16.29C21.43,-17.82,29.90,-19.06,40.36,-19.06z"/>
+	<path
+		transform = "rotate(-0.00 22.75 3.98)"
+		fill="url(#fillGrad7)"
+		stroke="#00AFAF"
+		fill-opacity="1.0"
+		stroke-opacity="1.000"
+		fill-rule="nonzero"
+		stroke-width="0.10553839"
+		stroke-linejoin="miter"
+		stroke-linecap="square"
+		d="M13.60,6.20A2.21 1.97 269.58 0 1 13.60,1.77L31.91,1.76A2.21 1.97 90.42 0 1 31.91,6.18L13.60,6.20z"/>
+	<path
+		transform = "rotate(-0.00 22.59 27.46)"
+		fill="url(#fillGrad66)"
+		stroke="#00B8B8"
+		fill-opacity="1.0"
+		stroke-opacity="1.000"
+		fill-rule="nonzero"
+		stroke-width="0.10976644"
+		stroke-linejoin="miter"
+		stroke-linecap="square"
+		d="M11.35,33.63C11.54,34.54,11.81,35.19,12.27,35.82Q12.83,36.46,14.04,37.31L20.35,41.71L20.37,44.64C20.52,45.78,21.35,46.60,22.66,46.66C23.98,46.60,24.67,45.71,24.81,44.67L24.83,41.75L31.41,37.16Q32.62,36.38,33.10,35.66C33.53,34.97,33.72,34.50,33.89,33.69L33.91,30.03C33.91,29.14,33.91,28.49,33.63,27.85C33.51,27.43,33.10,26.76,32.75,26.41C32.55,26.11,31.65,25.48,30.78,25.17L15.76,19.35L15.76,12.70L29.43,12.70L29.46,18.09A2.24 2.14 -0.00 0 0 33.87,18.09L33.84,8.26L11.27,8.29L11.27,19.64C11.40,21.56,12.43,22.51,13.54,23.20L29.42,29.36L29.42,33.10L22.65,37.87L15.74,33.14L15.71,30.13A2.25 2.16 -0.00 0 0 11.27,30.17L11.35,33.63z"/>
+	<path
+		fill="#9BFF00"
+		stroke="#212121"
+		fill-opacity="1.000"
+		stroke-opacity="1.000"
+		fill-rule="nonzero"
+		stroke-width="0.020312734"
+		stroke-linejoin="miter"
+		stroke-linecap="square"
+		d="M30.68,26.60L18.56,25.78L18.56,40.73L30.68,40.77L42.79,40.73L42.79,25.78L30.68,26.60"/>
+	<path
+		fill="#FFFBA7"
+		stroke="#FFFFFF"
+		fill-opacity="1.000"
+		stroke-opacity="1.000"
+		fill-rule="nonzero"
+		stroke-width="0.08467347"
+		stroke-linejoin="miter"
+		stroke-linecap="square"
+		d="M30.74,25.57C31.13,25.40,31.45,25.23,31.80,25.09C32.31,24.86,32.97,24.65,33.51,24.49C34.50,24.19,36.00,23.98,36.71,23.98C37.21,23.93,37.74,23.95,38.32,23.95C39.20,24.05,40.03,24.08,40.58,24.24L40.80,39.79Q40.44,39.76,40.00,39.76C39.05,39.74,38.26,39.69,37.21,39.85C36.63,39.88,36.01,40.05,35.42,40.16C34.57,40.28,33.90,40.56,33.29,40.71C32.37,40.99,31.41,41.48,30.68,42.12C29.94,41.54,28.99,40.96,28.06,40.80C27.08,40.45,25.60,40.15,24.89,40.09C24.40,40.02,23.86,39.98,23.30,39.97C22.40,39.98,21.57,39.91,20.66,39.93L20.79,24.24C21.44,24.08,22.27,24.05,23.15,23.95C23.73,23.95,24.26,23.93,24.76,23.98C25.47,23.98,26.97,24.19,27.97,24.49C28.51,24.65,29.16,24.86,29.67,25.09C30.02,25.23,30.34,25.40,30.74,25.57z"/>
+	<path
+		fill="#00FEFF"
+		stroke="#000000"
+		fill-opacity="1.000"
+		stroke-opacity="0.051"
+		fill-rule="nonzero"
+		stroke-width="0.020312734"
+		stroke-linejoin="miter"
+		stroke-linecap="square"
+		d="M31.50,41.55L31.71,25.13L30.78,25.53L29.79,25.08L29.77,41.52L30.68,42.12L31.50,41.55z"/>
+</svg>

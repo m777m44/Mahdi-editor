@@ -6,6 +6,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.activities.settings.SettingsRoutes
 import com.mahdi.commands.CommandProvider
 import com.mahdi.commands.ToolbarConfiguration
+import com.mahdi.commands.editor.PythonReplCommand
+import com.mahdi.commands.editor.PythonRunSelectionCommand
+import com.mahdi.commands.editor.PythonToolkitCommand
 import com.mahdi.commands.editor.PythonRunScriptCommand
 import com.mahdi.commands.editor.RunCommand
 import com.mahdi.commands.global.OpenLinkCommand
@@ -71,6 +74,12 @@ class RunnerFeature : Feature {
         ToolbarConfiguration.addGlobalToolbarCommand(RunCommand, 0)
         // 9.7.0: تشغيل سكربت بايثون مباشرة (Ctrl+R) بلا نافذة اختيار مشغّل
         CommandProvider.registerCommand(PythonRunScriptCommand())
+        // 9.8.0: وحدة تحكّم بايثون التفاعلية (Ctrl+Shift+K) — Pydroid Console
+        CommandProvider.registerCommand(PythonReplCommand())
+        // 9.8.0: تشغيل التحديد أو السطر الحالي (Ctrl+Shift+Enter) بلا حفظ الملف
+        CommandProvider.registerCommand(PythonRunSelectionCommand())
+        // 9.8.0: زرّ واحد يجمع أدوات بايثون في الشريط (قائمة فرعية)
+        CommandProvider.registerCommand(PythonToolkitCommand())
 
         // 9.2.0: «فتح رابط» — متصفّح داخلي كما في المتصفحات (لا متصفّح ثانٍ:
         // يُستخدم PreviewBrowserActivity نفسه الذي يعرض ملفات HTML).
@@ -84,6 +93,9 @@ class RunnerFeature : Feature {
         htmlRunnersRoute?.let { SettingsRegistry.unregisterRoute(it) }
 
         CommandProvider.unregisterCommand(PythonRunScriptCommand())
+        CommandProvider.unregisterCommand(PythonReplCommand())
+        CommandProvider.unregisterCommand(PythonRunSelectionCommand())
+        CommandProvider.unregisterCommand(PythonToolkitCommand())
         CommandProvider.unregisterCommand(OpenLinkCommand)
         CommandProvider.unregisterCommand(RunCommand)
         ToolbarConfiguration.removeGlobalToolbarCommand(RunCommand)

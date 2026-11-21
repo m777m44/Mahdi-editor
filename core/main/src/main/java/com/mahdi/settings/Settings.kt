@@ -232,6 +232,15 @@ object Settings {
     var current_lang: String by CachedPreference("current_lang", "ar")
     var extra_keys_symbols by CachedPreference("extra_keys_symbols", DEFAULT_EXTRA_KEYS_SYMBOLS)
     var extra_keys_commands by CachedPreference("extra_keys_commands", DEFAULT_EXTRA_KEYS_COMMANDS)
+
+    /**
+     * 9.8.0 — هل حُسم اختيار حزمة الأيقونات مرّة؟
+     *
+     * عند أول تشغيل بعد التحديث نُفعّل أيقونات VS Code تلقائيًا (‏الشكل الجديد
+     * مقصود)، ثم نرفع هذا العلم. بعدها لو اختار المستخدم «بدون حزمة» تبقى
+     * خياراته كما هي ولا نعود نفرض شيئًا.
+     */
+    var icon_pack_chosen_once by CachedPreference("icon_pack_chosen_once", false)
     var git_username by CachedPreference("git_username", "")
     var git_password by CachedPreference("git_password", "")
     var git_name by CachedPreference("git_name", "")

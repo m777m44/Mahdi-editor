@@ -18,6 +18,7 @@ import com.mahdi.editor.KeywordManager
 import com.mahdi.editor.LanguageManager
 import com.mahdi.extension.ActivityProvider
 import com.mahdi.icons.pack.IconPackManager
+import com.mahdi.icons.pack.VsCodeIconPack
 import com.mahdi.icons.pack.currentIconPack
 import com.mahdi.lsp.FileIconProvider
 import com.mahdi.lsp.LspPersistence
@@ -41,6 +42,7 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(DelicateCoroutinesApi::class)
 open class App : Application() {
@@ -129,6 +131,11 @@ open class App : Application() {
         }
 
         guarded("icon packs") {
+            // 9.8.0: حزمة أيقونات VS Code تُنسخ من الأصول مرّة واحدة، ثم يفهرسها
+            // المدير كأي حزمة مثبَّتة. النسخ قبل الفهرس مقصود: الفهرس يقرأ ما على
+            // القرص، فلو نسخنا بعده لاحتاج إقلاعين لتظهر.
+            VsCodeIconPack.ensureInstalled(this@App)
+
             iconPackManager.indexLocalPacks()
             // 2.5.0: أُزيلت «الألوان الديناميكية» (Monet) — نُبطلها دائمًا حتى تبقى الثيمات الأربعة فقط
             if (Settings.monet) Settings.monet = false
@@ -137,6 +144,25 @@ open class App : Application() {
             if (Settings.icon_pack.isNotEmpty() && iconPackManager.localIconPacks.value[Settings.icon_pack] == null) {
                 Settings.icon_pack = ""
                 currentIconPack.value = null
+            }
+
+            // 9.8.0: أول تشغيل بعد التحديث → الأيقونات الملوّنة مفعّلة افتراضيًا،
+            // لأن الشكل الجديد هو ما طلبه المستخدم صراحةً. الاختيار يُحترم بعدها:
+            // لو اختار المستخدم «النظام» (‏Settings.icon_pack = "") لا نعود نفرضها.
+            //
+            // **على الخيط الرئيسي:** `Settings.icon_pack` و`currentIconPack` كلاهما
+            // حالة Compose (`mutableStateOf`)، وكتابتها من IO لا تُحدِّث الواجهة
+            // بشكل موثوق. النداء هنا ينتقل ويعود، فلا يُعطّل شيئًا.
+            if (!Settings.icon_pack_chosen_once) {
+                withContext(Dispatchers.Main) {
+                    iconPackManager.localIconPacks.value[VsCodeIconPack.ID]?.let { pack ->
+                        if (Settings.icon_pack.isEmpty()) {
+                            Settings.icon_pack = VsCodeIconPack.ID
+                            currentIconPack.value = pack
+                        }
+                    }
+                    Settings.icon_pack_chosen_once = true
+                }
             }
 
             iconPackManager.indexStoreIconPacks()

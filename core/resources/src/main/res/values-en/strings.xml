@@ -1189,4 +1189,13 @@ Thank you for using Mahdi-Editor.</string>
     <string name="close_all_sessions">Close all windows</string>
     <string name="close_all_sessions_msg">All terminal windows will be closed and their processes terminated. Continue?</string>
     <string name="check_python_runtime">Python runtime (libpython) check</string>
+
+    <string name="vscode_themes_group">VS Code themes</string>
+    <string name="vscode_themes_desc">Darcula, Abyss and Quiet Light — colours and syntax from VS Code</string>
+    <string name="import_vscode_theme">Import VS Code theme</string>
+    <string name="import_vscode_theme_desc">Pick a .tmTheme or -color-theme.json file</string>
+    <string name="vscode_theme_failed">Could not read the theme — make sure it is a valid VS Code theme file</string>
+    <string name="vscode_icons_name">VS Code icons</string>
+    <string name="vscode_icons_desc">Colourful file-type shapes (Python, JSON, Java, folders…)</string>
+    <string name="vscode_icons_unavailable">Built-in pack unavailable — restart the app to copy it again</string>
 </resources>

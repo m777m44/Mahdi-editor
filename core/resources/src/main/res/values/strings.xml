@@ -1214,4 +1214,13 @@
     <string name="close_all_sessions">إغلاق كل النوافذ</string>
     <string name="close_all_sessions_msg">ستُغلق كل نوافذ الطرفية وتُنهى عملياتها. هل تريد المتابعة؟</string>
     <string name="check_python_runtime">فحص مفسّر بايثون (libpython)</string>
+
+    <string name="vscode_themes_group">ثيمات VS Code</string>
+    <string name="vscode_themes_desc">دراكولا والهاوية والضوء الهادئ — ألوان وتلوين نحوي من VS Code</string>
+    <string name="import_vscode_theme">استيراد ثيم VS Code</string>
+    <string name="import_vscode_theme_desc">اختر ملف ‎.tmTheme أو ‎-color-theme.json</string>
+    <string name="vscode_theme_failed">تعذّر قراءة الثيم — تأكّد أنه ملف ثيم VS Code صالح</string>
+    <string name="vscode_icons_name">أيقونات VS Code</string>
+    <string name="vscode_icons_desc">أشكال ملوّنة لأنواع الملفات (بايثون، JSON، جافا، المجلّدات…)</string>
+    <string name="vscode_icons_unavailable">الحزمة المدمجة غير متاحة — أعد تشغيل التطبيق لتُنسخ من جديد</string>
 </resources>

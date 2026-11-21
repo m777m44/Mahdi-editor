@@ -127,6 +127,8 @@ jobs:
             --tests "com.mahdi.text.BidiFileNameTest" \
             --tests "com.mahdi.editor.complete.PythonIntelliSenseTest" \
             --tests "com.mahdi.editor.complete.PythonSnippetsTest" \
+            --tests "com.mahdi.editor.complete.PythonAutoImportTest" \
+            --tests "com.mahdi.theme.VsCodeThemeImporterTest" \
             2>&1 | tee /tmp/tests.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
@@ -176,6 +178,42 @@ jobs:
           fi
           if [ "$fail" -ne 0 ]; then echo "❌ بيان الـ APK ناقص — أوقفنا الإصدار"; exit 1; fi
           echo "✅ بيان الـ APK كامل"
+
+      # ═══════════════════════════════════════════════════════════════════════════
+      # 9.8.0: أصول VS Code داخل الـ APK — ثلاثة ثيمات وحزمة أيقونات.
+      # بلا هذا الفحص قد تُحذف مجلدات `assets/vscode` من الحزمة (أو يُنسى
+      # `noCompress`) فيظهر التطبيق بلا أيقونات ولا ثيمات **بعد** النشر.
+      # ═══════════════════════════════════════════════════════════════════════════
+      - name: Verify VS Code assets inside APK
+        run: |
+          set -uo pipefail
+          fail=0
+          for asset in assets/vscode/themes/darcula.json \
+                       assets/vscode/themes/abyss.json \
+                       assets/vscode/themes/quiet-light.json \
+                       assets/vscode/icons/manifest.json \
+                       assets/vscode/icons/python.svg \
+                       assets/vscode/icons/folder.svg \
+                       assets/fonts/Hack-Regular.ttf \
+                       assets/fonts/SourceCodePro-Regular.ttf; do
+            # `unzip -p` يفكّ ضغط الملف فعليًا: أقوى دليل على وجوده وسلامة
+            # ضغطه من مجرّد ظهور اسمه في الفهرس.
+            if unzip -p out/Mahdi-Editor.apk "$asset" 2>/dev/null | head -c 1 | od -An -tu1 | grep -qE '[0-9]'; then
+              echo "✅ $asset"
+            else
+              echo "::error title=أصل مفقود::المسار $asset غير موجود داخل الـ APK"
+              fail=1
+            fi
+          done
+          # عدد أيقونات الحزمة: 24 شكلًا + مجلّد + افتراضي + نصّ = 27
+          icons=$(unzip -l out/Mahdi-Editor.apk 2>/dev/null | grep -cF 'assets/vscode/icons/' || true)
+          echo "أيقونات SVG داخل الـ APK: $icons"
+          if [ "${icons:-0}" -lt 24 ]; then
+            echo "::error title=أيقونات ناقصة::$icons أيقونة فقط — المتوقّع 24 على الأقل"
+            fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "❌ أصول VS Code ناقصة — أوقفنا الإصدار"; exit 1; fi
+          echo "✅ أصول VS Code كاملة"
 
       # عند فشل التجميع في طلب دمج: انشر أسطر الخطأ كتعليق على الطلب،
       # حتى يراها من لا يملك صلاحية الوصول إلى سجلات Actions.

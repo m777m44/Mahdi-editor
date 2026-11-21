@@ -2,6 +2,8 @@ package com.mahdi.theme
 
 import androidx.compose.runtime.mutableStateListOf
 import com.google.gson.Gson
+import com.google.gson.JsonArray
+import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import com.mahdi.settings.Preference
 import com.mahdi.utils.logError
@@ -68,6 +70,11 @@ object CustomThemes {
         val lightText: Long? = null,
         val lightTextSecondary: Long? = null,
         val lightOutline: Long? = null,
+        // 9.8.0: رموز TextMate للثيمات المستوردة (‏VS Code / tmTheme).
+        // اختيارية: الثيمات القديمة لا تحملها، و`Gson` يتركها null.
+        // بلا حفظها يضيع تلوين الكود للثيم المستورد بعد إعادة التشغيل،
+        // فيبقى الاسم والألوان ويعود المحرّر إلى تلوين الثيم الأساسي.
+        val tokenColors: String? = null,
     ) {
         fun darkColors(): MahdiColors =
             MahdiColors(
@@ -111,13 +118,37 @@ object CustomThemes {
                 dark = dark,
             )
 
+        /** رموز TextMate المحفوظة، أو مصفوفة فارغة. */
+        fun tokenArray(): JsonArray {
+            val raw = tokenColors?.takeIf { it.isNotBlank() } ?: return JsonArray()
+            return runCatching {
+                    val parsed = JsonParser.parseString(raw)
+                    when {
+                        parsed.isJsonArray -> parsed.asJsonArray
+                        parsed.isJsonObject -> JsonArray().apply { add(parsed) }
+                        else -> JsonArray()
+                    }
+                }
+                .getOrDefault(JsonArray())
+        }
+
         /** يبني الثيم كاملًا: بلوحتين إن وُجدت الفاتحة، وإلا باشتقاقها. */
         fun toHolder(): ThemeHolder {
             val light = lightColorsOrNull()
-            return if (light != null) {
-                themeHolderFrom(id = id, name = name, light = light, dark = darkColors())
+            val base =
+                if (light != null) {
+                    themeHolderFrom(id = id, name = name, light = light, dark = darkColors())
+                } else {
+                    toSpec().toThemeHolder()
+                }
+            val tokens = tokenArray()
+            if (tokens.size() == 0) return base
+            // الرموز تُطبَّق على الوضع الذي كُتب له الثيم فقط؛ الوضع المشتقّ يرث
+            // تلوين الثيمات الأصلية كما يفعل [VsCodeThemes].
+            return if (dark) {
+                base.copy(darkTokenColors = tokens)
             } else {
-                toSpec().toThemeHolder()
+                base.copy(lightTokenColors = tokens)
             }
         }
     }
@@ -169,7 +200,13 @@ object CustomThemes {
      * يحفظ ثيمًا **بلوحتين منفصلتين** (فاتحة وداكنة) — يُستخدم لثيمات المتجر
      * ولأي ثيم يُستورد من حزمة قياسية تحتوي `light` و`dark`.
      */
-    fun savePair(id: String, name: String, light: MahdiColors, dark: MahdiColors): ThemeHolder {
+    fun savePair(
+        id: String,
+        name: String,
+        light: MahdiColors,
+        dark: MahdiColors,
+        tokenColors: String? = null,
+    ): ThemeHolder {
         ensureLoaded()
         val base = ThemeSpec(id = id, name = name, style = ThemeStyle.SOLID, colors = dark, dark = true)
         val stored =
@@ -182,10 +219,21 @@ object CustomThemes {
                 lightText = light.text,
                 lightTextSecondary = light.textSecondary,
                 lightOutline = light.outline,
+                tokenColors = tokenColors?.takeIf { it.isNotBlank() },
             )
         persist(readStored().filterNot { it.id == id } + stored)
 
-        val holder = themeHolderFrom(id = id, name = name, light = light, dark = dark)
+        val holder =
+            themeHolderFrom(id = id, name = name, light = light, dark = dark).let { built ->
+                val tokens = stored.tokenArray()
+                if (tokens.size() == 0) {
+                    built
+                } else {
+                    // الثيم المُستورد يُحفظ بلوحته الداكنة أساسًا، فتطبيق الرموز
+                    // على الوضع الداكن هو الصحيح دائمًا هنا.
+                    built.copy(darkTokenColors = tokens)
+                }
+            }
         val index = _themes.indexOfFirst { it.id == id }
         if (index >= 0) _themes[index] = holder else _themes.add(holder)
         return holder

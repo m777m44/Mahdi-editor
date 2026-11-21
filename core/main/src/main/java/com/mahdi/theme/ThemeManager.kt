@@ -96,7 +96,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
         allowTrailingComma = true
     }
 
-    private val _loadedThemesState = mutableStateOf(builtInThemes)
+    private val _loadedThemesState = mutableStateOf(builtInThemes + vscodeThemesOrEmpty())
     val loadedThemesState: State<List<ThemeHolder>> = _loadedThemesState
     private val _localThemes = MutableStateFlow<Map<String, LocalTheme>>(emptyMap())
     val localThemes: StateFlow<Map<String, LocalTheme>> = _localThemes.asStateFlow()
@@ -146,7 +146,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
         _themeIdState.value = id
 
         val holder =
-            if (builtInThemes.any { it.id == id } || CustomThemes.themes.any { it.id == id }) {
+            if (builtInThemes.any { it.id == id } || vscodeThemesOrEmpty().any { it.id == id } || CustomThemes.themes.any { it.id == id }) {
                 null
             } else {
                 withContext(Dispatchers.IO) {
@@ -507,7 +507,7 @@ class ThemeManager : CoroutineScope by CoroutineScope(Dispatchers.IO) {
             }
             withContext(Dispatchers.Main) {
                 _localThemes.value = newLocalThemes
-                setLoadedThemes(builtInThemes + newLoadedThemes)
+                setLoadedThemes(builtInThemes + vscodeThemesOrEmpty() + newLoadedThemes)
             }
         }
     }
@@ -734,4 +734,17 @@ fun resolveThemeMode(mode: Int): Int {
     } else {
         AppCompatDelegate.MODE_NIGHT_NO
     }
+}
+
+/**
+ * 9.8.0 — ثيمات VS Code المدمجة، أو قائمة فارغة إن تعذّرت القراءة.
+ *
+ * لا نرمي استثناءً أبدًا: ثيم تالف في الأصول يجب ألا يمنع الإقلاع. والسياق
+ * يؤخذ من [com.mahdi.utils.application] كما في بقية الطبقة.
+ */
+private fun vscodeThemesOrEmpty(): List<ThemeHolder> {
+    val context = application ?: return emptyList()
+    return runCatching { VsCodeThemes.all(context) }
+        .onFailure { logError(it, "Failed to load VS Code themes") }
+        .getOrDefault(emptyList())
 }
