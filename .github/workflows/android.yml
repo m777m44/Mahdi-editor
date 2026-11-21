@@ -130,35 +130,10 @@ jobs:
             2>&1 | tee /tmp/tests.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
-            # 9.7.0: كل اختبار فاشل يصبح **تعليقًا** في تبويب Checks (annotations
-            # API) يُقرأ بلا سجل بناء كامل. السكربت مكتوب في ملف منفصل (بمحاذاة
-            # عمود الصفر بعد تجريد إزاحة YAML) ليبقى Python صحيح الإزاحة.
-            cat > /tmp/annotate_tests.py <<'PYXML'
-import glob, sys, xml.etree.ElementTree as ET
-
-shown = 0
-for path in glob.glob('core/main/build/test-results/testDebugUnitTest/*.xml'):
-    try:
-        root = ET.parse(path).getroot()
-    except Exception as error:
-        print(f"::error title=test-results::{path}: {error}")
-        continue
-    for case in root.iter('testcase'):
-        failure = case.find('failure')
-        if failure is None:
-            failure = case.find('error')
-        if failure is None:
-            continue
-        name = f"{case.get('classname')}.{case.get('name')}"
-        message = (failure.get('message') or failure.text or '')
-        message = ' '.join(message.split())[:600]
-        print(f"::error title=unit-test::{name} — {message}")
-        shown += 1
-if shown == 0:
-    print("::error title=unit-test::فشل Gradle قبل تشغيل الاختبارات (انظر /tmp/tests.log)")
-PYXML
-            python3 /tmp/annotate_tests.py || true
-            # ذيل سجل Gradle في تعليق الـ PR (آخر ٢٥ سطرًا فقط)
+            # 9.7.0: كل اختبار فاشل يصبح تعليقًا في تبويب Checks (annotations)،
+            # والذيل في سجل البناء. السكربت في tools/ci/annotate_tests.py
+            # (ملف مستقل يُختبَر ويعمل محليًا أيضًا).
+            python3 tools/ci/annotate_tests.py || true
             tail -25 /tmp/tests.log || true
           fi
           exit "$rc"
