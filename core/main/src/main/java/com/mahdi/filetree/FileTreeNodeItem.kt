@@ -36,14 +36,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mahdi.components.compose.utils.addIf
@@ -247,10 +244,9 @@ fun FileTreeNodeItem(
                     softWrap = metrics.twoLines,
                     overflow = TextOverflow.Ellipsis,
                     color = titleColor,
-                    // لفّ الاتجاه ثنائي الاتجاه: السطر العربي يبقى RTL، والاسم
-                    // اللاتيني كاملًا (مثل `build.gradle.kts`) يبقى LTR.
-                    textDirection = TextDirection.ContentOrLtr,
-                    modifier = Modifier.addIf(underlineColor != null) { drawErrorUnderline(underlineColor!!) },
+                    // الاتجاه يُضبط في `nameStyle` لا هنا: `Text` لا يقبل
+                    // `textDirection` كمعامل، و`TextStyle` هو الحامل الصحيح له.
+                    modifier = underlineModifier(underlineColor),
                 )
             }
 
@@ -322,3 +318,14 @@ private fun RowMeta(node: FileTreeNode, file: FileObject, metrics: FileTreeMetri
         modifier = Modifier.padding(start = 6.dp),
     )
 }
+
+/**
+ * الخطّ المموّج لملفّ فيه خطأ — أو لا شيء.
+ *
+ * `addIf` يتوقّع `Modifier.() -> Modifier`، والاستدعاء المضمّن مباشرةً داخل
+ * تركيبة `Text` كان يخفق في استنتاج النوع (خطأ المترجم: «None of the
+ * following candidates is applicable»). الدالّة الصريحة تُثبّت النوع مرّة
+ * واحدة وتُقرأ أوضح من تعبير مضمّن.
+ */
+private fun underlineModifier(color: Color?): Modifier =
+    if (color == null) Modifier else Modifier.drawErrorUnderline(color)
