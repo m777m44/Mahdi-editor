@@ -488,3 +488,16 @@ fun themeStyleOf(id: String): ThemeStyle? = themeCatalog.firstOrNull { it.id == 
 
 /** كل الثيمات جاهزة، بالترتيب المعروض في الشاشة. */
 val catalogThemes: List<ThemeHolder> = themeCatalog.map { it.toThemeHolder() }
+
+/**
+ * 9.8.0 — معرّفات الثيمات **المدمجة** (لا تُحذف): الأربعة الأصلية + الثلاثة
+ * المستوردة من VS Code.
+ *
+ * شاشة الثيمات كانت تعتبر كل ما ليس في [themeCatalog] «مثبَّتًا» فتعرض له زرّ
+ * حذف. الآن التمييز بالمعرّف لا بالمصدر، فالثيمات المدمجة كلها بلا زرّ حذف
+ * ولو لم تكن في كتالوج 2.0.
+ */
+val bundledThemeIds: Set<String> = themeCatalog.map { it.id }.toSet() + VsCodeThemes.IDS
+
+/** هل الثيم مدمج (لا يُحذف)؟ */
+fun isBundledTheme(id: String): Boolean = id in bundledThemeIds

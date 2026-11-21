@@ -8,6 +8,7 @@ import com.mahdi.commands.editor.EmulateKeyCommand
 import com.mahdi.commands.editor.JumpToLineCommand
 import com.mahdi.commands.editor.LowerCaseCommand
 import com.mahdi.commands.editor.PasteCommand
+import com.mahdi.commands.editor.PythonAutoImportCommand
 import com.mahdi.commands.editor.PythonSnippetCommand
 import com.mahdi.commands.editor.RedoCommand
 import com.mahdi.commands.editor.RefreshCommand
@@ -90,6 +91,7 @@ object CommandProvider {
     lateinit var FormatDocumentLspCommand: FormatDocumentLspCommand
     lateinit var FormatSelectionCommand: FormatSelectionCommand
     lateinit var PythonSnippetCommand: PythonSnippetCommand
+    lateinit var PythonAutoImportCommand: PythonAutoImportCommand
 
     fun buildCommands() =
         synchronized(this) {
@@ -133,6 +135,8 @@ object CommandProvider {
             registerBuiltin(FormatSelectionCommand()) { FormatSelectionCommand = it }
             // 9.7.0: مقتطفات بايثون الجاهزة داخل لوحة الأوامر (Pydroid-class)
             registerBuiltin(PythonSnippetCommand()) { PythonSnippetCommand = it }
+            // 9.8.0: إصلاح الاستيرادات الناقصة وترتيبها (Auto Import / Organize Imports)
+            registerBuiltin(PythonAutoImportCommand()) { PythonAutoImportCommand = it }
         }
 
     private fun <T : Command> registerBuiltin(command: T, assign: (T) -> Unit) {

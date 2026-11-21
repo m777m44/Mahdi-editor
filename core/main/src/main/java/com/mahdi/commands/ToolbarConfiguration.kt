@@ -23,9 +23,42 @@ object ToolbarConfiguration {
         "editor.undo|editor.redo|editor.save|editor.run|global.new_file|editor.editable|editor.search|editor.encoding|editor.refresh|global.terminal|global.settings"
 
     /**
+     * 9.8.0 — شريط المحرّر الافتراضي بعد إضافة «أدوات بايثون».
+     *
+     * زرّ واحد يحلّ محلّ خمسة: لو أضفنا الأوامر الخمسة مباشرة لضاق الشريط على
+     * الهاتف وخرج «الحفظ» من الشاشة. الزرّ يظهر لملفات بايثون فقط (بفضل
+     * `isSupported`)، فلا يزحم بقية الملفات.
+     */
+    const val DEFAULT_EDITOR_TOOLBAR_COMMANDS_9_8 =
+        "editor.undo|editor.redo|editor.save|editor.run|editor.python_toolkit|global.new_file|editor.editable|editor.search|editor.encoding|editor.refresh|global.terminal|global.settings"
+
+    /**
      * ترحيل لمرّة واحدة: من كان على الشريط الافتراضي القديم بلا تعديل يحصل على زرّ
      * «الترميز»، ومن عدّل شريطه يبقى كما هو تمامًا.
      */
+    /**
+     * 9.8.0 — يُضيف «أدوات بايثون» إلى شريط من لم يعدّله.
+     *
+     * يُوضع بعد «تشغيل» مباشرةً لأنه أقرب زرّ لذهن كاتب بايثون، ويُتخطّى إن
+     * كان زرّ آخر قريب موجودًا أو كان المستخدم قد رتّب شريطه بنفسه — ترتيب
+     * المستخدم مقدَّم دائمًا على الافتراضي.
+     *
+     * **متى يُستدعى؟** بعد تسجيل الأوامر لا قبله: الإدراج يتمّ بالمعرّف فورًا،
+     * لكن `getForId` يُرجع `null` لو لم يُسجَّل الأمر بعد فيُظهر الشريط فراغًا.
+     * لذا يُستدعى من `App.onCreate` بعد [com.mahdi.feature.FeatureRegistry.initFeatures].
+     */
+    fun migratePythonToolkitCommand() {
+        val current = Settings.action_items
+        if (current.contains("editor.python_toolkit")) return
+        // فقط الشريطين الافتراضيين المعروفين — أي شريط آخر مخصّص لا نلمسه
+        val isStock = current == DEFAULT_EDITOR_TOOLBAR_COMMANDS || current == LEGACY_DEFAULT_EDITOR_TOOLBAR_COMMANDS
+        if (!isStock) return
+        val items = current.split("|").toMutableList()
+        val index = items.indexOf("editor.run")
+        if (index >= 0) items.add(index + 1, "editor.python_toolkit") else items.add("editor.python_toolkit")
+        Settings.action_items = items.joinToString("|")
+    }
+
     fun migrateEncodingCommand() {
         val current = Settings.action_items
         if (current.contains("editor.encoding")) return
