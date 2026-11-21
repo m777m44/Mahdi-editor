@@ -88,7 +88,7 @@ class PythonSnippetsTest {
         source.forEach { c ->
             when {
                 escaping -> escaping = false
-                c == '\\' && quote != null -> escaping = true
+                c == '\\' -> escaping = true
                 quote != null -> if (c == quote) quote = null
                 c == '"' || c == '\'' -> quote = c
                 c == '(' -> parens++

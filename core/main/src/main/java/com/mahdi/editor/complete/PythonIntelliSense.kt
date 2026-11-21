@@ -60,14 +60,23 @@ object PythonIntelliSense {
         if (prefix.isNotEmpty() && prefix.length < MIN_PREFIX) return emptyList()
 
         val out = LinkedHashMap<String, Suggestion>(limit * 3)
+        // رتبة مستقلة عن نوع الاقتراح: **رموز الملف** تتقدّم دائمًا، لأن اسمًا
+        // كتبه المستخدم قبل سطرين أقرب إلى ذهنه من دالة مدمجة في المكتبة.
+        val priority = HashMap<String, Int>(32)
         val lower = prefix.lowercase()
 
-        fun offer(candidate: String, kind: SuggestionKind, detail: String? = null) {
+        fun offer(
+            candidate: String,
+            kind: SuggestionKind,
+            detail: String? = null,
+            isLocal: Boolean = false,
+        ) {
             if (candidate.length <= prefix.length) return
             if (!candidate.lowercase().startsWith(lower)) return
             if (candidate.equals(prefix, ignoreCase = true)) return
             if (out.containsKey(candidate)) return
             out[candidate] = Suggestion(candidate, kind, detail)
+            priority[candidate] = if (isLocal) -1 else (KIND_RANK[kind] ?: 9)
         }
 
         // ——— ١) بعد نقطة: عضو من وحدة/كائن أوَّل ———
@@ -86,13 +95,13 @@ object PythonIntelliSense {
         // الكلمات المفتاحية هنا ضجيج: من كتب `import ` يريد اسم وحدة لا `print`.
         if (tail.afterImport) {
             MODULES.forEach { name, kind -> offer(name, kind) }
-            symbolsInFile(text, cursor).forEach { offer(it.first, it.second, it.third) }
+            symbolsInFile(text, cursor).forEach { offer(it.first, it.second, it.third, isLocal = true) }
             return out.values.take(limit)
         }
 
         // ——— ٢) رموز الملف: def/class/متغيّرات ———
         symbolsInFile(text, cursor).forEach { symbol ->
-            offer(symbol.first, symbol.second, symbol.third)
+            offer(symbol.first, symbol.second, symbol.third, isLocal = true)
         }
 
         // ——— ٣) توقيع دالة معروفة عند فتح قوس ———
@@ -120,7 +129,7 @@ object PythonIntelliSense {
 
         return out.values
             .sortedWith(
-                compareBy<Suggestion> { KIND_RANK[it.kind] ?: 9 }
+                compareBy<Suggestion> { priority[it.text] ?: 9 }
                     .thenBy { it.text.length }
                     .thenBy { it.text },
             )

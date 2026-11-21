@@ -91,7 +91,6 @@ object RunnerManager {
         projectRoot: FileObject? = null,
     ): Boolean {
         if (fileObject == null) return false
-        beforeRun?.invoke()
         val runner =
             getAvailableRunners(fileObject, projectRoot)
                 .filterIsInstance<FileRunner>()
@@ -101,9 +100,6 @@ object RunnerManager {
         Events.publish(RunnerEvent.RunnerRun(runner))
         return true
     }
-
-    /** خطّاف اختياري يُنفَّذ قبل أي تشغيل مباشر (يضبطه من يريد حفظًا مسبقًا). */
-    var beforeRun: (suspend () -> Unit)? = null
 
     fun run(
         activity: Activity,
