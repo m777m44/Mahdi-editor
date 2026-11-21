@@ -1,12 +1,28 @@
 package com.mahdi.editor.complete
 
-/** نوع الاقتراح — يحدّد ترتيبه والأيقونة المعروضة في الشريط. */
-enum class SuggestionKind { WORD, FUNCTION, KEYWORD }
+/**
+ * نوع الاقتراح — يحدّد ترتيبه والأيقونة المعروضة في الشريط.
+ *
+ * 9.7.0: أُضيفت أنواع محرّك بايثون ([PythonIntelliSense]):
+ * [MODULE] لوحدة أو صنف، [LOCAL] لمتغيّر أو رمز من الملف نفسه، و[SNIPPET]
+ * لمقتطف يُدرج بتوقيع كامل (معاملات الدالة مثلًا).
+ */
+enum class SuggestionKind { WORD, FUNCTION, KEYWORD, MODULE, LOCAL, SNIPPET }
 
-/** اقتراح واحد جاهز للإدراج في المحرّر. */
+/**
+ * اقتراح واحد جاهز للإدراج في المحرّر.
+ *
+ * @property text النص المستبدَل بالبادئة المكتوبة.
+ * @property kind نوعه (يحدّد الرتبة والرمز).
+ * @property detail وصف قصير يظهر في الشريط (`def parse(self, text)` · `from os`).
+ * @property insert نص الإدراج حين يختلف عن [text] — مقتطف بمعاملات مثلًا؛
+ *   الشريط يعرض [text] ويُدرج [insert] (أو [text] إن كان null).
+ */
 data class Suggestion(
     val text: String,
     val kind: SuggestionKind,
+    val detail: String? = null,
+    val insert: String? = null,
 ) {
     /** رمز صغير يظهر قبل الاقتراح في الشريط (بلا أيقونات إضافية). */
     val glyph: String
@@ -15,6 +31,9 @@ data class Suggestion(
                 SuggestionKind.FUNCTION -> "ƒ"
                 SuggestionKind.KEYWORD -> "🔑"
                 SuggestionKind.WORD -> "🔤"
+                SuggestionKind.MODULE -> "❖"
+                SuggestionKind.LOCAL -> "▪"
+                SuggestionKind.SNIPPET -> "✂"
             }
 }
 
@@ -127,6 +146,9 @@ object AutocompleteEngine {
             SuggestionKind.FUNCTION -> 0
             SuggestionKind.KEYWORD -> 1
             SuggestionKind.WORD -> 2
+            SuggestionKind.MODULE -> 3
+            SuggestionKind.LOCAL -> 4
+            SuggestionKind.SNIPPET -> 5
         }
 
     private fun normalize(languageId: String?): String =

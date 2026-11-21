@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,6 +73,9 @@ fun AutocompleteBar(
                     items(suggestions, key = { it.text }) { suggestion ->
                         SuggestionChip(suggestion = suggestion, isArabic = isArabic) { onSelect(suggestion) }
                     }
+                    if (suggestions.size > 1) {
+                        item { KeysHint(isArabic = isArabic) }
+                    }
                 }
             }
         }
@@ -105,5 +109,34 @@ private fun SuggestionChip(
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,
         )
+        // 9.7.0: وصف قصير بجانب الاسم — توقيع دالة الملف أو مصدر الرمز،
+        // فيعرف المطوّر **ما** يقترحه المحرّك لا اسمًا مجرّدًا (كما في Pydroid).
+        val detail = suggestion.detail
+        if (!detail.isNullOrBlank()) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = if (isArabic) detail.bidiNumbers() else detail,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.widthIn(max = 180.dp),
+            )
+        }
     }
+}
+
+/**
+ * تلميح صغير في نهاية الشريط يذكّر بسلوك الشريط: لمسة تُدرج، والسهم على
+ * لوحة المفاتيح يختار. يظهر مرة واحدة في أقصى الشريط فلا يزاحم الاقتراحات.
+ */
+@Composable
+private fun KeysHint(isArabic: Boolean) {
+    Text(
+        text = if (isArabic) "لمسة للإدراج" else "tap to insert",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+        maxLines = 1,
+    )
 }
