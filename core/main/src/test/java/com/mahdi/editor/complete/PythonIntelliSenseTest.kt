@@ -72,13 +72,14 @@ class PythonIntelliSenseTest {
         val list = texts("import re\nimport ")
         assertTrue(list.toString(), "os" in list)
         assertTrue(list.toString(), "requests" in list)
+        assertEquals("عدد الاقتراحات", PythonIntelliSense.MAX, list.size)
     }
 
     @Test
     fun importPrefixFiltersModules() {
         // وبادئة تُرشّح: `import req` ← requests فقط
         val list = texts("import req")
-        assertEquals(list.toString(), listOf("requests").toList())
+        assertEquals(list, listOf("requests"))
     }
 
     @Test
