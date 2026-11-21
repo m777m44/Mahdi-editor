@@ -2,6 +2,7 @@ package com.mahdi.theme
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.util.Locale
 import kotlinx.serialization.json.contentOrNull
 
 /**
@@ -359,11 +360,18 @@ object VsCodeThemeImporter {
         val ca = hex(a) ?: 0xFF000000
         val cb = hex(b) ?: 0xFFFFFFFF
         fun ch(v: Long, shift: Int) = ((v shr shift) and 0xFF).toInt()
-        fun mix(x: Int, y: Int) = (x + (y - x) * ratio).toInt().coerceIn(0, 255)
+        // تقريب لا بتر: مزج `#000000` مع `#FFFFFF` بنسبة ٥٠٪ يجب أن يعطي
+        // `#808080` لا `#7F7F7F`. البتر يجعل كل القنوات أخفض بدرجة، فتظهر
+        // الألوان المشتقّة أغمق من اللازم في كل ثيم يُستورد.
+        fun mix(x: Int, y: Int) = Math.round(x + (y - x) * ratio).coerceIn(0, 255)
         val r = mix(ch(ca, 16), ch(cb, 16))
         val g = mix(ch(ca, 8), ch(cb, 8))
         val bl = mix(ch(ca, 0), ch(cb, 0))
-        return "#%02X%02X%02X".format(r, g, b)
+        // `String.format` امتداد على سلسلة التنسيق: `.format(r, g, b)` تُمرّر
+        // `r` **مستقبِلًا** لا وسيطًا، فيستهلك `%02X` الأول قيمة `g` ويُسقط
+        // `b` — فيرمي `IllegalFormatConversionException` حين يصل `r` (وهو Int)
+        // إلى محوّل نصّي. استعمال `String.format` الصريحة يضع الثلاثة وسائط.
+        return String.format(Locale.US, "#%02X%02X%02X", r, g, bl)
     }
 
     private fun kotlinx.serialization.json.JsonObject.string(key: String): String? =

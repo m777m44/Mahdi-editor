@@ -166,7 +166,9 @@ object VsCodeThemes {
         val br = (b shr 16) and 0xFF
         val bg = (b shr 8) and 0xFF
         val bb = b and 0xFF
-        fun m(x: Long, y: Long) = (x + (y - x) * ratio).toInt().coerceIn(0, 255)
+        // تقريب لا بتر — نفس سبب [VsCodeThemeImporter.lerpHex]: البتر يجعل
+        // الألوان المشتقّة أغمق بدرجة في كل قناة.
+        fun m(x: Long, y: Long) = Math.round(x + (y - x) * ratio).coerceIn(0, 255)
         return (0xFF000000L or
             (m(ar, br) shl 16).toLong() or
             (m(ag, bg) shl 8).toLong() or
