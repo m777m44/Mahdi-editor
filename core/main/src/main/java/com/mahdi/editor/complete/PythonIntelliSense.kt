@@ -56,7 +56,8 @@ object PythonIntelliSense {
         val prefix = tail.prefix
         // لا شيء لإكماله: مؤشر بعد مسافة/سطر جديد بلا بادئة ولا مستقبِل.
         // (كانت هذه الحالة تعرض ١٢ كلمة مفتاحية عند كل سطر جديد — إزعاج حقيقي.)
-        if (prefix.isEmpty() && tail.receiver == null && !tail.afterImport) return emptyList()
+        val hasCall = tail.opensParen && tail.callName.isNotEmpty()
+        if (prefix.isEmpty() && tail.receiver == null && !tail.afterImport && !hasCall) return emptyList()
         if (prefix.isNotEmpty() && prefix.length < MIN_PREFIX) return emptyList()
 
         val out = LinkedHashMap<String, Suggestion>(limit * 3)
@@ -104,20 +105,22 @@ object PythonIntelliSense {
             offer(symbol.first, symbol.second, symbol.third, isLocal = true)
         }
 
-        // ——— ٣) توقيع دالة معروفة عند فتح قوس ———
-        if (tail.opensParen) {
-            signatureOf(text, prefix)?.let { signature ->
-                if (!out.containsKey("$prefix(")) {
-                    out["$prefix("] =
-                        Suggestion(
-                            text = prefix,
-                            kind = SuggestionKind.SNIPPET,
-                            detail = signature,
-                            insert = signature,
-                        )
-                    return out.values.take(limit)
-                }
+        // ——— ٣) توقيع دالة معروفة عند فتح قوس: `greet(|` ———
+        if (tail.opensParen && tail.callName.isNotEmpty()) {
+            val name = tail.callName
+            signatureOf(text, name)?.let { signature ->
+                out[name] =
+                    Suggestion(
+                        text = name,
+                        kind = SuggestionKind.SNIPPET,
+                        detail = signature,
+                        insert = signature,
+                    )
+                return out.values.take(limit)
             }
+            // دالة غير معروفة في الملف: لا نقترح شيئًا داخل النداء — الشريط
+            // فوق لوحة المفاتيح يغطّي السطر الذي يكتبه المستخدم الآن.
+            return emptyList()
         }
 
         // ——— ٤) الكلمات المفتاحية والدوال المدمجة ———
@@ -144,10 +147,15 @@ object PythonIntelliSense {
         val prefix: String,
         /** المستقبِل قبل النقطة إن كان التعبير `recv.pref`، وإلا null. */
         val receiver: String?,
-        /** هل تلي البادئة قوس مفتوح مباشرة؟ (`name(`) */
+        /** هل يسبق المؤشر قوس مفتوح مباشرة؟ (`name(|`) */
         val opensParen: Boolean,
         /** هل نحن في سياق `import` أو `from … import`؟ */
         val afterImport: Boolean,
+        /**
+         * الاسم المستدعى عند `name(|` — البادئة نفسها قبل القوس.
+         * منفصل عن [prefix] لأن المؤشر **بعد** القوس فالبادئة تكون فارغة.
+         */
+        val callName: String = "",
     )
 
     /**
@@ -178,8 +186,17 @@ object PythonIntelliSense {
             receiver = name.takeIf { it.isNotEmpty() }
         }
 
-        val opensParen = cursor < text.length && text[cursor] == '('
-        return ExpressionTail(prefix, receiver, opensParen, afterImport)
+        // القوس **قبل** المؤشر: في `greet(` يكون المؤشر بعد القوس لا قبله،
+        // فتكون البادئة فارغة والاسم قبل القوس — نقرأه منفصلًا.
+        val opensParen = cursor > 0 && text[cursor - 1] == '('
+        var callName = ""
+        if (opensParen) {
+            var end = cursor - 1
+            val floorName = (end - 200).coerceAtLeast(0)
+            while (end > floorName && isIdentPart(text[end - 1])) end--
+            callName = text.subSequence(end, cursor - 1).toString()
+        }
+        return ExpressionTail(prefix, receiver, opensParen, afterImport, callName)
     }
 
     /** بداية السطر الحالي (بعد آخر `\n`). */
