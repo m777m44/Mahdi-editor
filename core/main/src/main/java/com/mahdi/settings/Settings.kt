@@ -137,6 +137,28 @@ object Settings {
     var format_on_save by CachedPreference("format_on_save", false)
     var show_hidden_files_drawer by CachedPreference("show_hidden_files_drawer", true)
     var compact_folders_drawer by CachedPreference("compact_folders_drawer", true)
+
+    // ————— 9.9.0: شكل شجرة الملفات —————
+    /** اسم الملف على سطرين حين يطول، بدل بتره بـ«…». */
+    var file_tree_two_lines by CachedPreference("file_tree_two_lines", true)
+
+    /** ارتفاع الصفّ بالسلم النسبي: 0 = مضغوط · 1 = عادي · 2 = مريح. */
+    var file_tree_density by CachedPreference("file_tree_density", 1)
+
+    /** تكبير الشجرة بالقرص (1.0 = الحجم الأساسي). */
+    var file_tree_scale by CachedPreference("file_tree_scale", 1f)
+
+    /** حجم الخطّ المطلق (sp) — يُستخدم حين يكون التكبير «الحرّ» مفعّلًا. */
+    var file_tree_font_sp by CachedPreference("file_tree_font_sp", 0f)
+
+    /** عرض «حجم الملف» بجانب الاسم. */
+    var file_tree_show_size by CachedPreference("file_tree_show_size", true)
+
+    /** عرض عدد العناصر داخل المجلد. */
+    var file_tree_show_count by CachedPreference("file_tree_show_count", true)
+
+    /** وصل أسماء المجلدات المفردة بـ«اسم › اسم» كما في VS Code. */
+    var file_tree_compact_path by CachedPreference("file_tree_compact_path", false)
     var show_hidden_files_search by CachedPreference("show_hidden_files_search", false)
     var show_tab_icons by CachedPreference("show_tab_icons", true)
     var split_extra_keys by CachedPreference("split_extra_keys", false)

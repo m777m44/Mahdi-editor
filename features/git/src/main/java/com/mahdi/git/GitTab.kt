@@ -82,7 +82,6 @@ import com.mahdi.activities.main.ui.drawerStateRef
 import com.mahdi.activities.main.ui.fileTreeViewModel
 import com.mahdi.components.SingleInputDialog
 import com.mahdi.components.MahdiDropdownMenuItem
-import com.mahdi.components.getDrawerWidth
 import com.mahdi.drawer.DrawerTab
 import com.mahdi.feature.FeatureRegistry
 import com.mahdi.feature.FeatureViewModel
@@ -719,7 +718,7 @@ class GitTab : DrawerTab() {
 
         Row(
             modifier =
-                Modifier.width((getDrawerWidth() - 61.dp))
+                Modifier.fillMaxWidth()
                     .combinedClickable(onClick = onToggleExpansion)
                     .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -780,7 +779,7 @@ class GitTab : DrawerTab() {
 
         Row(
             modifier =
-                Modifier.width((getDrawerWidth() - 61.dp))
+                Modifier.fillMaxWidth()
                     .combinedClickable(onClick = onToggleExpansion)
                     .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -841,7 +840,7 @@ class GitTab : DrawerTab() {
 
         Row(
             modifier =
-                Modifier.width((getDrawerWidth() - 61.dp))
+                Modifier.fillMaxWidth()
                     .combinedClickable(onClick = onToggleExpansion)
                     .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,

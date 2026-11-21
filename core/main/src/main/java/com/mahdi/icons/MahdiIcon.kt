@@ -73,8 +73,28 @@ fun MahdiIcon(
     }
 }
 
+/**
+ * 9.9.0 — مُحمِّل SVG واحد مشترك، بدل مُحمِّل جديد لكل أيقونة.
+ *
+ * كان كل استدعاء يبني `ImageLoader` كاملًا (بلا ذاكرة ولا قرص)، وصفوف الشجرة
+ * تنادي دالّة الأيقونة لكل صفّ ولكل ملفّ فرعي. النتيجة: فكّ SVG من جديد عشرات
+ * المرّات في الثانية، ونبضات في المعالجة تظهر كأيقونات مبتورة أو متكرّرة.
+ * هنا يُبنى مرّة واحدة لكل عملية، بذاكرة ٢٥٪ من الذاكرة المتاحة (سقف ٥٠ميغا)
+ * وقرص معطّل — الأصول داخل التطبيق لا تتغيّر.
+ */
+private var sharedSvgLoader: ImageLoader? = null
+
 @Composable
 fun rememberSvgImageLoader(): ImageLoader {
-    val context = LocalContext.current
-    return remember { ImageLoader.Builder(context).components { add(SvgDecoder.Factory()) }.build() }
+    val context = LocalContext.current.applicationContext
+    return remember(context) {
+        sharedSvgLoader
+            ?: ImageLoader
+                .Builder(context)
+                .components { add(SvgDecoder.Factory()) }
+                .memoryCache { coil.memory.MemoryCache.Builder(context).maxSizePercent(0.25).build() }
+                .crossfade(80)
+                .build()
+                .also { sharedSvgLoader = it }
+    }
 }

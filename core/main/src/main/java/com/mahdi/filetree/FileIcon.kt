@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mahdi.file.FileObject
@@ -43,7 +44,14 @@ private val info = drawables.info
  * @param isExpanded Whether the file is expanded.
  */
 @Composable
-fun FileIcon(file: FileObject, iconTint: Color? = null, isExpanded: Boolean = false) {
+fun FileIcon(
+    file: FileObject,
+    iconTint: Color? = null,
+    isExpanded: Boolean = false,
+    // 9.9.0: الحجم صار معاملًا حتى يتبع تكبير الشجرة. القيمة الافتراضية هي
+    // الحجم القديم نفسه، فلا يتغيّر أي نداء قائم.
+    size: Dp = 20.dp,
+) {
     val iconPackFile = currentIconPack.value?.getIconFileForFile(file, isExpanded)
     val imageLoader = rememberSvgImageLoader()
 
@@ -69,10 +77,10 @@ fun FileIcon(file: FileObject, iconTint: Color? = null, isExpanded: Boolean = fa
             imageLoader = imageLoader,
             contentDescription = null,
             colorFilter = if (useTint) ColorFilter.tint(tint) else null,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(size),
         )
     } else {
-        MahdiIcon(icon = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        MahdiIcon(icon = icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
     }
 }
 
