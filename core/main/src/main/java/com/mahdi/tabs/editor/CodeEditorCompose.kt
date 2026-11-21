@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.mahdi.editor.complete.AutocompleteBar
 import com.mahdi.editor.complete.AutocompleteEngine
+import com.mahdi.editor.complete.PythonIntelliSense
 import com.mahdi.editor.complete.Suggestion
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
@@ -130,11 +131,15 @@ fun EditorTab.CodeEditor(
             return@LaunchedEffect
         }
         val prefix = AutocompleteEngine.currentPrefix(content, cursor)
+        // 9.7.0: بايثون يمرّ على المحرّك المتخصّص (أعضاء الوحدات، رموز الملف،
+        // التوقيعات، استنتاج النوع) — والباقي على المحرّك العام كما كان.
+        val isPython = extension?.lowercase()?.removePrefix(".") in PYTHON_EXTENSIONS
         val list =
-            if (prefix.length >= AutocompleteEngine.MIN_PREFIX) {
-                AutocompleteEngine.suggest(content, cursor, extension, AutocompleteEngine.MAX_SUGGESTIONS)
-            } else {
-                emptyList()
+            when {
+                isPython -> PythonIntelliSense.suggest(content, cursor)
+                prefix.length >= AutocompleteEngine.MIN_PREFIX ->
+                    AutocompleteEngine.suggest(content, cursor, extension, AutocompleteEngine.MAX_SUGGESTIONS)
+                else -> emptyList()
             }
         currentPrefix = prefix
         suggestions = list
@@ -212,9 +217,17 @@ fun EditorTab.CodeEditor(
                         val content = ed.text
                         val cursor = content.getCharIndex(caretLine, caretColumn)
                         val start = AutocompleteEngine.prefixStart(cursor, currentPrefix)
+                        // المقتطف قد يحمل نصًا أطول (توقيع دالة) — نُدرج `insert`
+                        // ونضع المؤشر داخل القوسين إن انتهى النص بـ`)`.
+                        val inserted = suggestion.insert ?: suggestion.text
                         if (cursor in currentPrefix.length..content.length) {
-                            content.replace(start, cursor, suggestion.text)
-                            ed.setSelection(caretLine, caretColumn - currentPrefix.length + suggestion.text.length)
+                            content.replace(start, cursor, inserted)
+                            val caret = caretColumn - currentPrefix.length + inserted.length
+                            val insideParens = inserted.endsWith(")") && inserted.contains("(")
+                            ed.setSelection(
+                                caretLine,
+                                if (insideParens) caret - 1 else caret,
+                            )
                         }
                     }
                 }
@@ -532,3 +545,6 @@ private suspend fun List<LspServer>.filterActiveLspServers(
 private fun FileObject.getExternalServers(): List<LspServer> {
     return LspRegistry.externalServers.value.filter { server -> server.isSupported(this) }
 }
+
+/** امتدادات بايثون التي تستخدم المحرّك المتخصّص [PythonIntelliSense] (9.7.0). */
+private val PYTHON_EXTENSIONS = setOf("py", "pyi", "pyw", "python")

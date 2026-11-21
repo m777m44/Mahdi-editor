@@ -121,9 +121,22 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════════
       - name: Run critical unit tests
         run: |
+          set +e
           ./gradlew :core:main:testDebugUnitTest --no-daemon \
             --tests "com.mahdi.runtime.PythonLinkDiagnosticsTest" \
-            --tests "com.mahdi.text.BidiFileNameTest"
+            --tests "com.mahdi.text.BidiFileNameTest" \
+            --tests "com.mahdi.editor.complete.PythonIntelliSenseTest" \
+            --tests "com.mahdi.editor.complete.PythonSnippetsTest" \
+            2>&1 | tee /tmp/tests.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            # 9.7.0: كل اختبار فاشل يصبح تعليقًا في تبويب Checks (annotations)،
+            # والذيل في سجل البناء. السكربت في tools/ci/annotate_tests.py
+            # (ملف مستقل يُختبَر ويعمل محليًا أيضًا).
+            python3 tools/ci/annotate_tests.py || true
+            tail -25 /tmp/tests.log || true
+          fi
+          exit "$rc"
 
       - name: Verify APK manifest components
         run: |
