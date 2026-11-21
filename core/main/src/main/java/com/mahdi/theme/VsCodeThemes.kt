@@ -128,9 +128,9 @@ object VsCodeThemes {
         c.copy(
             background = 0xFFF7F8FA,
             surface = 0xFFFFFFFF,
-            primary = mix(c.primary, 0xFF101418.toInt(), 0.25f),
-            secondary = mix(c.secondary, 0xFF101418.toInt(), 0.25f),
-            accent = mix(c.accent, 0xFF101418.toInt(), 0.25f),
+            primary = mix(c.primary, 0xFF101418L, 0.25f),
+            secondary = mix(c.secondary, 0xFF101418L, 0.25f),
+            accent = mix(c.accent, 0xFF101418L, 0.25f),
             text = 0xFF171A1F,
             textSecondary = 0xFF5A6270,
             outline = 0xFFD5DAE1,
@@ -141,9 +141,9 @@ object VsCodeThemes {
         c.copy(
             background = 0xFF101318,
             surface = 0xFF171B21,
-            primary = mix(c.primary, 0xFFFFFFFF.toInt(), 0.35f),
-            secondary = mix(c.secondary, 0xFFFFFFFF.toInt(), 0.25f),
-            accent = mix(c.accent, 0xFFFFFFFF.toInt(), 0.35f),
+            primary = mix(c.primary, 0xFFFFFFFFL, 0.35f),
+            secondary = mix(c.secondary, 0xFFFFFFFFL, 0.25f),
+            accent = mix(c.accent, 0xFFFFFFFFL, 0.35f),
             text = 0xFFF0F2F5,
             textSecondary = 0xFFA6AEBB,
             outline = 0xFF2C333D,
@@ -152,7 +152,14 @@ object VsCodeThemes {
     private fun computeTextSecondary(text: Long, background: Long, dark: Boolean): Long =
         mix(text, background, if (dark) 0.38f else 0.45f)
 
-    private fun mix(a: Long, b: Int, ratio: Float): Long {
+    /**
+     * يمزج لونين بمعامِلات ARGB كاملة (‏`Long` لأن القيمة تتجاوز `Int.MAX`).
+     *
+     * كان المعامِل الثاني `Int`، و`computeTextSecondary` يمرّر له `background`
+     * من نوع `Long` — خطأ نوع يمنع الترجمة. توحيد النوعين `Long` يزيل الحاجة
+     * إلى `.toInt()`/`.toLong()` عند كل نداء ويُبقي الحساب على ٣٢ بت.
+     */
+    private fun mix(a: Long, b: Long, ratio: Float): Long {
         val ar = (a shr 16) and 0xFF
         val ag = (a shr 8) and 0xFF
         val ab = a and 0xFF
@@ -161,9 +168,9 @@ object VsCodeThemes {
         val bb = b and 0xFF
         fun m(x: Long, y: Long) = (x + (y - x) * ratio).toInt().coerceIn(0, 255)
         return (0xFF000000L or
-            (m(ar, br.toLong()) shl 16).toLong() or
-            (m(ag, bg.toLong()) shl 8).toLong() or
-            m(ab, bb.toLong()).toLong())
+            (m(ar, br) shl 16).toLong() or
+            (m(ag, bg) shl 8).toLong() or
+            m(ab, bb).toLong())
     }
 
     private fun hexToLong(raw: String): Long? {
