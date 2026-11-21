@@ -86,6 +86,13 @@ jobs:
             echo "::error title=pylink_test::فشل اختبار حرس الرابط — التفاصيل في التعليقات أعلاه"
             exit 1
           fi
+          # 9.8.0: تعليقات كوتلن تُداخل. `/*` داخل توثيق يبتلع بقية الملف
+          # ويظهر كأخطاء «Unresolved reference» في ملفات أخرى — تشخيص مضلّل
+          # كلّف دورة بناء كاملة. الفحص ثوانٍ، ويُفشل البناء قبل الترجمة.
+          if ! python3 tools/tests/kdoc_check.py; then
+            echo "::error title=kdoc_check::تعليق كتلة غير مغلق — رسائل 'Unresolved reference' قد تكون ناتجة عنه"
+            exit 1
+          fi
           exit "$syntax"
 
       - name: Accept Android SDK licenses

@@ -8,7 +8,7 @@ import com.google.gson.JsonParser
 /**
  * 9.8.0 — ثيمات VS Code المدمجة (Darcula · Abyss · Quiet Light).
  *
- * الأصول في `assets/vscode/themes/*.json` يُولّدها
+ * الأصول في `assets/vscode/themes/` (ملفات `darcula.json` وأخواتها) يُولّدها
  * `tools/vscode-import/import_assets.py` من أصول حزمة `vs-code-heroes`
  * (‏**ألوان ورموز فقط** — لا كود، ولا dex، ولا مفاتيح توقيع).
  *

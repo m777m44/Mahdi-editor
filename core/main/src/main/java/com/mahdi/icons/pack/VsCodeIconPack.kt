@@ -38,7 +38,10 @@ object VsCodeIconPack {
      * آمنة للنداء المتكرّر: تتحقّق من ملف علامة مكتوب في نهاية النسخ، فلا
      * تُعاد الكتابة في كل إقلاع. تُرجع true إن كانت الحزمة جاهزة بعده.
      */
-    fun ensureInstalled(context: Context = application ?: return false): Boolean {
+    fun ensureInstalled(context: Context? = application): Boolean {
+        // 9.8.0: القيمة الافتراضية لا يمكن أن تحوي `return` في كوتلن، فالحالة
+        // «التطبيق لم يُهيَّأ بعد» تُفحص داخل الجسم.
+        val context = context ?: return false
         val dir = installDir()
         val marker = dir.resolve(MARKER)
         if (marker.exists() && dir.resolve(MANIFEST).exists()) return true

@@ -328,8 +328,13 @@ object PythonAutoImport {
 
     private val IMPORT_LINE = Regex("""(?m)^\s*(?:import\s+\S.*|from\s+\S+\s+import\s+.*)$""")
 
-    fun isImportLine(line: String): Boolean =
-        line.trim().let { it.startsWith("import ") || it.startsWith("from ") } && !it.trimStart().startsWith("#")
+    fun isImportLine(line: String): Boolean {
+        // 9.8.0: `it` لا يعيش خارج كتلة `let`؛ كان الشرط الثاني يشير إليه بعد
+        // إغلاقها فلا يُترجم. المتغيّر المحلّي أوضح وأصحّ.
+        val trimmed = line.trim()
+        val isImport = trimmed.startsWith("import ") || trimmed.startsWith("from ")
+        return isImport && !trimmed.startsWith("#")
+    }
 
     /**
      * هل السطر استيراد **في العمود صفر**؟

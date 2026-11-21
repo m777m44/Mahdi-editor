@@ -2,6 +2,7 @@ package com.mahdi.theme
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * 9.8.0 — استيراد ثيمات VS Code (‏`.tmTheme` و`*-color-theme.json`) إلى Mahdi-Editor.
@@ -93,19 +94,19 @@ object VsCodeThemeImporter {
                 ?: colors.string("activityBar.activeBorder")
                 ?: colors.string("focusBorder")
                 ?: colors.string("statusBarItem.remoteBackground")
-        val primary = accent ?: lerpHex(bg, fg ?: "#FFFFFF", 0.35)
+        val primary = accent ?: lerpHex(bg, fg ?: "#FFFFFF", 0.35f)
         val surface =
             colors.string("editorWidget.background")
                 ?: colors.string("sideBar.background")
                 ?: colors.string("activityBar.background")
-                ?: lerpHex(bg, fg ?: "#FFFFFF", 0.06)
+                ?: lerpHex(bg, fg ?: "#FFFFFF", 0.06f)
         val secondary =
             colors.string("activityBar.background")
-                ?: lerpHex(bg, primary, 0.25)
+                ?: lerpHex(bg, primary, 0.25f)
         val outline =
             colors.string("editorLineNumber.foreground")
                 ?: colors.string("editorWidget.border")
-                ?: lerpHex(bg, fg ?: "#FFFFFF", 0.18)
+                ?: lerpHex(bg, fg ?: "#FFFFFF", 0.18f)
 
         return Imported(
             background = hex(bg) ?: return null,
@@ -114,7 +115,7 @@ object VsCodeThemeImporter {
             secondary = hex(secondary) ?: hex(primary) ?: 0xFF888888,
             accent = hex(accent ?: primary) ?: hex(primary) ?: 0xFFFFFFFF,
             text = hex(fg) ?: if (isDark(bg)) 0xFFFFFFFF else 0xFF111111,
-            outline = hex(outline) ?: lerpHex(bg, fg ?: "#FFFFFF", 0.18).let { hex(it) } ?: 0xFF888888,
+            outline = hex(outline) ?: lerpHex(bg, fg ?: "#FFFFFF", 0.18f).let { hex(it) } ?: 0xFF888888,
             tokens = tokens,
             dark = isDark(bg),
             sourceName = obj.string("name"),
@@ -280,15 +281,15 @@ object VsCodeThemeImporter {
         val dark = if (background != null) isDark(bg) else fallbackDark
         val fg = foreground?.let { hex(it) }
             ?: if (dark) 0xFFFFFFFF else 0xFF111111
-        val primary = lerpHex(bg, foreground ?: (if (dark) "#FFFFFF" else "#000000"), 0.45).let { hex(it) } ?: fg
+        val primary = lerpHex(bg, foreground ?: (if (dark) "#FFFFFF" else "#000000"), 0.45f).let { hex(it) } ?: fg
         return Imported(
             background = bgLong,
-            surface = lerpHex(bg, foreground ?: "#FFFFFF", 0.08).let { hex(it) } ?: bgLong,
+            surface = lerpHex(bg, foreground ?: "#FFFFFF", 0.08f).let { hex(it) } ?: bgLong,
             primary = primary,
-            secondary = lerpHex(bg, foreground ?: "#FFFFFF", 0.30).let { hex(it) } ?: primary,
+            secondary = lerpHex(bg, foreground ?: "#FFFFFF", 0.30f).let { hex(it) } ?: primary,
             accent = primary,
             text = fg,
-            outline = lerpHex(bg, foreground ?: "#FFFFFF", 0.22).let { hex(it) } ?: 0xFF777777,
+            outline = lerpHex(bg, foreground ?: "#FFFFFF", 0.22f).let { hex(it) } ?: 0xFF777777,
             tokens = tokens,
             dark = dark,
             sourceName = name,

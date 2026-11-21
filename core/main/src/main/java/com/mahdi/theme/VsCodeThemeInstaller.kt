@@ -70,7 +70,7 @@ object VsCodeThemeInstaller {
                 ?: name.substringBeforeLast('.').takeIf { it.isNotBlank() }
                 ?: "ثيم VS Code"
         val colors = imported.toColors()
-        return Result.Ready(id, label, colors.light, colors.dark, imported.tokens)
+        return Result.Ready(id, label, colors.first, colors.second, imported.tokens)
     }
 
     /**
