@@ -2,6 +2,7 @@ package com.mahdi.editor.complete
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 /**

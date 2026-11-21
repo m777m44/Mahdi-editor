@@ -121,11 +121,27 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════════
       - name: Run critical unit tests
         run: |
+          set +e
           ./gradlew :core:main:testDebugUnitTest --no-daemon \
             --tests "com.mahdi.runtime.PythonLinkDiagnosticsTest" \
             --tests "com.mahdi.text.BidiFileNameTest" \
             --tests "com.mahdi.editor.complete.PythonIntelliSenseTest" \
-            --tests "com.mahdi.editor.complete.PythonSnippetsTest"
+            --tests "com.mahdi.editor.complete.PythonSnippetsTest" \
+            2>&1 | tee /tmp/tests.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            # 9.7.0: أسطر الفشل تُحقن في سجل البناء ليظهر سبب الاختبار الفاشل
+            # في تعليق الـ PR نفسه بدل «راجع سجل التشغيل» بلا تفصيل.
+            {
+              echo "FAILURE: unit tests failed"
+              grep -hE "^(com\.mahdi|<testcase|<failure)|AssertionError|expected:|tests? completed" /tmp/tests.log | head -40 || true
+              for f in core/main/build/test-results/testDebugUnitTest/*.xml; do
+                [ -f "$f" ] || continue
+                grep -hE "<testcase|<failure" "$f" | head -40 || true
+              done
+            } | tee -a /tmp/gradle.log
+          fi
+          exit "$rc"
 
       - name: Verify APK manifest components
         run: |
