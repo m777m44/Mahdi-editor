@@ -134,11 +134,15 @@ jobs:
             # في تعليق الـ PR نفسه بدل «راجع سجل التشغيل» بلا تفصيل.
             {
               echo "FAILURE: unit tests failed"
-              grep -hE "^(com\.mahdi|<testcase|<failure)|AssertionError|expected:|tests? completed" /tmp/tests.log | head -40 || true
+              echo "--- key lines ---"
+              grep -hE "FAILED|AssertionError|expected:|No tests found|error:|e: " /tmp/tests.log | head -40 || true
               for f in core/main/build/test-results/testDebugUnitTest/*.xml; do
                 [ -f "$f" ] || continue
-                grep -hE "<testcase|<failure" "$f" | head -40 || true
+                echo "--- $f ---"
+                grep -hE "<testcase|<failure|message=" "$f" | head -60 || true
               done
+              echo "--- tail of test log ---"
+              tail -80 /tmp/tests.log || true
             } | tee -a /tmp/gradle.log
           fi
           exit "$rc"
