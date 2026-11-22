@@ -175,13 +175,14 @@ fun FileTree(
     // الشجرة تُسوَّى إلى صفوف مرئية: الفتح والطيّ = إضافة/حذف صفوف من القائمة،
     // فتُركَّب الصفوف الظاهرة وحدها (١٥ بدل آلاف) ويعمل `animateItem`.
     val rows =
-        remember(rootNode, flags, fileListCache, showHidden, filterText) {
+        remember(rootNode, flags, fileListCache, showHidden, filterText, Settings.file_tree_compact_path) {
             buildFileTreeRows(
                 root = rootNode,
                 flags = flags,
                 cache = fileListCache,
                 showHidden = showHidden,
                 filter = filterText,
+                compactPath = Settings.file_tree_compact_path,
             )
         }
 
