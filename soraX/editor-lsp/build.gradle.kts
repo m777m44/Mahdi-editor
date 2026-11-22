@@ -41,6 +41,27 @@ android {
     }
 }
 
+/**
+ * 10.0.1 — تثبيت `gson` الذي يأتي من POM الخاصّ بـLSP4J.
+ *
+ * المشكلة: LSP4J يطلب `gson:[2.9.1,3.0)` — **مدى نسخ مفتوح**. المدى المفتوح
+ * يُلزم Gradle بقراءة `maven-metadata.xml` من كل مستودع ليختار أعلى نسخة،
+ * وليس بتثبيت نسخة واحدة. فإذا كان أي مستودع (هنا `repo.eclipse.org`) يعيد
+ * ‏503، يسقط حلّ `gson` كلّه — رغم أن النسخة 2.14.0 موجودة سالمة في Maven
+ * Central. أوقف هذا البناء مرّتين، ورسالته تُوهم بأن الحزمة مفقودة.
+ *
+ * الحلّ: نُسجّل سبب اختيار النسخة صراحةً، فيثبّت Gradle نسخة واحدة ولا يطلب
+ * فهرس المدى إطلاقًا. لا نغيّر سلوكًا: 2.14.0 داخل المدى وهو ما كان يُختار.
+ */
+configurations.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "com.google.code.gson" && requested.name == "gson") {
+            useVersion(libs.gson.get().version!!)
+            because("تثبيت صريح يتفادى استعلام فهرس المدى المفتوح من مستودعات قد تعيد 503")
+        }
+    }
+}
+
 dependencies {
     compileOnly(projects.editor)
     implementation(libs.lsp4j)
