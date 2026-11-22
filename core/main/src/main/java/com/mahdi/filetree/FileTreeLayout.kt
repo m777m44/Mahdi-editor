@@ -42,14 +42,33 @@ data class FileTreeMetrics(
     val rowPadding: Dp,
     /** هل الاسم على سطرين حين يطول؟ */
     val twoLines: Boolean,
+    /** قطر شيفرون الطيّ. */
+    val chevron: Dp,
+    /** ارتفاع سطر الاسم الواحد — يُستخدم لتثبيت ارتفاع الصفّ. */
+    val lineBox: Dp,
+    /** المسافة بين الأيقونة والاسم. */
+    val iconGap: Dp,
+    /** سماكة خطوط دليل الشجرة. */
+    val guideStroke: Dp,
+    /** نصف قطر زوايا خلفية الصفّ المحدَّد. */
+    val corner: Dp,
 ) {
-    /** ارتفاع السطر الواحد للاسم. */
-    val lineHeight: Dp
-        get() = (nameSize.value * 1.28f).dp
-
-    /** ارتفاع كتلة الاسم: سطر أو سطران. */
-    val nameBlockHeight: Dp
-        get() = if (twoLines) lineHeight * 2 else lineHeight
+    /**
+     * ارتفاع الصفّ **بالضبط**.
+     *
+     * الصفّ يعلن ارتفاعه ولا يتركه للقياس الضمني: أوّلًا لأنه مطلب
+     * `animateItem()` في LazyColumn (الحركة تحتاج ارتفاعًا معروفًا مسبقًا)،
+     * وثانيًا لأن صفوفًا بارتفاعات متغيّرة أثناء التكبير تجعل التمرير يقفز
+     * وتفقد القائمة موضعها. الارتفاع محسوب من الخطّ نفسه، فهو يتبع التكبير
+     * والكثافة بدقّة، ولا يقلّ أبدًا عن ٤٤dp — حدّ اللمس المريح.
+     */
+    val rowHeight: Dp
+        get() {
+            val lines = if (twoLines) 2 else 1
+            val content = lineBox * lines + rowPadding * 2
+            val minimum = if (twoLines) 52.dp else 44.dp
+            return if (content > minimum) content else minimum
+        }
 }
 
 /** أقلّ تكبير مقبول. تحته يصير النصّ غير مقروء على الهاتف. */
@@ -98,6 +117,12 @@ fun rememberFileTreeMetrics(sizeScale: Float): FileTreeMetrics {
                     }
                     .let { if (scale > 1.28f) it + 1.dp else it },
             twoLines = twoLines,
+            chevron = (12.dp * scale).coerceIn(10.dp, 20.dp),
+            // ١٧sp لارتفاع السطر عند ١٤sp: نسبة مقروءة لا متلاصقة ولا متباعدة.
+            lineBox = (base.value * 1.22f * scale).dp,
+            iconGap = (8.dp * scale).coerceIn(5.dp, 14.dp),
+            guideStroke = (1.dp * scale).coerceIn(0.8.dp, 2.dp),
+            corner = (10.dp * scale).coerceIn(7.dp, 18.dp),
         )
     }
 }
