@@ -1,6 +1,16 @@
 package com.mahdi.filetree
 
 import android.os.Environment
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +27,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
@@ -29,7 +44,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -45,7 +62,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -55,6 +75,7 @@ import com.mahdi.components.MahdiDropdownMenuItem
 import com.mahdi.drawer.DrawerViewModel
 import com.mahdi.file.FileObject
 import com.mahdi.icons.MahdiIcon
+import com.mahdi.resources.drawables
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
@@ -89,6 +110,51 @@ fun FileTree(
     val isAnyFileSelected = selectedFiles[rootNode.file]?.isNotEmpty() == true
     val selectionCount = selectedFiles[rootNode.file]?.size ?: 0
     val isFileOperationInProgress = fileOperationsCount > 0
+
+    // 10.0.0 — الحالة كلّها تُجمع **هنا** مرّة واحدة، لا في كل صفّ.
+    // ستّة اشتراكات × ألف صفّ كانت تعني ستّة آلاف اشتراك وستّة آلاف إعادة
+    // تركيب لكل نقرة واحدة على ملفّ. الآن: صفّ واحد يُعاد تركيبه.
+    val expandedNodes by viewModel.expandedNodes.collectAsStateWithLifecycle()
+    val focusedMap by viewModel.focusedFile.collectAsStateWithLifecycle()
+    val loadingStates by viewModel.loadingStates.collectAsStateWithLifecycle()
+    val cutNodes by viewModel.cutNodes.collectAsStateWithLifecycle()
+    val fileListCache by viewModel.fileListCache.collectAsStateWithLifecycle()
+    val diagnosedNodes by viewModel.diagnosedNodes.collectAsStateWithLifecycle()
+    val showHidden = Settings.show_hidden_files_drawer
+
+    var filterText by remember { mutableStateOf("") }
+    // شريط التصفية مخفيّ افتراضيًا: صفّ كامل من الشجرة مكسب ثمين على هاتف.
+    // يُفتح بزرّ العدسة في الشريط، ويبقى مفتوحًا ما دام فيه نصّ (فلا يختفي
+    // تحت أصابعك أثناء الكتابة).
+    var filterOpen by remember { mutableStateOf(false) }
+    val filterVisible = filterOpen || filterText.isNotEmpty()
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    val flags =
+        remember(expandedNodes, selectedFiles, focusedMap, loadingStates, cutNodes, diagnosedNodes, rootNode.file) {
+            FileTreeFlags(
+                expanded = expandedNodes[rootNode.file] ?: emptySet(),
+                selected = selectedFiles[rootNode.file]?.toSet() ?: emptySet(),
+                cut = cutNodes.toSet(),
+                loading = loadingStates,
+                severity = diagnosedNodes,
+                focused = focusedMap[rootNode.file],
+            )
+        }
+
+    // الشجرة تُسوَّى إلى صفوف مرئية: الفتح والطيّ = إضافة/حذف صفوف من القائمة،
+    // فتُركَّب الصفوف الظاهرة وحدها (١٥ بدل آلاف) ويعمل `animateItem`.
+    val rows =
+        remember(rootNode, flags, fileListCache, showHidden, filterText) {
+            buildFileTreeRows(
+                root = rootNode,
+                flags = flags,
+                cache = fileListCache,
+                showHidden = showHidden,
+                filter = filterText,
+            )
+        }
 
     // Auto-expand root node on first composition
     LaunchedEffect(rootNode.file) {
@@ -144,6 +210,13 @@ fun FileTree(
                 if (isAnyFileSelected) {
                     SelectionActions(viewModel, drawerViewModel, rootNode, selectedFiles[rootNode.file] ?: emptyList())
                 } else {
+                    IconButton(onClick = { filterOpen = !filterOpen }) {
+                        Icon(
+                            painter = painterResource(drawables.manage_search),
+                            contentDescription = stringResource(strings.file_tree_filter_hint),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                     // ذرّا التكبير بجانب الأدوات: لا يحتاج المستخدم معرفة إيماءة
                     // القرص، ويكفيه نقرة واحدة. يُضغطان محدودين عند الحدّين.
                     ZoomButtons(
@@ -153,13 +226,30 @@ fun FileTree(
                             Settings.file_tree_scale = next
                         },
                     )
-                    FileTreeActions(viewModel, onSearchClick, liveScale) { next ->
+                    FileTreeActions(viewModel, rootNode.file, onSearchClick, liveScale) { next ->
                         liveScale = next
                         Settings.file_tree_scale = next
                     }
                 }
             }
         }
+
+        // 10.0.0 — تصفية فورية داخل الشجرة.
+        // البحث القديم كان نافذة منفصلة ثم قائمة نتائج: تنتقل ذهابًا وإيابًا.
+        // هنا تكتب فيُضمر ما لا يطابق في مكانه، فترى الملفّ **داخل سياقه**
+        // (أيّ مجلد يحويه) لا في قائمة مبنيّة من أسماء.
+        TreeFilterBar(
+            visible = filterVisible,
+            value = filterText,
+            onValueChange = { filterText = it },
+            onClose = {
+                filterText = ""
+                filterOpen = false
+            },
+            // عدد المطابقات = الصفوف المرئية فعلًا (المجلدات المفتوحة للتوجيه
+            // لا تُحتسب كي لا يبدو الرقم أكبر من النتائج التي تراها).
+            matchCount = if (filterText.isBlank()) null else rows.count { !it.node.isExpandable },
+        )
 
         Box(modifier = Modifier.fillMaxWidth().height(3.dp)) {
             if (isFileOperationInProgress || isIndexingRoot) {
@@ -183,22 +273,39 @@ fun FileTree(
                     Settings.file_tree_scale = next
                 },
             ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 6.dp),
-                ) {
-                    // جذر واحد يُوسَّع تلقائيًا؛ صفوفه تُركَّب عند الظهور.
-                    item(key = "root-${rootNode.file.hashCode()}-${rootNode.name}") {
-                        FileTreeNodeItem(
-                            modifier = Modifier.fillMaxWidth(),
-                            root = rootNode.file,
-                            node = rootNode,
-                            depth = 0,
-                            onFileClick = { rootNode.onFileClick(it) },
-                            viewModel = viewModel,
-                            metrics = metrics,
-                        )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 6.dp),
+                    ) {
+                        itemsIndexed(
+                            items = rows,
+                            key = { _, row -> row.key },
+                            contentType = { _, row -> if (row.node.isExpandable) "dir" else "file" },
+                        ) { _, row ->
+                            FileTreeNodeItem(
+                                // `animateItem` يجعل الفتح والطيّ انسيابًا: الصفوف
+                                // تنزلق إلى مواضعها بدل أن تقفز قفزة واحدة.
+                                modifier = Modifier.animateItem(
+                                    fadeInSpec = tween(160),
+                                    placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                                    fadeOutSpec = tween(110),
+                                ),
+                                root = rootNode.file,
+                                row = row,
+                                onFileClick = { rootNode.onFileClick(it) },
+                                viewModel = viewModel,
+                                metrics = metrics,
+                            )
+                        }
                     }
+
+                    BackToTopButton(
+                        visible = listState.firstVisibleItemIndex > 6,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                        onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                    )
                 }
             }
         }
@@ -415,6 +522,7 @@ private fun SelectionActions(
 @Composable
 private fun FileTreeActions(
     viewModel: FileTreeViewModel,
+    viewModelRoot: FileObject,
     onSearchClick: () -> Unit,
     scale: Float,
     onScale: (Float) -> Unit,
@@ -463,6 +571,22 @@ private fun FileTreeActions(
             )
 
             MenuSectionHeader(stringResource(strings.file_tree_section_appearance))
+
+            MahdiDropdownMenuItem(
+                text = { Text(stringResource(strings.file_tree_expand_all)) },
+                onClick = {
+                    viewModel.expandAllLoaded(viewModelRoot)
+                    showOptionsMenu = false
+                },
+            )
+
+            MahdiDropdownMenuItem(
+                text = { Text(stringResource(strings.file_tree_collapse_all)) },
+                onClick = {
+                    viewModel.collapseAll(viewModelRoot)
+                    showOptionsMenu = false
+                },
+            )
 
             // ————— 9.9.0: شكل الأسماء والأحجام (داخل نفس القائمة، لا شاشة ثانية) —————
             MahdiDropdownMenuItem(
@@ -637,4 +761,109 @@ private fun MenuSectionHeader(title: String) {
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 2.dp),
     )
+}
+
+/**
+ * 10.0.0 — شريط تصفية رفيع أعلى الشجرة.
+ *
+ * يظهر فقط عند الحاجة: حين تكتب، أو حين تضغط عدسة البحث. وجوده الدائم كان
+ * يأكل صفًّا كاملًا من الشجرة القصيرة، وغيابه الدائم يجعل الميزة غير مكتشفة.
+ * ويُظهر عدد المطابقات صريحًا (`٣ من ١٢`) — رقم بلا كلمة «من» يبدو خطأً.
+ */
+@Composable
+private fun TreeFilterBar(
+    visible: Boolean,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onClose: () -> Unit,
+    matchCount: Int?,
+) {
+    val focusManager = LocalFocusManager.current
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(140)) + expandVertically(tween(160)),
+        exit = fadeOut(tween(110)) + shrinkVertically(tween(140)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.bodySmall,
+                placeholder = {
+                    Text(
+                        text = stringResource(strings.file_tree_filter_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(drawables.search),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                trailingIcon = {
+                    if (value.isNotEmpty()) {
+                        IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                painter = painterResource(drawables.close),
+                                contentDescription = stringResource(strings.file_tree_filter_clear),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                shape = RoundedCornerShape(10.dp),
+            )
+
+            if (matchCount != null) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = matchCount.toString().bidiNumbers(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * زرّ «العودة إلى الأعلى».
+ *
+ * مُستخرَج في دالّة مستقلّة لسبب تقني لا تجميلي: داخل `Column` أعلاه يكون
+ * `ColumnScope` حاضرًا ضمنيًا، فتلتقط Kotlin نسخة `ColumnScope.AnimatedVisibility`
+ * وترفض الاستدعاء داخل `Box` («cannot be called in this context with an
+ * implicit receiver»). هنا لا يوجد أي مُستقبِل ضمني فتُحلّ النسخة العامّة.
+ */
+@Composable
+private fun BackToTopButton(visible: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(tween(150)) + scaleIn(tween(180), initialScale = 0.8f),
+        exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.8f),
+    ) {
+        SmallFloatingActionButton(
+            onClick = onClick,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ) {
+            // شيفرون قائم بدل أصل جديد: نفس عائلة الأيقونات، ولا ملفّ يُصان لأجل سهم.
+            Icon(
+                painter = painterResource(drawables.chevron_up),
+                contentDescription = stringResource(strings.file_tree_back_to_top),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
 }

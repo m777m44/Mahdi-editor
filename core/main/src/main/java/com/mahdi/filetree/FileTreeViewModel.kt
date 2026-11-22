@@ -321,6 +321,43 @@ class FileTreeViewModel : ViewModel() {
         return _diagnosedNodes.value[fileObject] ?: -1
     }
 
+    /**
+     * 10.0.0 — طيّ كل شيء فورًا.
+     *
+     * لا يُعيد تحميل أي مجلد ولا يمسّ الذاكرة: يُفرِغ مجموعة المفتوحة فقط،
+     * فتُسوَّى الشجرة إلى صفّ الجذر في إعادة تركيب واحدة. لذلك يبقى فوريًا
+     * حتى على مشروع بآلاف المجلدات.
+     */
+    fun collapseAll(projectRoot: FileObject) {
+        _expandedNodes.update { it - projectRoot }
+        viewModelScope.launch { Events.publish(FileTreeEvent.NodeCollapsed(projectRoot, projectRoot)) }
+    }
+
+    /**
+     * 10.0.0 — توسيع كل **ما هو محمّل** في الذاكرة.
+     *
+     * لا نقرأ القرص هنا إطلاقًا: نُوسّع المجلدات التي سبق أن فُتحت ونعرف
+     * أبناءها. محاولة توسيع مجلد غير محمّل تعني آلاف عمليات القرص في نقرة
+     * واحدة، وهو ما يجعل التطبيق يتجمّد. المستخدم يفتح ما يريده، ثم «توسيع
+     * الكل» يمدّ الشجرة على ما يعرفه التطبيق — بلا انتظار.
+     */
+    fun expandAllLoaded(projectRoot: FileObject) {
+        val reachable = LinkedHashSet<FileObject>()
+        val queue = ArrayDeque<FileObject>()
+        queue.addLast(projectRoot)
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            for (child in _fileListCache.value[current].orEmpty()) {
+                if (!child.isExpandable) continue
+                if (!_fileListCache.value.containsKey(child.file)) continue
+                if (reachable.add(child.file)) queue.addLast(child.file)
+            }
+        }
+        if (reachable.isEmpty()) return
+        _expandedNodes.update { map -> map + (projectRoot to ((map[projectRoot] ?: emptySet()) + reachable)) }
+        viewModelScope.launch { Events.publish(FileTreeEvent.NodeExpanded(projectRoot, projectRoot)) }
+    }
+
     fun toggleNodeExpansion(projectRoot: FileObject, fileObject: FileObject) {
         val wasExpanded = isNodeExpanded(projectRoot, fileObject)
         if (wasExpanded) {

@@ -1210,4 +1210,9 @@ Thank you for using Mahdi-Editor.</string>
     <string name="file_tree_density_roomy">Roomy</string>
     <string name="file_tree_section_appearance">Appearance</string>
     <string name="file_tree_section_sort">Sort by</string>
+    <string name="file_tree_filter_hint">Filter files…</string>
+    <string name="file_tree_filter_clear">Clear filter</string>
+    <string name="file_tree_expand_all">Expand all</string>
+    <string name="file_tree_collapse_all">Collapse all</string>
+    <string name="file_tree_back_to_top">Back to top</string>
 </resources>

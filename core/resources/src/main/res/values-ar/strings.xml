@@ -1240,4 +1240,9 @@
     <string name="file_tree_density_roomy">مريح</string>
     <string name="file_tree_section_appearance">المظهر والأحجام</string>
     <string name="file_tree_section_sort">الترتيب</string>
+    <string name="file_tree_filter_hint">تصفية الملفات…</string>
+    <string name="file_tree_filter_clear">مسح التصفية</string>
+    <string name="file_tree_expand_all">توسيع الكل</string>
+    <string name="file_tree_collapse_all">طيّ الكل</string>
+    <string name="file_tree_back_to_top">العودة إلى الأعلى</string>
 </resources>
