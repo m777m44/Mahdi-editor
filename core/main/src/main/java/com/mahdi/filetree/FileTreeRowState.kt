@@ -1,6 +1,7 @@
 package com.mahdi.filetree
 
 import com.mahdi.file.FileObject
+import com.mahdi.settings.Settings
 
 /**
  * 10.0.0 — لقطة واحدة من حالة الشجرة.

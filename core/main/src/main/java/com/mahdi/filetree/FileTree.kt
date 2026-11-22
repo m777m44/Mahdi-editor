@@ -75,6 +75,7 @@ import com.mahdi.components.MahdiDropdownMenuItem
 import com.mahdi.drawer.DrawerViewModel
 import com.mahdi.file.FileObject
 import com.mahdi.icons.MahdiIcon
+import com.mahdi.resources.drawables
 import com.mahdi.resources.getString
 import com.mahdi.resources.strings
 import com.mahdi.settings.Settings
@@ -282,28 +283,11 @@ fun FileTree(
                         }
                     }
 
-                        // «عودة إلى الأعلى» تظهر فقط بعد التمرير بعيدًا — زرّ دائم
-                        // يغطّي آخر صفّ ويُزاحم المحتوى؛ مشروطًا لا يُرى حتى يُحتاج.
-                        AnimatedVisibility(
-                            visible = listState.firstVisibleItemIndex > 6,
-                            enter = fadeIn(tween(150)) + scaleIn(tween(180), initialScale = 0.8f),
-                            exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.8f),
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
-                        ) {
-                            SmallFloatingActionButton(
-                                onClick = { scope.launch { listState.animateScrollToItem(0) } },
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            ) {
-                                // شيفرون قائم بدل أصل جديد: نفس عائلة الأيقونات،
-                                // ولا ملفّ خامس يُصان لأجل سهم واحد.
-                                Icon(
-                                    painter = painterResource(drawables.chevron_up),
-                                    contentDescription = stringResource(strings.file_tree_back_to_top),
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                        }
+                    BackToTopButton(
+                        visible = listState.firstVisibleItemIndex > 6,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                        onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                    )
                 }
             }
         }
@@ -825,6 +809,37 @@ private fun TreeFilterBar(value: String, onValueChange: (String) -> Unit, matchC
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
+        }
+    }
+}
+
+/**
+ * زرّ «العودة إلى الأعلى».
+ *
+ * مُستخرَج في دالّة مستقلّة لسبب تقني لا تجميلي: داخل `Column` أعلاه يكون
+ * `ColumnScope` حاضرًا ضمنيًا، فتلتقط Kotlin نسخة `ColumnScope.AnimatedVisibility`
+ * وترفض الاستدعاء داخل `Box` («cannot be called in this context with an
+ * implicit receiver»). هنا لا يوجد أي مُستقبِل ضمني فتُحلّ النسخة العامّة.
+ */
+@Composable
+private fun BackToTopButton(visible: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(tween(150)) + scaleIn(tween(180), initialScale = 0.8f),
+        exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.8f),
+    ) {
+        SmallFloatingActionButton(
+            onClick = onClick,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ) {
+            // شيفرون قائم بدل أصل جديد: نفس عائلة الأيقونات، ولا ملفّ يُصان لأجل سهم.
+            Icon(
+                painter = painterResource(drawables.chevron_up),
+                contentDescription = stringResource(strings.file_tree_back_to_top),
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

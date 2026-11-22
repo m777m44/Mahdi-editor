@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mahdi.components.compose.utils.addIf
 import com.mahdi.file.FileObject
 import com.mahdi.file.ZipFileObject
@@ -54,6 +55,8 @@ import com.mahdi.ui.components.formatBytes
 import com.mahdi.utils.drawErrorUnderline
 import com.mahdi.utils.getFileColor
 import com.mahdi.utils.getUnderlineColor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 10.0.0 — صفّ واحد في شجرة الملفات.
@@ -120,7 +123,7 @@ fun FileTreeNodeItem(
         remember(metrics.nameSize, metrics.lineBox) {
             TextStyle(
                 fontSize = metrics.nameSize,
-                lineHeight = metrics.lineBox,
+                lineHeight = metrics.lineBox.value.sp,
                 fontWeight = if (row.focused) FontWeight.SemiBold else FontWeight.Normal,
                 // الاتجاه يتبع المحتوى: العربي RTL والاسم اللاتيني كاملًا LTR.
                 textDirection = TextDirection.ContentOrLtr,
