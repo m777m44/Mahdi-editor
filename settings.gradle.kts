@@ -20,6 +20,8 @@ dependencyResolutionManagement {
         maven("https://jitpack.io")
         maven("https://oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
+        // 10.0.1: Eclipse آخرًا لا أوّلًا — انقطاعه (503) كان يُسقط حلّ
+        // حزم موجودة سالمة في Central.
         maven("https://repo.eclipse.org/content/groups/releases/")
     }
 }

@@ -37,10 +37,17 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // 10.0.1 — الترتيب مقصود، لا تجميلي.
+        //
+        // `repo.eclipse.org` كان **قبل** Maven Central، فأي انقطاع عنده (503
+        // متكرّر، حدث فعلًا وأوقف بناءين) يُسقط حلّ `gson` كلّه رغم أن الحزمة
+        // موجودة في Central سالمة. الاعتماديات التي نحتاجها من Eclipse
+        // (LSP4J) موجودة أيضًا في Central، فتقديم Central يُقلّل نقاط الفشل.
+        // وأُبقي Eclipse أخيرًا كاحتياط لا كطريق أوّل.
         google()
         mavenCentral()
-        maven("https://repo.eclipse.org/content/groups/releases/")
         maven("https://maven.aliyun.com/nexus/content/groups/public/")
+        maven("https://repo.eclipse.org/content/groups/releases/")
     }
 }
 
