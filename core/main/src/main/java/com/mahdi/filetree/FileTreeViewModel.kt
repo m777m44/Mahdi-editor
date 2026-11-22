@@ -407,6 +407,13 @@ class FileTreeViewModel : ViewModel() {
             currentNode = child
         }
         _collapsedNameCache.update { it + (node.file to collapsedName) }
+        // 10.0.1: `expandFile` أعلاه وضع علامة «يُحمَّل» على كل مجلد في السلسلة،
+        // ثم حُمِّل ابنه تزامنيًا. بلا هذا السطر يبقى آخر مجلد بعلامة تحميل
+        // أبدية إن لم يمرّ على `loadAndCacheChildren` (لأن ابنه الوحيد ملفّ).
+        // الدوّامة الدائمة في شجرة المستخدم كان مصدرها هذا بالضبط.
+        _loadingStates.update { states ->
+            states.mapValues { (key, loading) -> if (key in _fileListCache.value) false else loading }
+        }
         return currentNode
     }
 
@@ -457,6 +464,25 @@ class FileTreeViewModel : ViewModel() {
 
     fun getNodeChildren(node: FileTreeNode): List<FileTreeNode> {
         return _fileListCache.value[node.file] ?: emptyList()
+    }
+
+    /**
+     * 10.0.1 — تحميل أبناء مجلد من [FileObject] مباشرةً، بلا عقدة جاهزة.
+     *
+     * بديل ضروري لـ[loadChildrenForNode] في شجرة **مسطّحة**: الشجرة تُبنى من
+     * الذاكرة، فمجلد ضُغط قبل أن يُحمَّل أبوه لا وجود له كعقدة، ويستحيل العثور
+     * عليه للطلب. هنا نُحمّله من هويّته مباشرةً — فيظهر محتواه متى جهز أبوه.
+     *
+     * وهذا بالضبط سبب «لا تظهر أي ملفات»: كان الطلب مشروطًا بوجود العقدة،
+     * والعقدة لا تُبنى إلا لمن حُمِّل، فدورة مغلقة لا تبدأ أبدًا.
+     */
+    fun loadChildrenForFile(file: FileObject) {
+        if (_fileListCache.value.containsKey(file)) {
+            _loadingStates.update { it + (file to false) }
+            return
+        }
+        _loadingStates.update { it + (file to true) }
+        viewModelScope.launch(Dispatchers.IO) { loadAndCacheChildren(file) }
     }
 
     fun loadChildrenForNode(node: FileTreeNode) {
@@ -520,9 +546,28 @@ class FileTreeViewModel : ViewModel() {
     }
 
     private suspend fun clearLoadingState(file: FileObject) {
-        // Use delay to avoid flickering
-        delay(300.milliseconds)
+        // تأخير قصير يمنع وميض الدوّامة عند القراءة السريعة.
+        delay(220.milliseconds)
         _loadingStates.update { it + (file to false) }
+    }
+
+    /**
+     * 10.0.1 — إصلاح ذاتي لحالات التحميل العالقة.
+     *
+     * أي مجلد صار محتواه في الذاكرة **يجب** ألّا يُعرض عليه مؤشّر تحميل.
+     * كان هذا التناقض ممكنًا (حمولة تزامنية تُنهي العمل فلا يصل الدور إلى
+     * `clearLoadingState`)، فتظهر دوّامة أبدية بجانب مجلد جاهز تمامًا.
+     * تُستدعى بعد أي تغيير في الذاكرة، فتُغلق الباب على الحالة المتضاربة.
+     */
+    fun reconcileLoadingStates() {
+        val cache = _fileListCache.value
+        _loadingStates.update { states ->
+            if (states.none { (key, loading) -> loading && cache.containsKey(key) }) {
+                states
+            } else {
+                states.mapValues { (key, loading) -> if (loading && cache.containsKey(key)) false else loading }
+            }
+        }
     }
 
     private suspend fun calculateFileSizes(fileObjects: List<FileObject>): Map<FileObject, Long> {
