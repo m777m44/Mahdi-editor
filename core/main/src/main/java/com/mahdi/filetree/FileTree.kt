@@ -115,7 +115,6 @@ fun FileTree(
     // ستّة اشتراكات × ألف صفّ كانت تعني ستّة آلاف اشتراك وستّة آلاف إعادة
     // تركيب لكل نقرة واحدة على ملفّ. الآن: صفّ واحد يُعاد تركيبه.
     val expandedNodes by viewModel.expandedNodes.collectAsStateWithLifecycle()
-    val selectedMap by viewModel.selectedFiles.collectAsStateWithLifecycle()
     val focusedMap by viewModel.focusedFile.collectAsStateWithLifecycle()
     val loadingStates by viewModel.loadingStates.collectAsStateWithLifecycle()
     val cutNodes by viewModel.cutNodes.collectAsStateWithLifecycle()
@@ -124,14 +123,19 @@ fun FileTree(
     val showHidden = Settings.show_hidden_files_drawer
 
     var filterText by remember { mutableStateOf("") }
+    // شريط التصفية مخفيّ افتراضيًا: صفّ كامل من الشجرة مكسب ثمين على هاتف.
+    // يُفتح بزرّ العدسة في الشريط، ويبقى مفتوحًا ما دام فيه نصّ (فلا يختفي
+    // تحت أصابعك أثناء الكتابة).
+    var filterOpen by remember { mutableStateOf(false) }
+    val filterVisible = filterOpen || filterText.isNotEmpty()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
     val flags =
-        remember(expandedNodes, selectedMap, focusedMap, loadingStates, cutNodes, diagnosedNodes, rootNode.file) {
+        remember(expandedNodes, selectedFiles, focusedMap, loadingStates, cutNodes, diagnosedNodes, rootNode.file) {
             FileTreeFlags(
                 expanded = expandedNodes[rootNode.file] ?: emptySet(),
-                selected = selectedMap[rootNode.file]?.toSet() ?: emptySet(),
+                selected = selectedFiles[rootNode.file]?.toSet() ?: emptySet(),
                 cut = cutNodes.toSet(),
                 loading = loadingStates,
                 severity = diagnosedNodes,
@@ -206,6 +210,13 @@ fun FileTree(
                 if (isAnyFileSelected) {
                     SelectionActions(viewModel, drawerViewModel, rootNode, selectedFiles[rootNode.file] ?: emptyList())
                 } else {
+                    IconButton(onClick = { filterOpen = !filterOpen }) {
+                        Icon(
+                            painter = painterResource(drawables.manage_search),
+                            contentDescription = stringResource(strings.file_tree_filter_hint),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                     // ذرّا التكبير بجانب الأدوات: لا يحتاج المستخدم معرفة إيماءة
                     // القرص، ويكفيه نقرة واحدة. يُضغطان محدودين عند الحدّين.
                     ZoomButtons(
@@ -228,9 +239,16 @@ fun FileTree(
         // هنا تكتب فيُضمر ما لا يطابق في مكانه، فترى الملفّ **داخل سياقه**
         // (أيّ مجلد يحويه) لا في قائمة مبنيّة من أسماء.
         TreeFilterBar(
+            visible = filterVisible,
             value = filterText,
             onValueChange = { filterText = it },
-            matchCount = if (filterText.isBlank()) null else rows.count { !it.node.isExpandable || it.expanded },
+            onClose = {
+                filterText = ""
+                filterOpen = false
+            },
+            // عدد المطابقات = الصفوف المرئية فعلًا (المجلدات المفتوحة للتوجيه
+            // لا تُحتسب كي لا يبدو الرقم أكبر من النتائج التي تراها).
+            matchCount = if (filterText.isBlank()) null else rows.count { !it.node.isExpandable },
         )
 
         Box(modifier = Modifier.fillMaxWidth().height(3.dp)) {
@@ -753,10 +771,16 @@ private fun MenuSectionHeader(title: String) {
  * ويُظهر عدد المطابقات صريحًا (`٣ من ١٢`) — رقم بلا كلمة «من» يبدو خطأً.
  */
 @Composable
-private fun TreeFilterBar(value: String, onValueChange: (String) -> Unit, matchCount: Int?) {
+private fun TreeFilterBar(
+    visible: Boolean,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onClose: () -> Unit,
+    matchCount: Int?,
+) {
     val focusManager = LocalFocusManager.current
     AnimatedVisibility(
-        visible = true,
+        visible = visible,
         enter = fadeIn(tween(140)) + expandVertically(tween(160)),
         exit = fadeOut(tween(110)) + shrinkVertically(tween(140)),
     ) {
