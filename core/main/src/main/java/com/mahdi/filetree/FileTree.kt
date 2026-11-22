@@ -12,6 +12,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,10 +26,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -58,6 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -66,6 +70,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -82,6 +87,7 @@ import com.mahdi.settings.Settings
 import com.mahdi.text.bidiNumbers
 import com.mahdi.utils.application
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 enum class SortMode(val stringRes: Int) {
@@ -143,16 +149,40 @@ fun FileTree(
             )
         }
 
+    /**
+     * 10.0.1 — تحميل أبناء كل مجلد مفتوح.
+     *
+     * **هذا كان أخطر عطل في 10.0.0:** حين حُوّلت الشجرة إلى صفوف مسطّحة،
+     * انتقل التحميل من `FileTreeNodeItem` (الذي كان يُركَّب لكل مجلد فيُشغّل
+     * `LaunchedEffect` خاصًّا به) إلى… لا مكان. فبقيت المجلدات تُوسَّم «مفتوحة»
+     * ولا يُقرأ محتواها إطلاقًا: تضغط المجلد فلا يظهر شيء، ومجلدات أخرى تبقى
+     * دوّامة تحميل إلى الأبد لأن `loadingStates` تُضبط ولا تُنظَّف أبدًا.
+     *
+     * الآن التحميل مسؤولية الشجرة لا الصفّ: نمرّ على المفتوحة بعد كل تغيير
+     * في القائمة أو الذاكرة، ونطلب ما ليس في الذاكرة. الصفوف لا تحمل
+     * `LaunchedEffect` إطلاقًا، فلا تُكرَّر الطلبات ولا تُفقَد.
+     */
+    LaunchedEffect(fileListCache) { viewModel.reconcileLoadingStates() }
+
+    LaunchedEffect(flags.expanded, fileListCache) {
+        flags.expanded.forEach { folder ->
+            // التحميل بالهويّة لا بالعقدة: المجلد قد يكون مفتوحًا قبل أن يعرفه
+            // مولّد الصفوف (أبوه لم يُحمَّل بعد)، فلا تُوجد له عقدة تُطلب.
+            if (!fileListCache.containsKey(folder)) viewModel.loadChildrenForFile(folder)
+        }
+    }
+
     // الشجرة تُسوَّى إلى صفوف مرئية: الفتح والطيّ = إضافة/حذف صفوف من القائمة،
     // فتُركَّب الصفوف الظاهرة وحدها (١٥ بدل آلاف) ويعمل `animateItem`.
     val rows =
-        remember(rootNode, flags, fileListCache, showHidden, filterText) {
+        remember(rootNode, flags, fileListCache, showHidden, filterText, Settings.file_tree_compact_path) {
             buildFileTreeRows(
                 root = rootNode,
                 flags = flags,
                 cache = fileListCache,
                 showHidden = showHidden,
                 filter = filterText,
+                compactPath = Settings.file_tree_compact_path,
             )
         }
 
@@ -212,20 +242,14 @@ fun FileTree(
                 } else {
                     IconButton(onClick = { filterOpen = !filterOpen }) {
                         Icon(
-                            painter = painterResource(drawables.manage_search),
+                            painter = painterResource(drawables.filter),
                             contentDescription = stringResource(strings.file_tree_filter_hint),
                             modifier = Modifier.size(20.dp),
+                            tint =
+                                if (filterVisible) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    // ذرّا التكبير بجانب الأدوات: لا يحتاج المستخدم معرفة إيماءة
-                    // القرص، ويكفيه نقرة واحدة. يُضغطان محدودين عند الحدّين.
-                    ZoomButtons(
-                        scale = liveScale,
-                        onScale = { next ->
-                            liveScale = next
-                            Settings.file_tree_scale = next
-                        },
-                    )
                     FileTreeActions(viewModel, rootNode.file, onSearchClick, liveScale) { next ->
                         liveScale = next
                         Settings.file_tree_scale = next
@@ -313,40 +337,52 @@ fun FileTree(
 }
 
 /**
- * 9.9.0 — زرّا التكبير («+» و«−») في شريط الشجرة.
+ * 10.0.1 — صفّ التكبير داخل قائمة الخيارات.
  *
- * التكبير بنقرة ضرورة لا رفاهية: إيماءة القرص غير معروفة لكثير من المستخدمين،
- * ومن يحتاج خطًّا أكبر (ضعف نظر، شمس ساطعة) يجب أن يجده في نقرة. الزرّان
- * يُعطَّلان عند الحدّ الأقصى/الأدنى حتى لا يبدو الضغط بلا أثر.
+ * عنوان واضح + «−» و«+» بينهما نسبة مئوية حيّة. هذا الشكل يُفهم من نفسه
+ * بلا شرح، بخلاف زرَّين عاريين في الشريط كانا يلتبسان بأدوات الملفات.
  */
 @Composable
-private fun ZoomButtons(scale: Float, onScale: (Float) -> Unit) {
-    val step = 0.1f
-    val canShrink = scale > FILE_TREE_MIN_SCALE + 0.001f
-    val canGrow = scale < FILE_TREE_MAX_SCALE - 0.001f
-
-    IconButton(
-        enabled = canShrink,
-        onClick = { onScale((scale - step).coerceIn(FILE_TREE_MIN_SCALE, FILE_TREE_MAX_SCALE)) },
+private fun ZoomRow(scale: Float, onScale: (Float) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        ZoomGlyph(
-            plus = false,
-            tint =
-                if (canShrink) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+        Text(
+            text = stringResource(strings.file_tree_zoom),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
         )
+        ZoomStepButton(plus = false, enabled = scale > FILE_TREE_MIN_SCALE + 0.001f) {
+            onScale((scale - 0.1f).coerceIn(FILE_TREE_MIN_SCALE, FILE_TREE_MAX_SCALE))
+        }
+        Text(
+            text = "${(scale * 100).roundToInt()}%",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.widthIn(min = 48.dp),
+            textAlign = TextAlign.Center,
+        )
+        ZoomStepButton(plus = true, enabled = scale < FILE_TREE_MAX_SCALE - 0.001f) {
+            onScale((scale + 0.1f).coerceIn(FILE_TREE_MIN_SCALE, FILE_TREE_MAX_SCALE))
+        }
     }
+}
 
-    IconButton(
-        enabled = canGrow,
-        onClick = { onScale((scale + step).coerceIn(FILE_TREE_MIN_SCALE, FILE_TREE_MAX_SCALE)) },
+/** زرّ «+»/«−» صغير داخل صفّ التكبير. */
+@Composable
+private fun ZoomStepButton(plus: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val tint =
+        if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
+    Box(
+        modifier =
+            Modifier.size(32.dp)
+                .clip(CircleShape)
+                .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        ZoomGlyph(
-            plus = true,
-            tint =
-                if (canGrow) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-        )
+        ZoomGlyph(plus = plus, tint = tint)
     }
 }
 
@@ -571,6 +607,11 @@ private fun FileTreeActions(
             )
 
             MenuSectionHeader(stringResource(strings.file_tree_section_appearance))
+
+            // التكبير صار صفًّا واحدًا بعنوانه وقيمته، لا زرَّين عاريين في
+            // الشريط. الزرّان هناك كانا يُقرآن «إضافة ملفّ / حذف» — وهو أسوأ
+            // من غياب الميزة: يدفع المستخدم إلى الضغط الخطأ.
+            ZoomRow(scale = scale, onScale = onScale)
 
             MahdiDropdownMenuItem(
                 text = { Text(stringResource(strings.file_tree_expand_all)) },

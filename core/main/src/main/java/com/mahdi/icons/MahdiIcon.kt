@@ -84,6 +84,23 @@ fun MahdiIcon(
  */
 private var sharedSvgLoader: ImageLoader? = null
 
+/**
+ * 10.0.1 — بصمة حزمة الأيقونات المثبَّتة.
+ *
+ * Coil يُخزّن الصورة بمفتاح = مسار الملفّ، فلو استُبدل `folder.svg` بمحتوى
+ * جديد بقي **الرسم القديم** في الذاكرة يُعرض من جديد. حدث هذا فعلًا: أُصلحت
+ * أيقونة المجلّد في 9.9.0 وبقيت المشوّهة تظهر على الجهاز.
+ *
+ * الحلّ: نُمرّر البصمة كـ`memoryCacheKey`، فيصير المفتاح «مسار + بصمة».
+ * تغيّر محتوى الحزمة ⇒ مفتاح جديد ⇒ فكّ جديد، بلا مسح ذاكرة يدوي ولا وميض.
+ */
+private var iconPackVersion: String = ""
+
+/** تُنادى عند تثبيت/تحديث حزمة أيقونات فتُبطل مفاتيح الذاكرة القديمة. */
+fun bumpIconPackVersion(version: String) {
+    iconPackVersion = version
+}
+
 @Composable
 fun rememberSvgImageLoader(): ImageLoader {
     val context = LocalContext.current.applicationContext
@@ -98,3 +115,11 @@ fun rememberSvgImageLoader(): ImageLoader {
                 .also { sharedSvgLoader = it }
     }
 }
+
+/**
+ * 10.0.1 — مفتاح ذاكرة Coil لأيقونة ملفّ.
+ *
+ * المسار وحده لا يكفي: الملفّ قد يُستبدل بمحتوى مصحَّح فيبقى الرسم القديم.
+ * ضمّ بصمة الحزمة إلى المفتاح يجعل التصحيح يظهر فورًا.
+ */
+fun iconMemoryCacheKey(file: java.io.File): String = "${file.absolutePath}#$iconPackVersion"

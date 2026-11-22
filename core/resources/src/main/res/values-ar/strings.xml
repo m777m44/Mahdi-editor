@@ -1245,4 +1245,5 @@
     <string name="file_tree_expand_all">توسيع الكل</string>
     <string name="file_tree_collapse_all">طيّ الكل</string>
     <string name="file_tree_back_to_top">العودة إلى الأعلى</string>
+    <string name="file_tree_zoom">حجم العرض</string>
 </resources>

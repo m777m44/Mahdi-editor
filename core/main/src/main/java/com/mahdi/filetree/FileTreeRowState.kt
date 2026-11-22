@@ -1,7 +1,6 @@
 package com.mahdi.filetree
 
 import com.mahdi.file.FileObject
-import com.mahdi.settings.Settings
 
 /**
  * 10.0.0 — لقطة واحدة من حالة الشجرة.
@@ -75,6 +74,9 @@ fun buildFileTreeRows(
     cache: Map<FileObject, List<FileTreeNode>>,
     showHidden: Boolean,
     filter: String = "",
+    // يُقرأ من الإعدادات في موضع النداء، لا هنا: دالّة تسوية الشجرة يجب أن
+    // تبقى **نقيّة** ليمكن اختبارها بلا Android (‏`Settings` يلمس التفضيلات).
+    compactPath: Boolean = false,
 ): List<FileTreeRow> {
     val query = filter.trim()
     // عند التصفية نعتبر كل شيء مفتوحًا: الهدف «أرِني ما يطابق» لا «تنقّل».
@@ -97,7 +99,7 @@ fun buildFileTreeRows(
 
         // دمج المجلدات المفردة: ننزل ما دام في الذاكرة مجلدٌ وحيدٌ قابل للتوسيع.
         // قرار **قراءة فقط** — لا تحميل ولا انتظار، فلا يتوقّف الرسم على القرص.
-        val merge = resolveMergedPath(node, flags.expanded, cache, revealAll)
+        val merge = resolveMergedPath(node, flags.expanded, cache, revealAll, compactPath)
         val shown = merge.node
         val shownName = merge.name
 
@@ -163,8 +165,9 @@ private fun resolveMergedPath(
     expanded: Set<FileObject>,
     cache: Map<FileObject, List<FileTreeNode>>,
     revealAll: Boolean,
+    compactPath: Boolean,
 ): MergedPath {
-    if (!Settings.file_tree_compact_path) return MergedPath(node, node.name)
+    if (!compactPath) return MergedPath(node, node.name)
     if (!revealAll && node.file !in expanded) return MergedPath(node, node.name)
 
     var current = node

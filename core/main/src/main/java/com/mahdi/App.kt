@@ -18,6 +18,7 @@ import com.mahdi.editor.KeywordManager
 import com.mahdi.editor.LanguageManager
 import com.mahdi.extension.ActivityProvider
 import com.mahdi.icons.pack.IconPackManager
+import com.mahdi.icons.bumpIconPackVersion
 import com.mahdi.icons.pack.VsCodeIconPack
 import com.mahdi.icons.pack.currentIconPack
 import com.mahdi.lsp.FileIconProvider
@@ -135,6 +136,9 @@ open class App : Application() {
             // المدير كأي حزمة مثبَّتة. النسخ قبل الفهرس مقصود: الفهرس يقرأ ما على
             // القرص، فلو نسخنا بعده لاحتاج إقلاعين لتظهر.
             VsCodeIconPack.ensureInstalled(this@App)
+            // 10.0.1: بصمة الحزمة تدخل في مفتاح ذاكرة الصور، فتصحيح أيقونة
+            // يظهر في نفس الإقلاع بدل أن تُخدَم النسخة القديمة للأبد.
+            VsCodeIconPack.currentFingerprint(this@App)?.let { bumpIconPackVersion(it) }
 
             iconPackManager.indexLocalPacks()
             // 2.5.0: أُزيلت «الألوان الديناميكية» (Monet) — نُبطلها دائمًا حتى تبقى الثيمات الأربعة فقط
@@ -162,6 +166,20 @@ open class App : Application() {
                         }
                     }
                     Settings.icon_pack_chosen_once = true
+                }
+            }
+
+            // 10.0.1 — مزامنة الحزمة **المختارة** مع ما على القرص بعد النسخ.
+            //
+            // `currentIconPack` قد يكون حُفظ في الجلسة السابقة بكائن يحمل بيانًا
+            // قديمًا. وحين استُبدلت الأصول (تصحيح أيقونة المجلّد) بقي الكائن
+            // القديم يُشير إلى المسارات نفسها ببيان قديم، فلا تُرى الأيقونة
+            // المصحَّحة. إعادة القراءة من `localIconPacks` بعد الفهرس تضمن أن
+            // ما يُرسم هو ما على القرص الآن.
+            val chosen = Settings.icon_pack
+            if (chosen.isNotEmpty()) {
+                withContext(Dispatchers.Main) {
+                    currentIconPack.value = iconPackManager.localIconPacks.value[chosen]
                 }
             }
 

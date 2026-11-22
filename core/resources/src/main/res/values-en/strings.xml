@@ -1215,4 +1215,5 @@ Thank you for using Mahdi-Editor.</string>
     <string name="file_tree_expand_all">Expand all</string>
     <string name="file_tree_collapse_all">Collapse all</string>
     <string name="file_tree_back_to_top">Back to top</string>
+    <string name="file_tree_zoom">Display size</string>
 </resources>

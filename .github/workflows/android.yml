@@ -142,6 +142,7 @@ jobs:
             --tests "com.mahdi.editor.complete.PythonIntelliSenseTest" \
             --tests "com.mahdi.editor.complete.PythonSnippetsTest" \
             --tests "com.mahdi.editor.complete.PythonAutoImportTest" \
+            --tests "com.mahdi.filetree.FileTreeRowsTest" \
             --tests "com.mahdi.theme.VsCodeThemeImporterTest" \
             2>&1 | tee /tmp/tests.log
           rc=${PIPESTATUS[0]}

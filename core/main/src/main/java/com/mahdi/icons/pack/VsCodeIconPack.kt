@@ -44,7 +44,23 @@ object VsCodeIconPack {
         val context = context ?: return false
         val dir = installDir()
         val marker = dir.resolve(MARKER)
-        if (marker.exists() && dir.resolve(MANIFEST).exists()) return true
+
+        // ★ 10.0.1 — الإصلاح الجوهري لعطل «الأيقونات تبقى قديمة إلى الأبد».
+        //
+        // كانت الحزمة تُنسخ مرّة واحدة وتُوسم بـ`.builtin`، فلا تُنسخ ثانية
+        // أبدًا. وحين أُصلحت `folder.svg` في 9.9.0 (كانت بأبعاد نسبية
+        // ومرشّحات توهّج تُرسم ركامًا) **لم يصل الإصلاح إلى جهاز المستخدم**:
+        // النسخة القديمة التالفة باقية في `local/icon_pack/vscode-heroes/`
+        // والعلامة تمنع استبدالها. فبقي المجلّد يُرسم بتلك الأيقونة المشوّهة
+        // ذات X الأحمر — في كل إصدار أحدثناه، بلا أثر.
+        //
+        // الحلّ: العلامة تحمل **بصمة الأصول** لا مجرّد الاسم. تغيّرت الأصول
+        // (إصلاح، إضافة أيقونة، تحديث الإصدار) ⇒ البصمة تختلف ⇒ نُعيد النسخ.
+        val fingerprint = assetFingerprint(context)
+        if (marker.exists() && dir.resolve(MANIFEST).exists()) {
+            if (fingerprint != null && marker.readText() == fingerprint) return true
+            // بصمة غير مطابقة (أو تعذّرت قراءتها): نُعيد النسخ بأمان أدناه.
+        }
 
         return runCatching {
                 // نسخة قد تكون جزئية من محاولة سابقة
@@ -62,8 +78,9 @@ object VsCodeIconPack {
                     }
                 }
 
-                // علامة النسخ تُكتب أخيرًا: وجودها يعني أن النسخ اكتمل
-                marker.writeText(ID)
+                // علامة النسخ تُكتب أخيرًا: وجودها يعني أن النسخ اكتمل،
+                // ومحتواها بصمة الأصول كي نكتشف تحديثها لاحقًا.
+                marker.writeText(fingerprint ?: ID)
                 dir.resolve(MANIFEST).exists()
             }
             .onFailure { logError(it, "Failed to install built-in VS Code icon pack") }
@@ -102,6 +119,34 @@ object VsCodeIconPack {
 
     /** هل الأصول موجودة في التطبيق أصلًا؟ (تُستدعى في اختبار الأصول). */
     fun assetNames(context: Context): List<String> = context.assets.list(ASSET_DIR)?.toList().orEmpty()
+
+    /**
+     * بصمة أصول الأيقونات: أسماؤها + أحجامها + آخر تعديل لها.
+     *
+     * الحجم والتاريخ ضروريان معًا: الإصلاح قد يحفظ الملفّ بالاسم نفسه وبحجم
+     * مقارب، لكن تاريخ تعديله داخل الـAPK يتغيّر مع كل بناء. البصمة رخيصة
+     * (قراءة فهرس الأصول لا محتواها) وتُحسب مرّة عند الإقلاع فقط.
+     */
+    /** بصمة الأصول الحالية — تُستخدم مفتاحًا لذاكرة الصور أيضًا. */
+    fun currentFingerprint(context: Context? = application): String? = context?.let { assetFingerprint(it) }
+
+    private fun assetFingerprint(context: Context): String? =
+        runCatching {
+                val names = context.assets.list(ASSET_DIR)?.sorted().orEmpty()
+                if (names.isEmpty()) return@runCatching null
+                val digest = StringBuilder()
+                names.forEach { name ->
+                    val size =
+                        runCatching {
+                            context.assets.openFd("$ASSET_DIR/$name").use { it.length }
+                        }.getOrDefault(0L)
+                    digest.append(name).append(':').append(size).append(';')
+                }
+                // ملفّان بأسماء وأحجام متطابقة يكفيان للتمييز؛ إضافة hashCode
+                // تجعل المقارنة رقمًا قصيرًا يُقرأ في السجلّ عند الحاجة.
+                "v2-${digest.toString().hashCode().toUInt().toString(16)}-${names.size}"
+            }
+            .getOrNull()
 
     private val SERIALIZER =
         kotlinx.serialization.json.Json {

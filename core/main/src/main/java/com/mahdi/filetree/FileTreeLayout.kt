@@ -98,9 +98,9 @@ fun rememberFileTreeMetrics(sizeScale: Float): FileTreeMetrics {
     return remember(density, twoLines, scale) {
         val base =
             when (density) {
-                0 -> 13.sp
-                2 -> 15.sp
-                else -> 14.sp
+                0 -> 12.sp
+                2 -> 14.sp
+                else -> 13.sp
             }
         FileTreeMetrics(
             nameSize = base * scale,

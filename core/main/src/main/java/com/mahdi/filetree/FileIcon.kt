@@ -9,12 +9,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.mahdi.file.FileObject
 import com.mahdi.file.FileTypeManager
 import com.mahdi.icons.Icon
 import com.mahdi.icons.MahdiIcon
+import com.mahdi.icons.iconMemoryCacheKey
 import com.mahdi.icons.pack.currentIconPack
 import com.mahdi.icons.rememberSvgImageLoader
 import com.mahdi.resources.drawables
@@ -73,10 +77,22 @@ fun FileIcon(
 
     if (iconPackFile != null) {
         AsyncImage(
-            model = iconPackFile,
+            // مفتاح يتضمّن بصمة الحزمة: تصحيح أيقونة يظهر فورًا بدل أن تُخدم
+            // النسخة القديمة من ذاكرة Coil إلى الأبد.
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(iconPackFile)
+                .memoryCacheKey(iconMemoryCacheKey(iconPackFile))
+                .build(),
             imageLoader = imageLoader,
             contentDescription = null,
             colorFilter = if (useTint) ColorFilter.tint(tint) else null,
+            // 10.0.1 — شبكة أمان: أيقونة حزمة تالفة أو غير قابلة للفكّ كانت
+            // تُرسم ركامًا أو فراغًا. الآن نسقط إلى أيقونة النظام المدمجة —
+            // وهي دائمًا سليمة — فلا تظهر أيقونة مشوّهة إطلاقًا.
+            // نسقط إلى رسمة النظام الجاهزة (وليست محتاجة لتحميل) عند فشل
+            // فكّ أيقونة الحزمة، فلا تُعرض أيقونة مشوّهة أو فراغ.
+            error = painterResource(if (file.isDirectory()) drawables.folder else drawables.unknown_document),
+            fallback = painterResource(if (file.isDirectory()) drawables.folder else drawables.unknown_document),
             modifier = Modifier.size(size),
         )
     } else {

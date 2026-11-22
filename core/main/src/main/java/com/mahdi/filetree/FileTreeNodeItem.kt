@@ -120,13 +120,22 @@ fun FileTreeNodeItem(
         }
 
     val nameStyle =
-        remember(metrics.nameSize, metrics.lineBox) {
+        remember(metrics.nameSize, metrics.lineBox, row.focused, row.node.isExpandable) {
             TextStyle(
                 fontSize = metrics.nameSize,
                 lineHeight = metrics.lineBox.value.sp,
-                fontWeight = if (row.focused) FontWeight.SemiBold else FontWeight.Normal,
+                // هرمية بصرية: المجلد أثقل قليلًا من الملفّ، والمحدَّد أثقل من
+                // المجرّد. بلا هذا يصير كل شيء بنفس الثقل فتفقد الشجرة شكلها
+                // الهرمي ويصعب تمييز «مجلد» من «ملفّ» بنظرة.
+                fontWeight =
+                    when {
+                        row.focused -> FontWeight.SemiBold
+                        row.node.isExpandable -> FontWeight.Medium
+                        else -> FontWeight.Normal
+                    },
                 // الاتجاه يتبع المحتوى: العربي RTL والاسم اللاتيني كاملًا LTR.
                 textDirection = TextDirection.ContentOrLtr,
+                letterSpacing = 0.1.sp,
                 lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
             )
         }
