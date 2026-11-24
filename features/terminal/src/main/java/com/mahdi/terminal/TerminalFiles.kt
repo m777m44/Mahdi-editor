@@ -46,6 +46,9 @@ fun setupTerminalFiles() {
             "self_heal",
             // 9.3.0: محرّك «ثبّتها بأي طريقة» — pkg · Node · pip بسلاسل بدائل
             "rescue",
+            // 10.1.0: دليل المكتبات العلمية (numpy…) — حزمة النظام أولًا،
+            // ونصيحة صحيحة عند الفشل بدل أوامر Termux التي لا تعمل هنا.
+            "scientific_deps",
         )
     internalFiles.forEach { setupAssetFile(it) }
 

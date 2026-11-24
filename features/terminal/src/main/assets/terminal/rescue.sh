@@ -42,6 +42,13 @@ fi
 MAHDI_RESCUE_LOADED=1
 MAHDI_RESCUE_VERSION="9.3.0"
 
+# 10.1.0: دليل المكتبات العلمية يُحمَّل معنا لا مع auto_deps: نحتاجه داخل
+# `mahdi_py_install_any` نفسها (تقديم حزمة النظام على البناء من المصدر)،
+# و`mh pkg` و`mh doctor` قد يُستدعيان قبل تحميل auto_deps.
+if [ -f "${LOCAL:-/home}/bin/scientific_deps" ]; then
+  . "${LOCAL:-/home}/bin/scientific_deps" >/dev/null 2>&1 || true
+fi
+
 # بدائل إن استُدعي الملف مبكرًا قبل utils
 if ! declare -f info >/dev/null 2>&1; then
   info() { printf '▸  %s\n' "$*"; }
@@ -584,7 +591,20 @@ mahdi_py_install_any() {
   fi
 
   local idx
-  # ١) الطريق العادي (يجرّب المخزن الدائم تلقائيًا)
+  # ١) المكتبات العلمية/الأصلية: حزمة النظام **أولًا**.
+  #
+  # كانت حزمة apt المحاولة السابعة، أي بعد بناء من المصدر كامل. numpy تحديدًا
+  # تفشل ترجمته على أندرويد فينتظر المستخدم دقائق ثم يرى فشلًا — مع أن
+  # `python3-numpy` جاهزة ومترجمة لمعمارية جهازه على بعد أمر واحد.
+  # هذا تقديم لا إضافة: الطريق نفسه الذي كان ناجحًا، فقط بلا انتظار عبثي.
+  if declare -f mahdi_is_native_heavy >/dev/null 2>&1 && mahdi_is_native_heavy "$pkg"; then
+    if mahdi_scientific_install "$pkg" "$module"; then
+      _mahdi_note "$pkg: جُهّزت من حزمة النظام"
+      return 0
+    fi
+  fi
+
+  # ١ب) الطريق العادي (يجرّب المخزن الدائم تلقائيًا)
   _mahdi_pip_quiet --upgrade --prefer-binary "$pkg" &&
     _mahdi_py_import_ok "$module" && return 0
 
@@ -633,6 +653,12 @@ mahdi_py_install_any() {
     _mahdi_note "$pkg: محاولة حزمة النظام $apt_pkg…"
     mahdi_apt_install_soft "$apt_pkg" >/dev/null 2>&1 || true
     _mahdi_py_import_ok "${module:-$(printf '%s' "$pkg" | tr '-' '_')}" && return 0
+  fi
+
+  # فشل كل شيء: نقول السبب والإجراء الصحيح — مرّة واحدة لكل حزمة، حتى لا
+  # تتحوّل الطرفية إلى جدار من التكرار عند كل تشغيل.
+  if declare -f mahdi_scientific_advise_once >/dev/null 2>&1; then
+    mahdi_scientific_advise_once "$pkg" >&2
   fi
 
   return 1
