@@ -128,7 +128,25 @@ object GuideContent {
         mh py --list       # كل مفسّرات بايثون، و--use للاختيار
         mh pip install …   # pip عبر أحدث مفسّر وبمخزن دائم
         mh cache           # أحجام المخازن، وprune ينظّف المؤقت فقط
+        mh deps            # حالة المكتبات العلمية، و--fix يثبّت الناقص
         ```
+
+        #### المكتبات العلمية (numpy · scipy · pandas …)
+
+        هذه المكتبات تحتوي كودًا أصليًا (C وFortran) لا يعمل إلا بعد ترجمته للمعمارية نفسها.
+        بناءها من المصدر داخل الهاتف يستغرق دقائق وغالبًا يفشل، لذلك **تُثبَّت هنا كحزم نظام
+        جاهزة ومترجمة مسبقًا** — وهذا أسرع بعشرات المرات وأكثر ثباتًا:
+
+        ```bash
+        mh deps                              # ما الجاهز وما الناقص؟
+        mh deps --fix                        # ثبّت الناقص تلقائيًا
+        mh pkg install python3-numpy         # أو صراحةً لحزمة واحدة
+        ```
+
+        - `pip install numpy` يُجرَّب تلقائيًا، لكن إن فشل فالسبب ليس خطأً منك.
+        - أسماء حزم النظام تختلف عن أسماء PyPI: `pillow` ← `python3-pil`، و`scikit-learn` ← `python3-sklearn`.
+        - **تنبيه:** إن وجدت على الإنترنت `pkg install python-numpy` أو مسار `/data/data/com.termux/…`
+          فتجاهلها — هذا التطبيق يعمل في بيئة **أوبنتو** خاصة به، لا داخل Termux، ولا وجود لهذين الأمرين فيه.
 
         - `pip` و`pip3` يمرّان دائمًا على مفسّر بايثون المختار، ويُعاد بناؤهما تلقائيًا إن حُذفا.
         - المِحَثّ يعرض فرع Git ورمز آخر أمر فاشل، ويتحوّل `❯` إلى اللون المرجاني عند الخطأ.
@@ -248,7 +266,25 @@ object GuideContent {
         mh new py app      # ready project: py · bot · web · api · html · node
         mh py --list       # every Python interpreter, --use to switch
         mh pip install …   # pip through the newest interpreter, permanent cache
+        mh deps            # scientific library status; --fix installs what is missing
         ```
+
+        #### Scientific libraries (numpy · scipy · pandas …)
+
+        These ship native C and Fortran code that must be compiled for the device ABI.
+        Building them from source on a phone takes minutes and usually fails, so here they are
+        **installed as pre-built system packages** — dramatically faster and more reliable:
+
+        ```bash
+        mh deps                              # what is ready, what is missing?
+        mh deps --fix                        # install whatever is missing
+        mh pkg install python3-numpy         # or one package explicitly
+        ```
+
+        - `pip install numpy` is still attempted first; if it fails, that is not your mistake.
+        - System package names differ from PyPI names: `pillow` → `python3-pil`, `scikit-learn` → `python3-sklearn`.
+        - **Note:** if you find `pkg install python-numpy` or `/data/data/com.termux/...` online,
+          ignore it — this app runs its own **Ubuntu** environment, not Termux, and neither exists here.
 
         - `pip` and `pip3` always resolve to the selected interpreter and rebuild themselves if removed.
         - The prompt shows the Git branch and the last failed status; `❯` turns coral on error.

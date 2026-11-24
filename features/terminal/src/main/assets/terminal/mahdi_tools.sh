@@ -288,6 +288,19 @@ _mh_doctor_fix() {
   return 0
 }
 
+# 10.1.0: صفّ واحد للمكتبات العلمية. لا نفحص الثمانية كلها هنا (كل فحص
+# يبدأ مفسّرًا جديدًا ≈ ٣٠٠ مللي) — نفحص numpy وحدها كمؤشّر، ونُحيل إلى
+# `mh deps` للتفصيل. الشاشة تبقى سريعة، والطريق إلى الحلّ واضح.
+_mh_doctor_scientific() {
+  local mod ver
+  mod="$(_mh_deps_module numpy)"
+  if ver="$(_mh_deps_version "$mod")"; then
+    _mh_doc ok "المكتبات العلمية" "numpy $ver"
+  else
+    _mh_doc warn "المكتبات العلمية" "numpy غير مثبّتة — mh deps --fix"
+  fi
+}
+
 _mh_doctor_summary() {
   printf '\n'
   mahdi_rule 34
@@ -368,6 +381,7 @@ mh_doctor() {
   if [ "$net" = "1" ]; then _mh_doctor_net; fi
   _mh_doctor_cache
   _mh_doctor_lsp
+  _mh_doctor_scientific
 
   [ "$fix" = "1" ] && _mh_doctor_fix
 
@@ -963,6 +977,119 @@ mh_help() {
   printf '\n'
 }
 
+# ——————————————————————————————————————————————————————————————————————————————
+# 10.1.0 — mh deps · حالة المكتبات العلمية وإصلاحها
+#
+# لماذا هذا الأمر موجود: رسالة «No module named 'numpy'» لا تقول للمستخدم
+# **ماذا يفعل**، والنصيحة الشائعة على الإنترنت (‏pkg install python-numpy)
+# لا تعمل في هذا التطبيق لأنه يعمل في أوبنتو تحت PRoot لا في Termux.
+# الأمر هنا يقول الحقيقة: أي مكتبة جاهزة، وأيّها يحتاج حزمة نظام، وبأي أمر.
+# ——————————————————————————————————————————————————————————————————————————————
+MH_DEPS_LIST="numpy scipy pandas matplotlib sklearn sympy requests lxml"
+
+# تحميل كسول: `mh deps --fix` لا يجب أن يتحوّل إلى تثبيت صامت-الفشل إن لم
+# يكن rescue.sh قد حُمّل بعد في هذه الجلسة.
+_mh_deps_load_module() {
+  declare -f mahdi_scientific_install >/dev/null 2>&1 && return 0
+  local f d
+  d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+  # في التطبيق: الملف يُنسخ بلا امتداد إلى \$LOCAL/bin · في المستودع: بالامتداد
+  for f in "${LOCAL:-/home}/bin/scientific_deps" "$d/scientific_deps" \
+    "$d/scientific_deps.sh"; do
+    [ -f "$f" ] || continue
+    # shellcheck source=/dev/null
+    . "$f" >/dev/null 2>&1 || continue
+    declare -f mahdi_scientific_install >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
+# اسم الوحدة القابل للاستيراد (numpy ← numpy · sklearn ← sklearn)
+_mh_deps_module() {
+  local pkg="$1"
+  if declare -f _mahdi_scientific_module >/dev/null 2>&1; then
+    _mahdi_scientific_module "$pkg"
+  else
+    printf '%s' "${pkg%%\[*}" | tr '-' '_'
+  fi
+}
+
+# نسخة المكتبة إن كانت مستوردة فعلًا، وإلا فشل.
+_mh_deps_version() {
+  local mod="$1"
+  "${MAHDI_PY:-python3}" - "$mod" 2>/dev/null <<'PYVER'
+import importlib, sys
+try:
+    m = importlib.import_module(sys.argv[1])
+except Exception:
+    sys.exit(1)
+print(getattr(m, "__version__", "—"))
+PYVER
+}
+
+mh_deps() {
+  local fix=0 pkg
+  case "${1:-}" in
+    --fix | -f | اصلح | إصلاح) fix=1 ;;
+    --help | -h | مساعدة) fix=2 ;;
+  esac
+
+  [ "$fix" -eq 1 ] && _mh_deps_load_module
+
+  if [ "$fix" -eq 2 ]; then
+    printf '\n  ${M_BOLD}mh deps${M_RESET}  ${M_MUTED}حالة المكتبات العلمية${M_RESET}\n'
+    printf '  ${M_BOLD}mh deps --fix${M_RESET}  ${M_MUTED}ثبّت الناقص بحزم النظام (سريع، مترجم مسبقًا)${M_RESET}\n\n'
+    return 0
+  fi
+
+  if [ "$fix" -eq 0 ]; then
+    printf '\n'
+    mahdi_rule 34
+    mahdi_heading "المكتبات العلمية"
+  fi
+
+  local ready=0 missing=0 mod ver
+  for pkg in $MH_DEPS_LIST; do
+    mod="$(_mh_deps_module "$pkg")"
+    if ver="$(_mh_deps_version "$mod")"; then
+      ready=$((ready + 1))
+      [ "$fix" -eq 1 ] || mahdi_status ok "$pkg" "$ver"
+    else
+      missing=$((missing + 1))
+      if [ "$fix" -eq 1 ]; then
+        # التثبيت عبر حزمة النظام: مترجمة مسبقًا، بلا بناء من المصدر
+        if declare -f mahdi_scientific_install >/dev/null 2>&1 &&
+          mahdi_scientific_install "$pkg" "$mod" >/dev/null 2>&1; then
+          mahdi_status ok "$pkg" "ثُبّتت"
+          ready=$((ready + 1))
+          missing=$((missing - 1))
+        else
+          mahdi_status bad "$pkg" "يحتاج: mh pkg install python3-$pkg"
+        fi
+      else
+        mahdi_status bad "$pkg" "غير مثبّتة"
+      fi
+    fi
+  done
+
+  if [ "$fix" -eq 0 ]; then
+    printf '\n'
+    if [ "$missing" -eq 0 ]; then
+      printf "  ${M_MINT}كل المكتبات جاهزة.${M_RESET}\n"
+    else
+      printf "  ${M_GOLD}%s${M_RESET} ${M_MUTED}غير مثبّتة — ${M_RESET}${M_SKY}mh deps --fix${M_RESET}\n" \
+        "$(mahdi_ar_plural "$missing" "واحدة" "اثنتان" "مكتبات" "مكتبة")"
+    fi
+    printf "  ${M_MUTED}ملاحظة: هذه البيئة أوبنتو داخل التطبيق، لا Termux —${M_RESET}\n"
+    printf "  ${M_MUTED}لذلك pkg install لا يعمل هنا؛ حزم النظام اسمها python3-*.${M_RESET}\n"
+    printf '\n'
+  else
+    printf '\n'
+    mahdi_status info "النتيجة" "$ready جاهزة · $missing ناقصة"
+    printf '\n'
+  fi
+}
+
 mh_home() {
   printf '\n'
   mahdi_rule 34
@@ -1011,6 +1138,10 @@ case "${1:-}" in
   doctor | فحص)
     shift
     mh_doctor "$@"
+    ;;
+  deps | مكتبات)
+    shift
+    mh_deps "$@"
     ;;
   py | python | بايثون)
     shift
